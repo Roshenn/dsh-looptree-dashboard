@@ -1,0 +1,79 @@
+{
+ "schema": "rotation/v1",
+ "project": {
+  "name": "竞品知识图谱",
+  "workspace": "/Users/julian/agentic/projects/kg"
+ },
+ "updated": "2026-10-26T23:20:00+08:00",
+ "loop": {
+  "id": "kg-loop",
+  "kind": "loop",
+  "title": "竞品知识图谱闭环",
+  "intent": "竞品功能和交互能在一个图谱里横向对比",
+  "acceptance": "2 个目标全部关闭，4 款竞品可切换",
+  "status": "done",
+  "closed_at": "2026-10-18T16:40:00+08:00",
+  "children": [
+   {
+    "id": "kg-g1",
+    "kind": "goal",
+    "title": "四款竞品数据入库",
+    "acceptance": "4 款竞品官网+文档抓取完成",
+    "status": "done",
+    "closed_at": "2026-10-18T14:20:00+08:00",
+    "children": [
+     {
+      "id": "kg-i1",
+      "kind": "idea",
+      "title": "官网 + 文档抓取",
+      "approach": "按站点适配抓取器",
+      "status": "done",
+      "closed_at": "2026-10-18T14:10:00+08:00",
+      "children": [
+       {
+        "id": "kg-e1",
+        "kind": "exec",
+        "title": "入库 4 款竞品",
+        "verify": "node scripts/kg-ingest.mjs",
+        "status": "done",
+        "closed_at": "2026-10-18T14:00:00+08:00",
+        "issues": [],
+        "proof": "4 款入库"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "kg-g2",
+    "kind": "goal",
+    "title": "图谱交互可用",
+    "acceptance": "节点连线 + 过滤，切换不卡顿",
+    "status": "done",
+    "closed_at": "2026-10-18T16:40:00+08:00",
+    "children": [
+     {
+      "id": "kg-i2",
+      "kind": "idea",
+      "title": "节点连线 + 过滤",
+      "approach": "力导向布局，按类别过滤",
+      "status": "done",
+      "closed_at": "2026-10-18T16:30:00+08:00",
+      "children": [
+       {
+        "id": "kg-e2",
+        "kind": "exec",
+        "title": "切换 4 款不卡顿",
+        "verify": "webapp-testing 录屏",
+        "status": "done",
+        "closed_at": "2026-10-18T16:20:00+08:00",
+        "issues": [],
+        "proof": "切换 < 200ms"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

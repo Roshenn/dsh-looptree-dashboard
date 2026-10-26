@@ -1,0 +1,10 @@
+# macOS / editor junk
+.DS_Store
+*.swp
+*~
+
+# 临时文件（serve.mjs 的原子写中间文件）
+.*.tmp
+
+# 本地导出
+*.local.json

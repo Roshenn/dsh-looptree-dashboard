@@ -1,0 +1,111 @@
+/**
+ * rotation-core.mjs — rotation/v1 的校验与树工具（零依赖）
+ * 被 validate-rotation.mjs（CLI）与 serve.mjs（写回服务）共用。
+ */
+
+const KINDS_BY_DEPTH = { 1: 'loop', 2: 'goal', 3: 'idea', 4: 'exec' };
+const STATUS = new Set(['plan', 'ready', 'doing', 'blocked', 'done']);
+const ID_RE = /^[a-z0-9][a-z0-9-]*$/;
+const iso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+
+export function validateCard(doc) {
+  const errors = [];
+  const warnings = [];
+  const ids = new Set();
+  const nodes = [];
+
+  function walk(n, depth, path) {
+    if (!n || typeof n !== 'object') { errors.push(`${path}: 不是对象`); return; }
+    const at = `${path}(${n.id ?? '?'})`;
+    nodes.push({ node: n, depth, path });
+
+    if (!n.id) errors.push(`${at}: 缺少 id`);
+    else if (!ID_RE.test(n.id)) errors.push(`${at}: id 需匹配 ${ID_RE}`);
+    else if (ids.has(n.id)) errors.push(`${at}: id 重复`);
+    else ids.add(n.id);
+
+    if (!n.title || !String(n.title).trim()) errors.push(`${at}: 缺少 title`);
+
+    const expectKind = KINDS_BY_DEPTH[depth];
+    if (!expectKind) {
+      if (n.kind !== 'exec') errors.push(`${at}: 深度 ${depth} 只能是 exec（面板会折叠显示）`);
+    } else if (n.kind !== expectKind) {
+      errors.push(`${at}: 深度 ${depth} 应为 ${expectKind}，实际 ${n.kind}`);
+    }
+
+    if (Array.isArray(n.issues) && n.kind !== 'exec') errors.push(`${at}: issues 只能挂在 exec 上`);
+    if (depth <= 2 && !String(n.acceptance || '').trim()) errors.push(`${at}: ${n.kind} 必须有 acceptance（验收方式）`);
+    if (n.kind === 'exec' && !String(n.verify || '').trim()) errors.push(`${at}: exec 必须有 verify`);
+
+    if (n.status != null && !STATUS.has(n.status)) errors.push(`${at}: status 非法（${n.status}）`);
+    if (n.closed_at != null && !iso(n.closed_at)) errors.push(`${at}: closed_at 必须是 ISO 时间或 null`);
+    if (n.closed_at != null && n.kind === 'exec' && !String(n.proof || '').trim()) {
+      errors.push(`${at}: 已关闭的 exec 必须有 proof（证据）`);
+    }
+    if (n.started_at != null) {
+      if (!iso(n.started_at)) errors.push(`${at}: started_at 必须是 ISO 时间或 null`);
+      else if (n.closed_at != null && Date.parse(n.started_at) > Date.parse(n.closed_at)) {
+        errors.push(`${at}: started_at 晚于 closed_at（在途时长为负）`);
+      }
+    }
+    if (n.status === 'doing' && n.closed_at == null && n.started_at == null) {
+      warnings.push(`${at}: doing 但缺 started_at，面板算不出在途时长`);
+    }
+
+    const kids = Array.isArray(n.children) ? n.children : [];
+    kids.forEach((k, i) => walk(k, depth + 1, `${path} > ${i}`));
+
+    if (n.closed_at != null) {
+      const openKids = kids.filter((k) => k.closed_at == null);
+      if (openKids.length) {
+        errors.push(`${at}: 已关闭但仍有 ${openKids.length} 个子节点未关闭（${openKids.map((k) => k.id).join(', ')}）`);
+      }
+    }
+    if (n.status === 'done' && kids.length) warnings.push(`${at}: 非叶子写入 status=done，将由子节点推导`);
+  }
+
+  if (!doc || typeof doc !== 'object') return { errors: ['根节点不是对象'], warnings, nodes, stats: {} };
+  if (doc.schema !== 'rotation/v1') errors.push(`schema 必须是 rotation/v1，实际 ${doc.schema}`);
+  if (!doc.project || !doc.project.name) errors.push('缺少 project.name');
+  if (!doc.project?.workspace) warnings.push('缺少 project.workspace（面板按路径匹配工作区会失败）');
+  if (!doc.loop) errors.push('缺少 loop 根节点');
+  else walk(doc.loop, 1, 'loop');
+
+  const leaves = nodes.filter((x) => !(x.node.children || []).length);
+  const stats = {
+    nodes: nodes.length,
+    maxDepth: Math.max(0, ...nodes.map((x) => x.depth)),
+    leaves: leaves.length,
+    closedLeaves: leaves.filter((x) => x.node.closed_at).length,
+    blocked: nodes.filter((x) => x.node.status === 'blocked' && !x.node.closed_at).length,
+    closable: nodes.filter((x) => {
+      const kids = x.node.children || [];
+      return !x.node.closed_at && kids.length && kids.every((k) => k.closed_at);
+    }).length,
+  };
+  return { errors, warnings, nodes, stats };
+}
+
+const K = { loop: '闭环', goal: '目标', idea: '构思', exec: '执行' };
+
+export function treeLines(loop) {
+  const out = [];
+  (function render(n, depth) {
+    const mark = n.closed_at ? '✓' : n.status === 'blocked' ? '✗' : '·';
+    out.push(`${'  '.repeat(depth - 1)}${mark} [${K[n.kind] ?? n.kind}] ${n.title}  ${n.id}`);
+    (n.children || []).forEach((c) => render(c, depth + 1));
+  })(loop, 1);
+  return out;
+}
+
+/** 由子节点推导父节点状态；close 时写回用 */
+export function deriveStatus(node) {
+  const kids = node.children || [];
+  if (!kids.length) return node.status || 'plan';
+  const all = (ns) => ns.flatMap((n) => (n.children?.length ? all(n.children) : [n]));
+  const leaves = all(kids);
+  if (leaves.some((l) => l.status === 'blocked' && !l.closed_at)) return 'blocked';
+  if (kids.every((k) => k.closed_at)) return 'done';
+  if (kids.some((k) => k.closed_at) || leaves.some((l) => l.status === 'doing')) return 'doing';
+  return 'ready';
+}

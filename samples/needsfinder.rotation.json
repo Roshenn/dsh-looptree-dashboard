@@ -1,0 +1,86 @@
+{
+ "schema": "rotation/v1",
+ "project": {
+  "name": "NeedsFinder",
+  "workspace": "/Users/julian/agentic/projects/needsfinder"
+ },
+ "updated": "2026-10-26T23:20:00+08:00",
+ "loop": {
+  "id": "nf-loop",
+  "kind": "loop",
+  "title": "需求发现闭环",
+  "intent": "从小红书真实讨论里端到端产出可验证的需求列表",
+  "acceptance": "10 条需求中 ≥6 条可由第三方复现",
+  "status": "doing",
+  "closed_at": null,
+  "children": [
+   {
+    "id": "nf-g1",
+    "kind": "goal",
+    "title": "小红书链路跑通",
+    "acceptance": "抓取→聚类→打分三段能跑完整条链路",
+    "status": "blocked",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "nf-i1",
+      "kind": "idea",
+      "title": "抓取 → 聚类 → 打分",
+      "approach": "三段各自可单独重跑",
+      "status": "doing",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "nf-e1",
+        "kind": "exec",
+        "title": "登录态保活 6h",
+        "verify": "node scripts/crawl.mjs --smoke",
+        "status": "blocked",
+        "closed_at": null,
+        "issues": [
+         {
+          "text": "扫码登录 6 小时后失效，抓取链路中断",
+          "at": "2026-10-26T21:35:00+08:00"
+         }
+        ],
+        "started_at": "2026-10-16T00:30:00+08:00"
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     }
+    ],
+    "started_at": "2026-10-23T09:00:00+08:00"
+   },
+   {
+    "id": "nf-g2",
+    "kind": "goal",
+    "title": "端到端产出 10 条需求",
+    "acceptance": "去重后 ≥10 条且带出处链接",
+    "status": "plan",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "nf-i2",
+      "kind": "idea",
+      "title": "需求去重",
+      "approach": "按语义相似度去重，阈值 0.82",
+      "status": "plan",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "nf-e2",
+        "kind": "exec",
+        "title": "需求去重率 < 20%",
+        "verify": "node scripts/dedupe-stats.mjs",
+        "status": "plan",
+        "closed_at": null,
+        "issues": []
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "started_at": "2026-10-24T21:00:00+08:00"
+ }
+}

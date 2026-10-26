@@ -1,0 +1,85 @@
+{
+ "schema": "rotation/v1",
+ "project": {
+  "name": "词块",
+  "workspace": "/Users/julian/agentic/projects/chunks"
+ },
+ "updated": "2026-10-26T23:20:00+08:00",
+ "loop": {
+  "id": "ck-loop",
+  "kind": "loop",
+  "title": "双轨学习闭环",
+  "intent": "教与学两条路径都能独立走完一组词块",
+  "acceptance": "两轨各完成 1 组词块且进度不互相覆盖",
+  "status": "doing",
+  "closed_at": null,
+  "children": [
+   {
+    "id": "ck-g1",
+    "kind": "goal",
+    "title": "教学轨可用",
+    "acceptance": "教学轨能按词频顺序推送词块",
+    "status": "doing",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "ck-i1",
+      "kind": "idea",
+      "title": "词频驱动词块顺序",
+      "approach": "按 COCA 词频排序，优先级高于自定义顺序",
+      "status": "doing",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "ck-e1",
+        "kind": "exec",
+        "title": "COCA 前 6000 命中 ≥ 90%",
+        "verify": "npm run measure -- coca",
+        "status": "doing",
+        "closed_at": null,
+        "issues": [],
+        "proof": "采样中",
+        "started_at": "2026-10-20T09:00:00+08:00"
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     }
+    ],
+    "started_at": "2026-10-23T09:00:00+08:00"
+   },
+   {
+    "id": "ck-g2",
+    "kind": "goal",
+    "title": "学习轨可用",
+    "acceptance": "学习轨能记录每块掌握度",
+    "status": "ready",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "ck-i2",
+      "kind": "idea",
+      "title": "语料词频现场计算",
+      "approach": "用户语料现场计算，不依赖预生成表",
+      "status": "ready",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "ck-e2",
+        "kind": "exec",
+        "title": "采样 1.2 万句完成",
+        "verify": "node scripts/sample.mjs --n 12000",
+        "status": "ready",
+        "closed_at": null,
+        "issues": [],
+        "started_at": "2026-10-20T09:00:00+08:00"
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     }
+    ],
+    "started_at": "2026-10-23T09:00:00+08:00"
+   }
+  ],
+  "started_at": "2026-10-24T21:00:00+08:00"
+ }
+}

@@ -1,0 +1,98 @@
+{
+ "schema": "rotation/v1",
+ "project": {
+  "name": "shadowing",
+  "workspace": "/Users/julian/agentic/projects/shadowing"
+ },
+ "updated": "2026-10-26T23:20:00+08:00",
+ "loop": {
+  "id": "sh-loop",
+  "kind": "loop",
+  "title": "youtube 跟读闭环",
+  "intent": "选一条视频就能逐句跟读并对齐",
+  "acceptance": "10 条视频中 ≥9 条字幕可渲染",
+  "status": "doing",
+  "closed_at": null,
+  "children": [
+   {
+    "id": "sh-g1",
+    "kind": "goal",
+    "title": "素材入库",
+    "acceptance": "链接解析 + 落盘可重复执行",
+    "status": "done",
+    "closed_at": "2026-10-22T09:30:00+08:00",
+    "children": [
+     {
+      "id": "sh-i1",
+      "kind": "idea",
+      "title": "链接解析 + 落盘",
+      "approach": "yt-dlp 取字幕，落盘到 data/",
+      "status": "done",
+      "closed_at": "2026-10-22T09:20:00+08:00",
+      "children": [
+       {
+        "id": "sh-e1",
+        "kind": "exec",
+        "title": "入库 40 条视频",
+        "verify": "node scripts/ingest.mjs --dry",
+        "status": "done",
+        "closed_at": "2026-10-22T09:10:00+08:00",
+        "issues": [],
+        "proof": "40 条入库，0 失败"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "sh-g2",
+    "kind": "goal",
+    "title": "词幕加载展示",
+    "acceptance": "词幕逐句高亮且与音频对齐",
+    "status": "doing",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "sh-i2",
+      "kind": "idea",
+      "title": "字幕抓取 + 时间轴对齐",
+      "approach": "自动字幕缺时间轴时走人工兜底",
+      "status": "doing",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "sh-e2",
+        "kind": "exec",
+        "title": "对齐误差 < 120ms",
+        "verify": "node scripts/align-check.mjs",
+        "status": "doing",
+        "closed_at": null,
+        "issues": [],
+        "proof": "实测 180ms",
+        "started_at": "2026-10-20T09:00:00+08:00"
+       },
+       {
+        "id": "sh-e3",
+        "kind": "exec",
+        "title": "自动字幕缺时间轴",
+        "verify": "node scripts/subtitle-check.mjs",
+        "status": "blocked",
+        "closed_at": null,
+        "issues": [
+         {
+          "text": "长视频无自动字幕，需人工时间轴",
+          "at": "2026-10-26T20:05:00+08:00"
+         }
+        ],
+        "started_at": "2026-10-20T09:00:00+08:00"
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     }
+    ],
+    "started_at": "2026-10-23T09:00:00+08:00"
+   }
+  ],
+  "started_at": "2026-10-24T21:00:00+08:00"
+ }
+}

@@ -1,0 +1,172 @@
+{
+ "schema": "rotation/v1",
+ "project": {
+  "name": "StoryWeft",
+  "workspace": "/Users/julian/agentic/projects/storyweft"
+ },
+ "updated": "2026-10-26T16:03:14.664Z",
+ "loop": {
+  "id": "sw-loop",
+  "kind": "loop",
+  "title": "3 情节层渲染可视化",
+  "intent": "打开项目就能看到三层情节图，不用读代码",
+  "acceptance": "三层各 ≥ 8 节点、可折叠、首屏 < 800ms",
+  "status": "doing",
+  "closed_at": null,
+  "children": [
+   {
+    "id": "sw-g1",
+    "kind": "goal",
+    "title": "情节数据模型可用",
+    "acceptance": "章节与情节两层索引可双向查询",
+    "status": "doing",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "sw-i1",
+      "kind": "idea",
+      "title": "章节 → 情节两层索引",
+      "approach": "章节表 + 情节表，情节挂章节 id",
+      "status": "ready",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "sw-e1",
+        "kind": "exec",
+        "title": "索引构建 + 校验通过",
+        "verify": "npm test -- index.spec.ts",
+        "proof": "4 个测试用例全绿（2026-10-24）",
+        "status": "done",
+        "closed_at": "2026-10-24T10:30:00+08:00",
+        "issues": []
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     },
+     {
+      "id": "sw-i2",
+      "kind": "idea",
+      "title": "分层 SVG 绘制",
+      "approach": "每层一个 <g>，用 transform 叠加",
+      "status": "ready",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "sw-e2",
+        "kind": "exec",
+        "title": "单层渲染 100 节点",
+        "verify": "npm run bench -- render",
+        "proof": "实测 210ms",
+        "status": "done",
+        "closed_at": "2026-10-26T16:03:15.932Z",
+        "issues": []
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     }
+    ],
+    "started_at": "2026-10-23T09:00:00+08:00"
+   },
+   {
+    "id": "sw-g2",
+    "kind": "goal",
+    "title": "三层叠渲染管线",
+    "acceptance": "切换章节时三层同步刷新且无残影",
+    "status": "doing",
+    "closed_at": null,
+    "children": [
+     {
+      "id": "sw-i3",
+      "kind": "idea",
+      "title": "分层绘制 + 缓存",
+      "approach": "按章节 id 缓存已绘制的层",
+      "status": "doing",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "sw-e3",
+        "kind": "exec",
+        "title": "首屏 3 层 < 800ms",
+        "verify": "npm run bench -- first-paint",
+        "proof": "实测 1.1s（未达标）",
+        "status": "doing",
+        "closed_at": null,
+        "issues": [],
+        "children": [
+         {
+          "id": "sw-e3a",
+          "kind": "exec",
+          "title": "拆解：层缓存命中率",
+          "verify": "打印 cache hit rate",
+          "status": "doing",
+          "closed_at": null,
+          "issues": [],
+          "started_at": "2026-10-18T21:00:00+08:00"
+         },
+         {
+          "id": "sw-e3b",
+          "kind": "exec",
+          "title": "拆解：首屏测量埋点",
+          "verify": "performance.mark 时间线",
+          "status": "plan",
+          "closed_at": null,
+          "issues": []
+         }
+        ],
+        "started_at": "2026-10-20T09:00:00+08:00"
+       },
+       {
+        "id": "sw-e4",
+        "kind": "exec",
+        "title": "章节切换不闪烁",
+        "verify": "录制 3 次切换，无残影帧",
+        "status": "blocked",
+        "closed_at": null,
+        "issues": [
+         {
+          "text": "切换时旧层未清空，出现残影",
+          "at": "2026-10-26T22:12:00+08:00"
+         }
+        ],
+        "started_at": "2026-10-18T00:30:00+08:00"
+       }
+      ],
+      "started_at": "2026-10-21T21:00:00+08:00"
+     }
+    ],
+    "started_at": "2026-10-23T09:00:00+08:00"
+   },
+   {
+    "id": "sw-g3",
+    "kind": "goal",
+    "title": "地图渲染完成",
+    "acceptance": "地图图层可复用，节点位置稳定",
+    "status": "done",
+    "closed_at": "2026-10-24T18:00:00+08:00",
+    "children": [
+     {
+      "id": "sw-i4",
+      "kind": "idea",
+      "title": "复用既有地图图层",
+      "approach": "直接接老地图的 layer 实例",
+      "status": "done",
+      "closed_at": "2026-10-24T17:40:00+08:00",
+      "children": [
+       {
+        "id": "sw-e5",
+        "kind": "exec",
+        "title": "图层复用接入",
+        "verify": "地图可拖动且节点对齐",
+        "proof": "手动验证通过",
+        "status": "done",
+        "closed_at": "2026-10-24T17:30:00+08:00",
+        "issues": []
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "started_at": "2026-10-24T21:00:00+08:00"
+ }
+}
