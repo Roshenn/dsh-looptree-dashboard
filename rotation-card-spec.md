@@ -86,6 +86,32 @@
 
 详情卡会标出来源：`内置` / `rotation.json` / `节点自定义`。
 
+### 上下文段也可配（`prompt_context`）
+
+不写就按默认（项目 + 闭环/意图/验收 + 目标/验收 + 构思/方案 + 当前节点字段 + 子节点）。
+
+```json
+"prompt_context": {
+  "fields": ["project", "loop", "goal", "goal.acceptance", "siblings", "node", "exec.verify", "exec.issues"],
+  "siblings": 3
+}
+```
+
+| 字段键 | 落在哪段 | 内容 |
+|---|---|---|
+| `project` | 上下文 | 项目名 |
+| `loop` / `loop.intent` / `loop.acceptance` | 上下文 | 闭环标题 / 意图 / 验收 |
+| `goal` / `goal.acceptance` | 上下文 | 当前目标（当前节点不是目标时才有） |
+| `idea` / `idea.approach` | 上下文 | 当前构思（当前节点不是构思时才有） |
+| `siblings` | 上下文 | 同级兄弟节点（条数由 `siblings` 控制，默认 0） |
+| `node` | 当前节点 | 类型 / id / 标题 / 状态 |
+| `node.acceptance` / `node.approach` | 当前节点 | 按节点类型显示验收或方案 |
+| `exec.verify` / `exec.proof` / `exec.issues` | 当前节点 | 执行项的验证 / 证据 / 未处置反馈 |
+| `children` | 当前节点 | 已有子节点列表（最多 8 条） |
+
+- `fields` 是**有序列表**，顺序即输出顺序；未知键只警告、直接跳过。
+- 节点级 `prompt_context` 覆盖卡片级（与 `prompts` 同一套优先级）。
+
 ## 不变量（validator 会拦）
 
 1. `schema` 必须为 `rotation/v1`。
@@ -99,6 +125,7 @@
 9. `started_at` 必须是 ISO 或 `null`，且**不能晚于** `closed_at`（否则在途为负）。
 10. `status: doing` 且未关闭时建议带 `started_at`（缺了只警告：面板算不出在途）。
 11. `prompts` 每条必须有 `id`（字母数字 `-_`）、`title`、`ask`；未知节点类型的 `prompts.<kind>` 只警告。
+12. `prompt_context.fields` 必须是已知键数组（未知键只警告）；`prompt_context.siblings` 需为 0–10 的整数。
 
 ## 最短实现遇到的问题与增量改进（Problems & Incremental Changes）
 

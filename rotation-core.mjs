@@ -9,6 +9,23 @@ const ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 const iso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 
 const KINDS = ['loop', 'goal', 'idea', 'exec'];
+const CTX_KEYS = new Set([
+  'project','loop','loop.intent','loop.acceptance','goal','goal.acceptance',
+  'idea','idea.approach','siblings','node','node.acceptance','node.approach',
+  'exec.verify','exec.proof','exec.issues','children',
+]);
+function checkPromptContext(cfg, at, errors, warnings) {
+  if (typeof cfg !== 'object' || Array.isArray(cfg)) { errors.push(`${at}: 必须是对象`); return; }
+  if (cfg.fields != null) {
+    if (!Array.isArray(cfg.fields)) errors.push(`${at}.fields: 必须是数组`);
+    else cfg.fields.forEach((k, i) => {
+      if (!CTX_KEYS.has(k)) warnings.push(`${at}.fields[${i}]: 未知上下文字段 ${JSON.stringify(k)}，会被忽略`);
+    });
+  }
+  if (cfg.siblings != null && (!Number.isInteger(cfg.siblings) || cfg.siblings < 0 || cfg.siblings > 10)) {
+    errors.push(`${at}.siblings: 需为 0–10 的整数`);
+  }
+}
 function checkPromptList(list, at, errors, warnings) {
   if (!Array.isArray(list)) { errors.push(`${at}: 必须是数组`); return; }
   if (!list.length) { warnings.push(`${at}: 空数组，等同不使用自定义模板`); return; }
@@ -62,6 +79,7 @@ export function validateCard(doc) {
       }
     }
     if (n.prompts != null) checkPromptList(n.prompts, `${at}.prompts`, errors, warnings);
+    if (n.prompt_context != null) checkPromptContext(n.prompt_context, `${at}.prompt_context`, errors, warnings);
     if (n.status === 'doing' && n.closed_at == null && n.started_at == null) {
       warnings.push(`${at}: doing 但缺 started_at，面板算不出在途时长`);
     }
@@ -82,6 +100,7 @@ export function validateCard(doc) {
   if (doc.schema !== 'rotation/v1') errors.push(`schema 必须是 rotation/v1，实际 ${doc.schema}`);
   if (!doc.project || !doc.project.name) errors.push('缺少 project.name');
   if (!doc.project?.workspace) warnings.push('缺少 project.workspace（面板按路径匹配工作区会失败）');
+  if (doc.prompt_context != null) checkPromptContext(doc.prompt_context, 'prompt_context', errors, warnings);
   if (doc.prompts != null) {
     if (typeof doc.prompts !== 'object' || Array.isArray(doc.prompts)) errors.push('prompts 必须是对象（按节点类型分组）');
     else Object.entries(doc.prompts).forEach(([k, list]) => {

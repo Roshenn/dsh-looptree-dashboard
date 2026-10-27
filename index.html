@@ -1345,49 +1345,71 @@ function taskListFor(p, n){
   return { list: PROMPT_TASKS[n.kind] || [], from: '内置' };
 }
 
+/* 上下文段可配：prompt_context.fields 有序列表；siblings 控制兄弟节点条数 */
+const CTX_DEFAULT = {
+  fields: ['project','loop','loop.intent','loop.acceptance','goal','goal.acceptance',
+           'idea','idea.approach','node','node.acceptance','node.approach',
+           'exec.verify','exec.proof','exec.issues','children'],
+  siblings: 0,
+};
+const CTX_DEF = {
+  'project':         { sec:'ctx',  r:(p)=> `- 项目：${p.name}` },
+  'loop':            { sec:'ctx',  r:(p,t)=> t[0] ? `- 当前待闭环：${t[0].title}` : null },
+  'loop.intent':     { sec:'ctx',  r:(p,t)=> t[0] && t[0].raw && t[0].raw.intent ? `  - 闭环意图：${t[0].raw.intent}` : null },
+  'loop.acceptance': { sec:'ctx',  r:(p,t)=> t[0] && t[0].raw && t[0].raw.acceptance ? `  - 闭环验收：${t[0].raw.acceptance}` : null },
+  'goal':            { sec:'ctx',  r:(p,t,n)=>{ const g=t.find(x=>x.kind==='goal'); return g && g!==n ? `- 当前目标：${g.title}` : null; } },
+  'goal.acceptance': { sec:'ctx',  r:(p,t,n)=>{ const g=t.find(x=>x.kind==='goal'); return g && g!==n && g.raw && g.raw.acceptance ? `  - 目标验收：${g.raw.acceptance}` : null; } },
+  'idea':            { sec:'ctx',  r:(p,t,n)=>{ const i=t.find(x=>x.kind==='idea'); return i && i!==n ? `- 当前构思：${i.title}` : null; } },
+  'idea.approach':   { sec:'ctx',  r:(p,t,n)=>{ const i=t.find(x=>x.kind==='idea'); return i && i!==n && i.raw && i.raw.approach ? `  - 方案：${i.raw.approach}` : null; } },
+  'siblings':        { sec:'ctx',  r:(p,t,n,cfg)=>{
+      const parent = t[t.length-2];
+      if (!parent) return null;
+      const sibs = (parent.children||[]).filter(x=>x.id!==n.id).slice(0, cfg.siblings || 3);
+      if (!sibs.length) return null;
+      return `- 同级${KIND[sibs[0].kind]}：${sibs.map(x=>`${x.title}${x.closed?'（已关闭）':''}`).join('；')}`;
+    } },
+  'node':            { sec:'node', r:(p,t,n)=> `- 类型：${KIND[n.kind]}（id: ${n.id}）\n- 标题：${n.title}\n- 状态：${stateOf(n).label}` },
+  'node.acceptance': { sec:'node', r:(p,t,n)=> (n.kind==='loop'||n.kind==='goal') && n.raw && n.raw.acceptance ? `- 验收：${n.raw.acceptance}` : null },
+  'node.approach':   { sec:'node', r:(p,t,n)=> n.kind==='idea' && n.raw && n.raw.approach ? `- 方案：${n.raw.approach}` : null },
+  'exec.verify':     { sec:'node', r:(p,t,n)=> n.kind==='exec' && n.raw && n.raw.verify ? `- 验证方式：${n.raw.verify}` : null },
+  'exec.proof':      { sec:'node', r:(p,t,n)=> n.kind==='exec' ? `- 证据：${(n.raw && n.raw.proof) || '（未填写）'}` : null },
+  'exec.issues':     { sec:'node', r:(p,t,n)=>{
+      const open = ((n.raw && n.raw.issues) || []).filter(i=>!i.resolved_at).map(i=>i.text);
+      return open.length ? `- 未处置反馈：${open.join('；')}` : null;
+    } },
+  'children':        { sec:'node', r:(p,t,n)=>{
+      const kids = (n.children||[]).map(k=>`${KIND[k.kind]}·${k.title}`).slice(0, 8);
+      return kids.length ? `- 已有子节点：${kids.join('；')}` : null;
+    } },
+};
+function contextConf(p, n){
+  const fromNode = n.raw && n.raw.prompt_context;
+  const fromCard = p.card && p.card.prompt_context;
+  const cfg = fromNode || fromCard || {};
+  return {
+    fields: Array.isArray(cfg.fields) && cfg.fields.length ? cfg.fields : CTX_DEFAULT.fields,
+    siblings: Number.isFinite(cfg.siblings) ? cfg.siblings : CTX_DEFAULT.siblings,
+  };
+}
+
 function composePrompt(p, n, task){
   const trail = pathTo(p.root, n.id);
-  const loop = trail[0], goal = trail.find(x => x.kind === 'goal'), idea = trail.find(x => x.kind === 'idea');
-  const r = n.raw || {};
-  const L = (x) => x && x.raw ? x.raw : {};
-  const lines = [];
-  lines.push('# 上下文');
-  lines.push(`- 项目：${p.name}`);
-  lines.push(`- 当前待闭环：${loop.title}`);
-  if (L(loop).intent)     lines.push(`  - 闭环意图：${L(loop).intent}`);
-  if (L(loop).acceptance) lines.push(`  - 闭环验收：${L(loop).acceptance}`);
-  if (goal && goal !== n) {
-    lines.push(`- 当前目标：${goal.title}`);
-    if (L(goal).acceptance) lines.push(`  - 目标验收：${L(goal).acceptance}`);
+  const cfg = contextConf(p, n);
+  const ctx = [], node = [];
+  for (const key of cfg.fields){
+    const f = CTX_DEF[key];
+    if (!f) continue;
+    let v = null;
+    try { v = f.r(p, trail, n, cfg); } catch { v = null; }
+    if (!v) continue;
+    (f.sec === 'ctx' ? ctx : node).push(v);
   }
-  if (idea && idea !== n) {
-    lines.push(`- 当前构思：${idea.title}`);
-    if (L(idea).approach) lines.push(`  - 方案：${L(idea).approach}`);
-  }
-  lines.push('');
-  lines.push('# 当前节点');
-  lines.push(`- 类型：${KIND[n.kind]}（id: ${n.id}）`);
-  lines.push(`- 标题：${n.title}`);
-  lines.push(`- 状态：${stateOf(n).label}`);
-  if (n.kind === 'loop' || n.kind === 'goal') {
-    if (r.acceptance) lines.push(`- 验收：${r.acceptance}`);
-    const kids = (n.children || []).map(k => `${KIND[k.kind]}·${k.title}`).slice(0, 8);
-    if (kids.length) lines.push(`- 已有子节点：${kids.join('；')}`);
-  }
-  if (n.kind === 'idea' && r.approach) lines.push(`- 方案：${r.approach}`);
-  if (n.kind === 'exec') {
-    if (r.verify) lines.push(`- 验证方式：${r.verify}`);
-    lines.push(`- 证据：${r.proof || '（未填写）'}`);
-    const open = (r.issues || []).filter(i => !i.resolved_at).map(i => i.text);
-    if (open.length) lines.push(`- 未处置反馈：${open.join('；')}`);
-  }
-  lines.push('');
-  lines.push('# 任务');
-  lines.push(task.ask);
-  lines.push('');
-  lines.push('# 输出要求');
-  lines.push(PROMPT_OUTPUT);
-  return lines.join('\n');
+  const out = [];
+  if (ctx.length){ out.push('# 上下文', ...ctx, ''); }
+  if (node.length){ out.push('# 当前节点', ...node, ''); }
+  out.push('# 任务', task.ask, '');
+  out.push('# 输出要求', PROMPT_OUTPUT);
+  return out.join('\n');
 }
 
 async function copyText(txt){

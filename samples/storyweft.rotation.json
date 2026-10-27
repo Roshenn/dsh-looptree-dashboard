@@ -195,5 +195,25 @@
     "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码、以及谁调用它。"
    }
   ]
+ },
+ "prompt_context": {
+  "fields": [
+   "project",
+   "loop",
+   "loop.intent",
+   "loop.acceptance",
+   "goal",
+   "goal.acceptance",
+   "idea",
+   "idea.approach",
+   "siblings",
+   "node",
+   "node.approach",
+   "exec.verify",
+   "exec.proof",
+   "exec.issues",
+   "children"
+  ],
+  "siblings": 3
  }
 }
