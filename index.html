@@ -216,14 +216,22 @@
   .archive-empty{padding:10px 16px 14px;font-size:11.5px;color:var(--tx4)}
 
   /* ───────── 第一列统计块 ───────── */
-  .lane-stats{margin-top:9px;padding-top:9px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:8px}
+  .lane-stats{margin-top:auto;padding-top:10px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:8px}
   .lane-stats .info-sec{gap:4px}
   .lane-stats .health .num{font-size:21px}
   .lane-stats .health .cap{font-size:9.5px;line-height:1.35}
   .lane-stats .info-row{font-size:11px}
   .lane-stats .info-row b{font-size:11.5px}
 
-  /* ───────── 服务（右侧信息列） ───────── */
+  /* ───────── 服务（第一列，项目名下方） ───────── */
+  .lane-svc{margin-top:8px;padding-top:8px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
+  .lane-svc .svc{margin-bottom:0;padding:5px 6px;background:color-mix(in srgb,var(--l2) 70%,transparent)}
+  .lane-svc .svc-name{font-size:11px}
+  .lane-svc .svc-url{font-size:10px;padding:0 0 2px}
+  .lane-svc .svc-acts{gap:3px}
+  .lane-svc .pbtn{height:19px;padding:0 6px;font-size:10px}
+
+  /* ───────── 服务（兼容信息列） ───────── */
   .lane-svc{margin-top:8px;padding-top:8px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
   .lane-svc .svc{margin-bottom:0;padding:5px 6px;background:color-mix(in srgb,var(--l2) 70%,transparent)}
   .lane-svc .svc-name{font-size:11px}
@@ -1006,8 +1014,6 @@ function infoMarkup(p){
       <div class="hub-note" style="display:none">${goalPct}</div>
     </div>
 
-    ${laneServices(p)}
-
     <div class="info-acts">
       <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
       <button class="tbtn" data-act="open" data-id="${p.id}">会话 ↗</button>
@@ -1203,6 +1209,7 @@ function laneMarkup(p){
       <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
+      ${laneServices(p)}
       ${laneStats(p)}
     </div>
     <div class="canvas"></div>
@@ -1321,6 +1328,7 @@ function renderFocus(){
           <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
+          ${laneServices(p)}
           ${laneStats(p)}
         </div>
         <div class="canvas"></div>
