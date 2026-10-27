@@ -2233,13 +2233,19 @@ $('#tab-focus').addEventListener('click', ()=>{ state.view='focus'; render(); })
 $('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
 $('#btn-refresh').addEventListener('click', ()=>{ state.stamp = new Date().toLocaleString('sv-SE').slice(0,16); render(); toast('已刷新（原型：数据仍是 mock）'); });
 $('#export-json').addEventListener('click', () => exportCard());
-// 从 DSH 界面点进来时才显示「返回」（弹窗被拦、同标签打开的情况）
+// 「返回」：只要页面是插件提供的（路径含 /rotation/）就显示，且永远能回到 DSH
 try {
-  const ref = document.referrer ? new URL(document.referrer) : null;
-  if (ref && ref.origin === location.origin && history.length > 1){
+  const servedByPlugin = location.pathname.includes('/rotation/');
+  if (servedByPlugin){
     const back = $('#back-to-dsh');
     back.hidden = false;
-    back.addEventListener('click', () => history.back());
+    back.textContent = '← 返回 DSH';
+    back.addEventListener('click', () => {
+      // 同标签打开时优先回退；没有历史（新标签/无 referrer）就回 DSH 根路径
+      const ref = document.referrer ? new URL(document.referrer) : null;
+      if (ref && ref.origin === location.origin && history.length > 1) history.back();
+      else location.assign('/');
+    });
   }
 } catch {}
 $('#add-project').addEventListener('click', () => {
@@ -2583,7 +2589,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   if (src) src.textContent = source === 'server'
     ? '数据源：项目 .dsh/rotation.json（可写回）'
     : source === 'static' ? '数据源：cards.js（只读样例）' : '数据源：内置 mock';
-  if (source !== 'server') markSave('未连接保存服务 · 用「导出 JSON」保存', 'warn');
+  if (source !== 'server') markSave(`未连接 ${location.origin} 的保存服务 · 用「导出 JSON」保存（若 DSH 换过端口，请从当前地址重新打开面板）`, 'warn');
   else markSave('已连接：改动会写回项目 .dsh/rotation.json', 'ok');
   if (location.protocol.startsWith('http')){
     try {
