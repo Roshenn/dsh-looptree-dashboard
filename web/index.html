@@ -2223,7 +2223,7 @@ async function refreshRuns(){
 async function persist(p){
   if (!p.card) return { ok:false, error:'没有可写回的 card' };
   p.card.updated = new Date().toISOString();
-  if (!p.file || !location.protocol.startsWith('http')){
+  if (!p.file || !API_BASE){
     markSave('未连接保存服务 · 用「导出 JSON」保存', 'warn');
     return { ok:false, error:'未连接保存服务' };
   }
@@ -2633,7 +2633,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
 (async function boot(){
   await resolveApiBase();
   let source = 'mock';
-  if (location.protocol.startsWith('http')){
+  if (API_BASE){
     try {
       const r = await fetch(api('/cards')).catch((e) => { window.__rotationLastApiError = api('/cards') + ' → ' + e.message; throw e; });
       if (!r.ok) window.__rotationLastApiError = api('/cards') + ' → HTTP ' + r.status;
@@ -2683,7 +2683,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
     }
   }
   else markSave('已连接：改动会写回项目 .dsh/rotation.json', 'ok');
-  if (location.protocol.startsWith('http')){
+  if (API_BASE){
     try {
       const r = await fetch(api('/run-config'));
       if (r.ok) RUN_CFG = await r.json();
