@@ -1351,6 +1351,7 @@ const CTX_DEFAULT = {
            'idea','idea.approach','node','node.acceptance','node.approach',
            'exec.verify','exec.proof','exec.issues','children'],
   siblings: 0,
+  refs: [],
 };
 const CTX_DEF = {
   'project':         { sec:'ctx',  r:(p)=> `- 项目：${p.name}` },
@@ -1367,6 +1368,25 @@ const CTX_DEF = {
       const sibs = (parent.children||[]).filter(x=>x.id!==n.id).slice(0, cfg.siblings || 3);
       if (!sibs.length) return null;
       return `- 同级${KIND[sibs[0].kind]}：${sibs.map(x=>`${x.title}${x.closed?'（已关闭）':''}`).join('；')}`;
+    } },
+  'refs':            { sec:'ctx',  r:(p,t,n,cfg)=>{
+      const list = cfg.refs || [];
+      if (!list.length) return null;
+      const lines = list.map(id => {
+        const x = findNode(p.root, id);
+        if (!x) return null;
+        const r = x.raw || {};
+        const bits = [`状态 ${stateOf(x).label}`];
+        if (x.kind === 'exec') {
+          if (r.verify) bits.push(`验证 ${r.verify}`);
+          if (r.proof) bits.push(`证据 ${r.proof}`);
+          const open = (r.issues||[]).filter(i=>!i.resolved_at).map(i=>i.text);
+          if (open.length) bits.push(`未处置反馈 ${open.join('；')}`);
+        } else if (x.kind === 'idea' && r.approach) bits.push(`方案 ${r.approach}`);
+        else if (r.acceptance) bits.push(`验收 ${r.acceptance}`);
+        return `- 引用·${KIND[x.kind]}「${x.title}」(${x.id})：${bits.join('；')}`;
+      }).filter(Boolean);
+      return lines.length ? lines.join('\n') : null;
     } },
   'node':            { sec:'node', r:(p,t,n)=> `- 类型：${KIND[n.kind]}（id: ${n.id}）\n- 标题：${n.title}\n- 状态：${stateOf(n).label}` },
   'node.acceptance': { sec:'node', r:(p,t,n)=> (n.kind==='loop'||n.kind==='goal') && n.raw && n.raw.acceptance ? `- 验收：${n.raw.acceptance}` : null },
@@ -1386,9 +1406,13 @@ function contextConf(p, n){
   const fromNode = n.raw && n.raw.prompt_context;
   const fromCard = p.card && p.card.prompt_context;
   const cfg = fromNode || fromCard || {};
+  const refs = Array.isArray(cfg.refs) ? cfg.refs.filter(x => typeof x === 'string') : CTX_DEFAULT.refs;
+  let fields = Array.isArray(cfg.fields) && cfg.fields.length ? cfg.fields.slice() : CTX_DEFAULT.fields.slice();
+  if (refs.length && !fields.includes('refs')) fields = fields.concat(['refs']);   // refs 写了但 fields 没列 → 自动补在末尾
   return {
-    fields: Array.isArray(cfg.fields) && cfg.fields.length ? cfg.fields : CTX_DEFAULT.fields,
+    fields,
     siblings: Number.isFinite(cfg.siblings) ? cfg.siblings : CTX_DEFAULT.siblings,
+    refs,
   };
 }
 

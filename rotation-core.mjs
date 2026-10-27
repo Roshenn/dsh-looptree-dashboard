@@ -12,8 +12,9 @@ const KINDS = ['loop', 'goal', 'idea', 'exec'];
 const CTX_KEYS = new Set([
   'project','loop','loop.intent','loop.acceptance','goal','goal.acceptance',
   'idea','idea.approach','siblings','node','node.acceptance','node.approach',
-  'exec.verify','exec.proof','exec.issues','children',
+  'exec.verify','exec.proof','exec.issues','children','refs',
 ]);
+const ID_RE_CORE = /^[a-z0-9][a-z0-9-]*$/;
 function checkPromptContext(cfg, at, errors, warnings) {
   if (typeof cfg !== 'object' || Array.isArray(cfg)) { errors.push(`${at}: 必须是对象`); return; }
   if (cfg.fields != null) {
@@ -24,6 +25,12 @@ function checkPromptContext(cfg, at, errors, warnings) {
   }
   if (cfg.siblings != null && (!Number.isInteger(cfg.siblings) || cfg.siblings < 0 || cfg.siblings > 10)) {
     errors.push(`${at}.siblings: 需为 0–10 的整数`);
+  }
+  if (cfg.refs != null) {
+    if (!Array.isArray(cfg.refs)) errors.push(`${at}.refs: 必须是数组（节点 id 列表）`);
+    else cfg.refs.forEach((id, i) => {
+      if (typeof id !== 'string' || !ID_RE_CORE.test(id)) errors.push(`${at}.refs[${i}]: 需为节点 id 字符串`);
+    });
   }
 }
 function checkPromptList(list, at, errors, warnings) {
@@ -110,6 +117,16 @@ export function validateCard(doc) {
   }
   if (!doc.loop) errors.push('缺少 loop 根节点');
   else walk(doc.loop, 1, 'loop');
+
+  const known = new Set(nodes.map(x => x.node.id));
+  const checkRefsIds = (cfg, at) => {
+    if (!cfg || !Array.isArray(cfg.refs)) return;
+    cfg.refs.forEach((id, i) => {
+      if (typeof id === 'string' && !known.has(id)) errors.push(`${at}.refs[${i}]: 找不到节点 ${JSON.stringify(id)}`);
+    });
+  };
+  checkRefsIds(doc.prompt_context, 'prompt_context');
+  nodes.forEach(x => checkRefsIds(x.node.prompt_context, `${x.path}.prompt_context`));
 
   const leaves = nodes.filter((x) => !(x.node.children || []).length);
   const stats = {

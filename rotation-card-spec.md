@@ -93,8 +93,15 @@
 ```json
 "prompt_context": {
   "fields": ["project", "loop", "goal", "goal.acceptance", "siblings", "node", "exec.verify", "exec.issues"],
-  "siblings": 3
+  "siblings": 3,
+  "refs": ["sw-e4"]
 }
+```
+
+`refs` 会渲染成一行：
+
+```
+- 引用·执行「章节切换不闪烁」(sw-e4)：状态 阻塞；验证 录制 3 次切换，无残影帧；证据 …；未处置反馈 切换时旧层未清空，出现残影
 ```
 
 | 字段键 | 落在哪段 | 内容 |
@@ -108,8 +115,11 @@
 | `node.acceptance` / `node.approach` | 当前节点 | 按节点类型显示验收或方案 |
 | `exec.verify` / `exec.proof` / `exec.issues` | 当前节点 | 执行项的验证 / 证据 / 未处置反馈 |
 | `children` | 当前节点 | 已有子节点列表（最多 8 条） |
+| `refs` | 上下文 | 按 id 引用树里**任意**节点（可跨目标/跨层），自动带出状态与该类型的要点 |
 
 - `fields` 是**有序列表**，顺序即输出顺序；未知键只警告、直接跳过。
+- `refs` 是节点 id 数组；**写了 refs 但 fields 没列 `refs` 时，会自动补在上下文末尾**（不会静默失效）。
+- `refs` 里出现不存在的 id → validator 报错（防止引用失效后 prompt 悄悄少一段）。
 - 节点级 `prompt_context` 覆盖卡片级（与 `prompts` 同一套优先级）。
 
 ## 不变量（validator 会拦）
@@ -126,6 +136,7 @@
 10. `status: doing` 且未关闭时建议带 `started_at`（缺了只警告：面板算不出在途）。
 11. `prompts` 每条必须有 `id`（字母数字 `-_`）、`title`、`ask`；未知节点类型的 `prompts.<kind>` 只警告。
 12. `prompt_context.fields` 必须是已知键数组（未知键只警告）；`prompt_context.siblings` 需为 0–10 的整数。
+13. `prompt_context.refs` 必须是节点 id 数组，且每个 id 都要能在同一张卡里找到，否则报错。
 
 ## 最短实现遇到的问题与增量改进（Problems & Incremental Changes）
 
