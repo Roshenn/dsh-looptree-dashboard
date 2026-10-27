@@ -1,0 +1,37 @@
+# CHANGELOG
+
+## 0.2.0 — 真机可用
+
+从「原型 + 本地服务」变成「装进 DSH 的插件」，并在真实 DSH 进程里逐项验证。
+
+### 新增
+- **插件形态**：`package.json` 的 `dsh.bundle.patch` + `cordis.patch.yml` 自动挂载；`lib/client.js` 走 `__ModuleLoader__`
+- **host 路由** `/rotation/*`：面板静态资源 + `/api/health|projects|cards|run*|services*`
+- **数据层**：注册表 `~/.dsh/rotation/registry.json` + 卡片 `<workspace>/.dsh/rotation.json`；写入走 validate → `.bak` → tmp+rename
+- **节点会话**：`ctx.agents.create` + `agent.followup` + `ctx.on('session/event')`，结果写回卡片 `session` 字段
+- **项目服务**：探活 / 一键拉起 / 停止 / 日志预览
+- **项目移除**：`DELETE /api/projects/<id>` + 泳道悬停 ✕（不删项目文件）
+- **入口**：DSH 右下角常驻「轮转」按钮（右栏 tab 在 0.2.1-rc.3 不渲染，已放弃）
+- **provider/model 钉死**：注册项目时可指定，便于把项目钉到网关路由
+- **工程化**：`npm run preflight`（lint / client 契约 / 会话状态机 / 样例 / tarball 五段）、`scripts/real-plugin-check.sh`（一次性 profile 真机验证）、`scripts/migrate-samples.mjs`、`scripts/check-install.mjs`
+- **文档**：`docs/architecture.md`、`INSTALL.md`（安装 / 验证 / 升级 / 回滚 / 网关 patch）
+
+### 修复（都是真机才暴露的）
+- client bundle 的 `id` 必须是**包名**，否则 `web boot: 1 entry did not activate`
+- client 必须导出 `inject = ['slots']`
+- host 必须在 `inject` 里声明 `agents` / `agentDefaultModel`，否则 `/api/run` 500
+- `turn/end` 要透传 `reason.error.message`，否则卡片只显示「turn 结束原因：error」
+- 中文项目名派生 id 会撞 `ID_RE`，改为退回 `project-<随机>`
+- 同版本 `file:` 包重装是空操作（pnpm 缓存），升级必须 `remove` + `add`
+- 空注册表曾退回样例数据，导致看不到空状态引导
+- `[hidden]` 被 `display:flex` 覆盖，空状态与矩阵同时出现
+- 后台标签页不刷新运行状态
+- preflight 的 mock 会写脏真实注册表
+
+### 真机验证记录
+- host 三路由 200；client 半进 boot 清单并零错误激活
+- 面板在真实浏览器里：空状态 → 注册项目 → 泳道渲染 → 数据源可写回
+- 真实会话：`POST /api/run` → `assistant/message "OK"` → `turn/end completed` → 卡片 `session.result = "OK"`
+
+## 0.1.0 — 原型
+静态面板（`index.html`）：泳道视图、详情卡、结构化 prompt、14 天趋势、健康度评分、服务探活、会话状态点、已关闭节点折叠。
