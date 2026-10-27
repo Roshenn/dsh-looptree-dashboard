@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.3.1 — 添加项目时直接选 DSH 工作区
+
+- 添加项目改为**下拉选 DSH 已有工作区**（读 `~/.dsh/storages/workspace.json` 的
+  `tables.workspaces`，返回 title + path），最后一项是「手动输入 / 选择其它目录…」
+- 选中工作区后名称自动带出工作区标题；同一目录重复登记返回 409
+- 新增 `GET /rotation/api/workspaces`；原来的原生目录选择保留为手动模式的备选
+- 修 `.detail-row[hidden]` 被 `display:flex` 覆盖导致手动行一直显示
+
 ## 0.3.0 — 添加项目可直接选目录
 
 - 添加项目弹窗新增「选择…」：优先用宿主自带的 `__DSH_DIRECTORY_PICKER__`（桌面端），
