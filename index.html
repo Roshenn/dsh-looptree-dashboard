@@ -318,9 +318,16 @@
   .prow:hover{background:var(--hover)}
   .ptitle{flex:1;text-align:left;font-size:11.5px;color:var(--tx2);padding:5px 6px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ptitle:hover{color:var(--tx1)}
-  .pcopy{height:22px;padding:0 8px;border-radius:5px;corner-shape:var(--corner);border:1px solid var(--b2);
-    background:var(--l3);color:var(--tx3);font-size:10.5px;flex:0 0 auto}
-  .pcopy:hover{color:var(--tx1);border-color:var(--b3)}
+  .pbtn{height:22px;padding:0 7px;border-radius:5px;corner-shape:var(--corner);border:1px solid var(--b2);
+    background:var(--l3);color:var(--tx3);font-size:10.5px;flex:0 0 auto;
+    transition:color 140ms var(--ease-out),border-color 140ms var(--ease-out),background-color 140ms var(--ease-out)}
+  .pbtn:hover{color:var(--tx1);border-color:var(--b3)}
+  .pbtn.run{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent);
+    background:color-mix(in srgb,var(--green) 12%,transparent)}
+  .pbtn.run:hover{color:var(--tx1);background:color-mix(in srgb,var(--green) 22%,transparent)}
+  #launch-prompt{width:100%;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx1);
+    background:var(--l1);border:1px solid var(--b2);border-radius:7px;padding:8px 9px;resize:vertical;min-height:180px}
+  #launch-prompt:focus{outline:2px solid var(--brand);outline-offset:1px}
   .pgen{margin:7px 0 0;padding:8px 9px;border-radius:7px;border:1px solid var(--b1);background:var(--l1);
     color:var(--tx2);font-size:10.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
     max-height:180px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -441,6 +448,7 @@
       <button class="modal-x" id="launch-x" aria-label="关闭">✕</button></div>
     <div class="modal-body" id="launch-body"></div>
     <div class="modal-foot">
+      <button class="tbtn" id="launch-copy">复制 prompt</button>
       <button class="tbtn" id="launch-cancel">取消</button>
       <button class="tbtn primary-converge" id="launch-ok">发起会话</button>
     </div>
@@ -1527,7 +1535,7 @@ function sessionMarkup(p, n){
   const tail = r && r.tail && r.tail.length ? r.tail[r.tail.length - 1] : null;
   const btn = busy
     ? `<button class="tbtn" data-run-cancel="1">取消</button>`
-    : `<button class="tbtn primary-converge" data-run-start="1">${r ? '再跑一轮' : '发起会话'}</button>`;
+    : (r ? `<button class="tbtn" data-run-again="1">再跑一轮</button>` : '');
   return `<div class="detail-sec">
     <div class="detail-k">会话<span class="psrc" style="color:${tone}">${st}${busy ? ' · ' + (secs >= 60 ? Math.floor(secs/60) + 'm' : secs + 's') : ''}</span></div>
     ${r ? `<div class="detail-row"><dt>会话</dt><dd class="mono">${r.sessionId || '—'}</dd></div>
@@ -1535,7 +1543,7 @@ function sessionMarkup(p, n){
       ${tail ? `<div class="detail-row"><dt>最后</dt><dd>${tail.brief}</dd></div>` : ''}
       ${r.error ? `<div class="detail-row"><dt>问题</dt><dd style="color:var(--red)">${esc(r.error)}</dd></div>` : ''}
       ${r.result ? `<pre class="pgen" style="max-height:120px">${esc(r.result.slice(0, 1200))}</pre>` : ''}`
-      : `<div class="detail-row"><dt>说明</dt><dd>还没有跑过会话，发起后会在这里显示进度与结果</dd></div>`}
+      : `<div class="detail-row"><dt>说明</dt><dd>还没有跑过会话；在下面每条 prompt 后面点「发起」即可</dd></div>`}
     <div class="detail-acts" style="margin-top:8px">${btn}
       ${r && r.result && n.kind === 'exec' ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
     </div>
@@ -1610,7 +1618,9 @@ function detailMarkup(p, n){
       <div class="prompt-list">
         ${tasks.list.map(t => `<div class="prow" data-task="${t.id}">
           <button class="ptitle" data-preview-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}">${esc(t.title)}</button>
-          <button class="pcopy" data-copy-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
+          <button class="pbtn" data-prompt-edit="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="先改 prompt 再决定">修改</button>
+          <button class="pbtn" data-copy-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
+          <button class="pbtn run" data-prompt-run="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="用这条 prompt 发起会话">发起</button>
         </div>`).join('')}
       </div>
       <pre class="pgen" id="pgen" hidden></pre>
@@ -1713,45 +1723,57 @@ function startEdit(field, anchor){
 }
 
 let launchCtx = null;   // { p, n, tasks, selected }
-function openLaunch(){
-  const id = detailNode; if (!id) return;
+function openLaunch(opts){
+  const id = (opts && opts.nodeId) || detailNode;
+  if (!id) return;
   const p = findProjectByNode(id); const n = p && findNode(p.root, id);
   if (!p || !n) return;
   const tasks = taskListFor(p, n).list;
-  launchCtx = { p, n, tasks, selected: tasks[0] && tasks[0].id };
+  if (!tasks.length) return toast('这个节点没有可用的 prompt 模板');
+  const preset = (opts && opts.taskId) || (tasks[0] && tasks[0].id);
+  launchCtx = { p, n, tasks, selected: preset, edited: false };
   if (!RUN_CFG){ toast('服务未连接：无法发起会话'); return; }
-  $('#launch-title').textContent = `发起会话 · ${KIND[n.kind]}「${n.title}」`;
+
+  $('#launch-title').textContent = `${opts && opts.mode === 'edit' ? '修改 prompt' : '发起会话'} · ${KIND[n.kind]}「${n.title}」`;
   $('#launch-body').innerHTML = `
-    <div class="detail-k" style="margin-bottom:5px">用哪条 prompt</div>
-    <div class="lsel">${tasks.map(t => `<label class="lopt"><input type="radio" name="ltask" value="${t.id}" ${t.id===launchCtx.selected?'checked':''}>
+    <div class="detail-k" style="margin-bottom:5px">用哪条模板</div>
+    <div class="lsel">${tasks.map(t => `<label class="lopt"><input type="radio" name="ltask" value="${t.id}" ${t.id===preset?'checked':''}>
       <span>${esc(t.title)}</span></label>`).join('')}</div>
-    <div class="detail-k" style="margin:11px 0 5px">将发送到 <span class="mono">${esc(p.card && p.card.project && p.card.project.workspace || p.workspace || '')}</span></div>
-    <pre class="pgen" id="launch-preview" style="max-height:180px"></pre>
+    <div class="detail-k" style="margin:12px 0 5px">Prompt（可直接改，改完再发起）
+      <span class="psrc" id="launch-edited" hidden>已手动修改</span></div>
+    <textarea id="launch-prompt" class="dfield" rows="9" spellcheck="false"></textarea>
+    <div class="mnote" style="margin-top:8px">工作目录 <span class="mono">${esc((p.card && p.card.project && p.card.project.workspace) || '')}</span></div>
     ${RUN_CFG.hasApiKey === false ? `<div class="mnote" style="color:var(--amber)">⚠ 运行器没拿到模型凭据（服务进程环境里没有 DEEPSEEK_API_KEY），现在发起大概率会失败。用 <code>DEEPSEEK_API_KEY=… node serve.mjs</code> 启动服务即可。</div>` : ''}
-    <div class="mnote">会话会真实调用模型并按 headless profile 执行，可能需要一两分钟。同一节点同时只允许一个会话，并发上限 ${RUN_CFG.maxConcurrent}。</div>`;
-  const renderPreview = () => {
+    <div class="mnote">会真实调用模型并按 headless profile 执行，可能需要一两分钟。同一节点同时只允许一个会话，并发上限 ${RUN_CFG.maxConcurrent}。</div>`;
+
+  const ta = $('#launch-prompt');
+  const fill = () => {
     const t = tasks.find(x => x.id === launchCtx.selected) || tasks[0];
-    $('#launch-preview').textContent = t ? composePrompt(p, n, t) : '';
+    ta.value = composePrompt(p, n, t);
+    launchCtx.edited = false;
+    const badge = $('#launch-edited'); if (badge) badge.hidden = true;
   };
+  fill();
+  ta.addEventListener('input', () => {
+    launchCtx.edited = true;
+    const badge = $('#launch-edited'); if (badge) badge.hidden = false;
+  });
   $('#launch-body').querySelectorAll('input[name=ltask]').forEach(r => r.addEventListener('change', () => {
-    launchCtx.selected = r.value; renderPreview();
+    launchCtx.selected = r.value; fill();
   }));
-  renderPreview();
+
   const m = $('#launch');
-  m.hidden = false;
-  requestAnimationFrame(() => { m.dataset.show = 'true'; });
+  showModal(m);
+  requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); });
 }
-function closeLaunch(){
-  const m = $('#launch');
-  if (!m || m.hidden) return;
-  m.dataset.show = 'false';
-  setTimeout(() => { m.hidden = true; }, 150);
-}
+function closeLaunch(){ hideModal($('#launch')); }
 async function doLaunch(){
   if (!launchCtx || !RUN_CFG) return;
   const { p, n, tasks, selected } = launchCtx;
+  const ta = $('#launch-prompt');
+  const prompt = (ta && ta.value || '').trim();
+  if (!prompt) return toast('prompt 是空的');
   const task = tasks.find(x => x.id === selected) || tasks[0];
-  const prompt = composePrompt(p, n, task);
   closeLaunch();
   toast('会话启动中…');
   try {
@@ -1769,6 +1791,25 @@ async function doLaunch(){
   } catch (e) {
     toast('发起失败：' + e.message);
   }
+}
+
+function showModal(m){
+  m.hidden = false;
+  const card = m.querySelector('.modal-card');
+  if (card){ card.style.transition = ''; card.style.opacity = ''; card.style.transform = ''; }
+  requestAnimationFrame(() => { m.dataset.show = 'true'; });
+  setTimeout(() => {
+    if (m.hidden) return;
+    m.dataset.show = 'true';
+    if (card){ card.style.transition = 'none'; card.style.opacity = '1'; card.style.transform = 'scale(1)'; }
+  }, 200);
+}
+function hideModal(m){
+  if (!m || m.hidden) return;
+  m.dataset.show = 'false';
+  const card = m.querySelector('.modal-card');
+  if (card){ card.style.transition = ''; card.style.opacity = ''; card.style.transform = ''; }
+  setTimeout(() => { m.hidden = true; }, 150);
 }
 
 function openConfirm(id){
@@ -1790,19 +1831,20 @@ function openConfirm(id){
   $('#modal-body').innerHTML = rows.join('');
   $('#modal-ok').textContent = isLoop ? '确认收敛' : '确认关闭';
   const m = $('#modal');
-  m.hidden = false;
-  requestAnimationFrame(() => { m.dataset.show = 'true'; });
+  showModal(m);
   $('#modal-ok').focus();
 }
 function closeConfirm(){
-  const m = $('#modal');
-  m.dataset.show = 'false';
-  setTimeout(() => { m.hidden = true; }, 160);
+  hideModal($('#modal'));
   pendingClose = null;
 }
 $('#launch-x').addEventListener('click', closeLaunch);
 $('#launch-cancel').addEventListener('click', closeLaunch);
 $('#launch-ok').addEventListener('click', doLaunch);
+$('#launch-copy').addEventListener('click', () => {
+  const ta = $('#launch-prompt');
+  copyText(ta ? ta.value : '').then(ok => toast(ok ? '已复制 prompt' : '复制失败：剪贴板被拒'));
+});
 $('#launch').addEventListener('click', (e) => { if (e.target.id === 'launch') closeLaunch(); });
 $('#modal-x').addEventListener('click', closeConfirm);
 $('#modal-cancel').addEventListener('click', closeConfirm);
@@ -1949,7 +1991,25 @@ document.addEventListener('click', (e)=>{
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');
   if (titleEl){ startEdit('title', titleEl); return; }
-  if (e.target.closest('[data-run-start]')){ openLaunch(); return; }
+  const runBtn = e.target.closest('[data-prompt-run]');
+  if (runBtn){
+    const p0 = PROJECTS.find(x => x.id === runBtn.dataset.proj);
+    if (p0) openLaunch({ nodeId: runBtn.dataset.nid, taskId: runBtn.dataset.promptRun, mode:'run' });
+    return;
+  }
+  const editBtn = e.target.closest('[data-prompt-edit]');
+  if (editBtn){
+    const p0 = PROJECTS.find(x => x.id === editBtn.dataset.proj);
+    if (p0) openLaunch({ nodeId: editBtn.dataset.nid, taskId: editBtn.dataset.promptEdit, mode:'edit' });
+    return;
+  }
+  if (e.target.closest('[data-run-again]')){
+    const id0 = detailNode;
+    const p0 = findProjectByNode(id0); const n0 = p0 && findNode(p0.root, id0);
+    const r0 = p0 && n0 && runFor(p0, n0);
+    openLaunch({ nodeId: id0, taskId: (r0 && r0.taskId) || undefined, mode:'run' });
+    return;
+  }
   if (e.target.closest('[data-run-cancel]')){
     const id = detailNode; const p0 = findProjectByNode(id); const n0 = p0 && findNode(p0.root, id);
     if (p0 && n0 && RUN_CFG){

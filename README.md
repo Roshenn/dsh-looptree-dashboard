@@ -20,9 +20,14 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 
 详情卡的「会话」段可以直接驱动一次真实 DSH 会话：
 
+每条 prompt 模板行尾都有三个按钮：**修改 / 复制 / 发起**。
+
 | 动作 | 行为 |
 |---|---|
-| 发起会话 / 再跑一轮 | 选一条 prompt 模板 → 确认弹窗预排完整 prompt → 在 `project.workspace` 下跑 `dsh --profile headless --json` |
+| 发起（每行） | 用这条模板预填 prompt → 弹窗里可**直接改** → `发起会话`；在 `project.workspace` 下跑 `dsh --profile headless --json` |
+| 修改（每行） | 同一个弹窗，打开即停在编辑态；改完可以只复制、不发起 |
+| 复制（每行） | 直接写入剪贴板（不改内容） |
+| 再跑一轮 | 会话段里，复用上次的模板与运行记录 |
 | 等待 | 节点卡片显示状态点（启动中 / 运行中 · 12s / 完成 / 失败 / 进程已不在），面板每 2s 拉一次状态 |
 | 取消 | 杀子进程，状态置「已取消」 |
 | 处理结果 | 结果预览 + 「写进证据」（exec 节点写入 `proof`）+「再跑一轮」 |
