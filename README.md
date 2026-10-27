@@ -28,6 +28,27 @@ curl -s localhost:4180/rotation/api/health
 装进 DSH（M0 之后）：市场 UI 安装本目录打包产物；按本机规则插件只走市场 UI，
 用 CLI 前先核对 `node_modules/.modules.yaml` 的 `storeDir` 与 `pnpm store path` 一致。
 
+## M1 数据层（已完成）
+
+```
+~/.dsh/rotation/registry.json     项目注册表 [{id,name,workspace,file}]
+<workspace>/.dsh/rotation.json    卡片真身（rotation/v1，跟着项目走）
+```
+
+接口：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/rotation/api/projects` | 注册表 + 卡片是否存在 |
+| POST | `/rotation/api/projects` | `{name, workspace}` 注册项目，自动建 `.dsh/rotation.json` 模板 |
+| GET | `/rotation/api/cards` | 所有项目的卡片 |
+| PUT | `/rotation/api/cards/<id或文件名>` | 校验 → `.bak` → 原子写；校验不过 422 |
+
+面板变化：工具栏多了「+ 项目」；数据源文案改成「项目 .dsh/rotation.json（可写回）」；
+所有请求走 `api()` 前缀，插件下是 `/rotation/api`，旧 `:4173` 服务下是 `/api`。
+
+迁移样例：`npm run migrate`（干跑），`npm run migrate -- --write` 真正写入，幂等（目标已存在就跳过）。
+
 ---
 # 闭环轮转面板（原型 v0.6 · 可读写 rotation/v1）
 

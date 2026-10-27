@@ -34,6 +34,7 @@
     "dev": "node scripts/dev-host.mjs",
     "serve": "node serve.mjs",
     "build:cards": "node scripts/build-cards.mjs",
-    "validate:samples": "for f in samples/*.rotation.json; do node validate-rotation.mjs \"$f\" --quiet || exit 1; done"
+    "validate:samples": "for f in samples/*.rotation.json; do node validate-rotation.mjs \"$f\" --quiet || exit 1; done",
+    "migrate": "node scripts/migrate-samples.mjs"
   }
 }
