@@ -55,6 +55,8 @@ cat ~/agentic/projects/chunks/.dsh/rotation.json | head -20
 | 打开面板是空白且控制台有 404 | 面板静态资源没打进包：确认 `npm pack` 列表里有 `web/index.html` |
 | 发起会话 503「会话服务不可用」 | DSH 版本缺少 `ctx.agents`；确认 `dsh --version` 与 `package.json` 的 `engines.dsh` 匹配 |
 | 一键拉起无反应 | 服务的 `cwd` 不存在或缺 `start` 命令；看卡片 `services` 配置 |
+| 发起会话失败：`Authentication Fails … invalid` | 宿主默认 provider 的 key 无效。要么在 GUI 里换可用凭据，要么注册项目时用 `provider`/`model` 把它钉到网关路由 |
+| 会话失败：`cannot get property "agents" without inject` | 插件版本过旧（< 0.1.0 修复版），升级插件（见「升级插件」） |
 
 ## 四、真机联调（不进你的日常 profile）
 

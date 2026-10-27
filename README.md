@@ -95,7 +95,23 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 | 卡片写回 | PUT 改标题 200，磁盘 `.dsh/rotation.json` 同步 ✓ |
 | 清理 | 测试项目已移除，真实注册表回到 `[]` ✓ |
 
-尚未验证：右栏 tab 的实际渲染（需要开一个会话看右栏）、以及 `ctx.agents` 真机事件序列。
+**真机跑客户端时抓到并修掉的 3 个 bug**（只有真装进去才会暴露）：
+
+| 问题 | 现象 | 修法 |
+|---|---|---|
+| client bundle 的 `id` 用了 `dsh-external/<pkg>` | `loaded without registering "dsh-rotation-dashboard"`，整个 web boot 失败 | `id` 必须等于包名；并补 `exports.inject = ['slots']` |
+| host 未声明 `agents` 服务 | `/api/run` 500：`cannot get property "agents" without inject` | `inject = ['webServer','agents','agentDefaultModel']` |
+| `turn/end` 只记 `reason.kind` | 卡片只显示「turn 结束原因：error」 | 透传 `reason.error.message`，现在显示真实 401 文本 |
+
+**真机会话测试结论**：`ctx.agents.create` + `followup` + `session/event` 全链路走通（能看到
+`agent/inbox/spliced` → `turn/start` → `assistant/attempt` → `turn/end`），但本机这次跑出来的
+`turn/end` 是 **401 Authentication Fails**（`.credentials.yaml` 里的 key 在厂商侧无效，
+且这份 DSH 配置里没有指向网关的 provider 路由）。这是环境问题，不是插件问题。
+
+> 若要把某个项目钉到网关路由：注册时带 `provider`/`model`，注册表会存下来，runner 优先用它：
+> `POST /rotation/api/projects {"name":"x","workspace":"/w","provider":"<网关 provider>","model":"<模型>"}`
+
+尚未验证：右栏 tab 的实际渲染（需要开一个会话看右栏）。
 
 ## M4 准备（进行中）
 

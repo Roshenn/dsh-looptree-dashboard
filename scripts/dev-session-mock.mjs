@@ -32,10 +32,11 @@ const ctx = {
   agentDefaultModel: { currentSelection: () => ({ provider: 'mock-provider', model: 'mock-model' }) },
   sessions: { get: () => null },
   agents: {
-    async create({ sessionId, meta }) {
+    async create({ sessionId, meta, agentOptions }) {
       const emit = (event) => {
         for (const fn of handlers.get('session/event') || []) fn({ sessionId, ...event });
       };
+      globalThis.__lastAgentOptions = agentOptions;
       const agent = {
         id: sessionId,
         cwd: meta?.cwd,
@@ -49,7 +50,12 @@ const ctx = {
           if (MODE === 'hang') return;
           setTimeout(() => emit({
             type: 'turn/end',
-            data: { turn: 1, reason: { kind: MODE === 'fail' ? 'error' : 'completed' } },
+            data: {
+              turn: 1,
+              reason: MODE === 'fail'
+                ? { kind: 'error', error: { message: 'Authentication Fails (mock 401)', code: 'AUTH' } }
+                : { kind: 'completed' },
+            },
           }), 90);
         },
         interrupt() {},
@@ -59,7 +65,8 @@ const ctx = {
   },
 };
 
-apply(ctx, { basePath: BASE });
+const OVERRIDE = process.env.MOCK_PROVIDER || '';
+apply(ctx, { basePath: BASE, ...(OVERRIDE ? { provider: OVERRIDE, model: 'mock-override-model' } : {}) });
 
 const WS = process.env.MOCK_WS || '/tmp/ws-mockrun';
 const project = await addProject({ id: 'mockrun', name: 'MockRun', workspace: WS })
@@ -103,7 +110,7 @@ server.listen(PORT, '127.0.0.1', async () => {
 
   let ok;
   if (MODE === 'fail') {
-    ok = run.status === 'failed' && /turn 结束原因/.test(run.error || '') && node?.session?.status === 'failed';
+    ok = run.status === 'failed' && /Authentication Fails/.test(run.error || '') && node?.session?.status === 'failed';
   } else if (MODE === 'hang') {
     const cancelled = await fetchJson('/run/cancel', {
       method: 'POST', headers: { 'content-type': 'application/json' },

@@ -36,7 +36,8 @@ const ok = (label, pass, detail = '') => {
 await import('../lib/client.js');
 
 ok('ModuleLoader 被调用', !!captured, captured?.id || '');
-ok('bundle id 形态正确', typeof captured?.id === 'string' && captured.id.startsWith('dsh-external/'), captured?.id);
+const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+ok('bundle id 等于包名（loader 按包名注册）', captured?.id === pkg.name, captured?.id);
 
 const module = captured.factory((name) => {
   if (name === 'react') return reactStub;
@@ -44,6 +45,7 @@ const module = captured.factory((name) => {
 });
 ok('factory 返回 apply', typeof module?.apply === 'function');
 ok('导出 name', typeof module?.name === 'string', module?.name);
+ok('导出 inject=slots', Array.isArray(module?.inject) && module.inject.includes('slots'), JSON.stringify(module?.inject));
 
 // ── 正常路径：提供 slots ──
 const registered = [];
