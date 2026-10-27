@@ -2035,6 +2035,12 @@ $('#density').addEventListener('click', (e)=>{
 });
 
 document.addEventListener('click', (e)=>{
+  // 点详情卡外面 → 关闭；点到别的节点则交给下面的节点逻辑切换
+  const dEl = $('#detail');
+  if (dEl && !dEl.hidden && !e.target.closest('.detail-card')){
+    const inOtherNode = e.target.closest('.tnode');
+    if (!inOtherNode || e.target.closest('button')) closeDetail();
+  }
   // 详情卡内部交互
   if (e.target.closest('#detail-x')){ closeDetail(); return; }
   const editVal = e.target.closest('[data-edit]');
