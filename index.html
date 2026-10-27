@@ -216,12 +216,11 @@
   .archive-empty{padding:10px 16px 14px;font-size:11.5px;color:var(--tx4)}
 
   /* ───────── 第一列统计块 ───────── */
-  .lane-stats{margin-top:auto;padding-top:10px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:8px}
-  .lane-stats .info-sec{gap:4px}
-  .lane-stats .health .num{font-size:21px}
-  .lane-stats .health .cap{font-size:9.5px;line-height:1.35}
-  .lane-stats .info-row{font-size:11px}
-  .lane-stats .info-row b{font-size:11.5px}
+  .lane-time{margin-top:auto;padding-top:10px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
+  .lane-time .info-row{font-size:11px}
+  .lane-time .info-row b{font-size:11.5px}
+  .lane-time .info-k{margin-bottom:2px}
+  .lane-stats{display:flex;flex-direction:column;gap:8px}
 
   /* ───────── 服务（第一列，项目名下方） ───────── */
   .lane-svc{margin-top:8px;padding-top:8px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
@@ -971,6 +970,26 @@ function laneStats(p){
   </div>`;
 }
 
+function laneTime(p){
+  const s0 = projectStats(p);
+  const etaTxt = s0.remain === 0 && s0.execs.length
+    ? '执行项已全部完成，待逐级确认关闭'
+    : s0.etaDays == null
+      ? (s0.closedNodes < 2 ? '样本不足：需 ≥2 个已关闭节点' : '关闭集中在 1 小时内，暂不估算')
+      : `约 ${fmtDays(s0.etaDays)} 后收敛 <em>置信 ${s0.conf}</em>`;
+  return `<div class="lane-time">
+    <div class="info-k">时间</div>
+    <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
+    <div class="info-row">关闭速率<b>${s0.rate ? s0.rate.toFixed(2) + ' 项/天' : '—'}</b></div>
+    <div class="info-row">在途<b>${s0.inflight.length} 项</b></div>
+    <div class="info-row" title="${s0.inflight[0] ? s0.inflight[0].title : ''}">最长在途<b>${s0.inflight[0] ? fmtDays(s0.inflight[0].days) : '—'}</b></div>
+    <div class="info-row">平均在途<b>${s0.avgInflight == null ? '—' : fmtDays(s0.avgInflight)}</b></div>
+    <div class="info-row">超期 &gt;7 天<b style="color:${s0.overdue?'var(--red)':'var(--tx2)'}">${s0.overdue}</b></div>
+    <div class="info-row">最近关闭<b>${s0.lastClosed ? new Date(s0.lastClosed).toLocaleString('sv-SE').slice(5,16) : '—'}</b></div>
+    <div class="eta">${etaTxt}</div>
+  </div>`;
+}
+
 function infoMarkup(p){
   const s0 = projectStats(p);
   const nodes = s0.all.length;
@@ -987,17 +1006,7 @@ function infoMarkup(p){
     ? guide.slice(0,2).map(g => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:11.5px">${g.text}</span></div>`).join('')
     : `<div class="info-empty">无待办，可考虑收敛或归档</div>`;
   return `<div class="info">
-    <div class="info-sec">
-      <div class="info-k">时间</div>
-      <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
-      <div class="info-row">关闭速率<b>${s0.rate ? s0.rate.toFixed(2) + ' 项/天' : '—'}</b></div>
-      <div class="info-row">在途<b>${s0.inflight.length} 项</b></div>
-      <div class="info-row" title="${s0.inflight[0] ? s0.inflight[0].title : ''}">最长在途<b>${s0.inflight[0] ? fmtDays(s0.inflight[0].days) : '—'}</b></div>
-      <div class="info-row">平均在途<b>${s0.avgInflight == null ? '—' : fmtDays(s0.avgInflight)}</b></div>
-      <div class="info-row">超期 &gt;7 天<b style="color:${s0.overdue?'var(--red)':'var(--tx2)'}">${s0.overdue}</b></div>
-      <div class="info-row">最近关闭<b>${s0.lastClosed ? new Date(s0.lastClosed).toLocaleString('sv-SE').slice(5,16) : '—'}</b></div>
-      <div class="eta">${etaTxt}</div>
-    </div>
+    ${laneStats(p)}
 
     ${trendMarkup(p)}
 
@@ -1210,7 +1219,7 @@ function laneMarkup(p){
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
       ${laneServices(p)}
-      ${laneStats(p)}
+      ${laneTime(p)}
     </div>
     <div class="canvas"></div>
     ${infoMarkup(p)}
@@ -1329,7 +1338,7 @@ function renderFocus(){
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
           ${laneServices(p)}
-          ${laneStats(p)}
+          ${laneTime(p)}
         </div>
         <div class="canvas"></div>
         ${infoMarkup(p)}
