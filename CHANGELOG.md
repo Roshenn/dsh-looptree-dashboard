@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.2.5 — 版本号显示
+
+- host 半注入 `window.__ROTATION_VERSION__`，面板顶部副标题从「原型 v0.3」改为真实插件版本
+  （之前容易误读成「还是原型」）
+
 ## 0.2.4 — 候选 API 地址探测
 
 - host 半在 index.html 注入**候选** API 地址（Host 头 / 探测到的监听端口 / 相对路径），
