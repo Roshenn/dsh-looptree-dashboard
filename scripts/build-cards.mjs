@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const dir = process.argv[2] || 'samples';
-const out = process.argv[3] || 'cards.js';
+const out = process.argv[3] || '../web/cards.js';
 if (!existsSync(dir)) { console.error(`目录不存在: ${dir}`); process.exit(2); }
 
 const files = readdirSync(dir).filter((f) => f.endsWith('.rotation.json')).sort();

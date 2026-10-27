@@ -19,10 +19,11 @@ import { readFile, writeFile, rename, readdir, stat } from 'node:fs/promises';
 import { join, extname, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { validateCard } from './rotation-core.mjs';
+import { validateCard } from './lib/core.mjs';
 
 const ROOT = process.cwd();
 const DIR = join(ROOT, 'samples');
+const WEB = join(ROOT, 'web');
 const PORT = Number(process.env.PORT || 4173);
 const RUN_TOKEN = randomBytes(12).toString('hex');
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT || 3);
@@ -436,8 +437,8 @@ const server = createServer(async (req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { ok: false, error: 'method' });
   let p = decodeURIComponent(url.pathname);
   if (p === '/') p = '/index.html';
-  const abs = resolve(ROOT, '.' + p);
-  if (!abs.startsWith(ROOT + sep) && abs !== ROOT) return send(res, 403, 'forbidden', 'text/plain; charset=utf-8');
+  const abs = resolve(WEB, '.' + p);
+  if (!abs.startsWith(WEB + sep) && abs !== WEB) return send(res, 403, 'forbidden', 'text/plain; charset=utf-8');
   try {
     const buf = await readFile(abs);
     return send(res, 200, buf, MIME[extname(abs)] || 'application/octet-stream');

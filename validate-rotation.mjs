@@ -5,7 +5,7 @@
  * 退出码：0 通过 / 1 有错误 / 2 读不出来
  */
 import { readFileSync } from 'node:fs';
-import { validateCard, treeLines } from './rotation-core.mjs';
+import { validateCard, treeLines } from './lib/core.mjs';
 
 const file = process.argv[2];
 const quiet = process.argv.includes('--quiet');

@@ -1,3 +1,34 @@
+# 闭环轮转面板 · DSH 插件
+
+把「多项目闭环轮转」做成 DSH 插件：一个泳道视图里同时看多个项目的
+`闭环 → 目标 → 构思 → 执行`，每个节点带可复制的结构化 prompt、可发起的会话、
+可一键拉起的项目服务。
+
+## 当前形态（M0 已跑通）
+
+```
+package.json          插件清单：dsh.bundle.patch + dsh.client
+cordis.patch.yml      安装后由 profile 自动挂载 host 半
+lib/index.js          host 半：/rotation/app/*（面板）、/rotation/api/*（数据/会话/服务）
+lib/client.js         client 半：DSH Web 右栏「轮转」入口（__ModuleLoader__ 形态）
+lib/core.mjs          rotation/v1 校验与树工具（host 与 CLI 共用）
+web/                  面板本体：index.html + cards.js（file:// 兜底数据）
+samples/              5 张示例卡（M1 会迁到各项目 workspace 的 .dsh/rotation.json）
+scripts/dev-host.mjs  不装 DSH 也能验证 host 半的假宿主
+serve.mjs             旧开发服务器（:4173，M3 后退役）
+```
+
+本地验证 host 半：
+
+```bash
+npm run dev            # http://127.0.0.1:4180/rotation/app/
+curl -s localhost:4180/rotation/api/health
+```
+
+装进 DSH（M0 之后）：市场 UI 安装本目录打包产物；按本机规则插件只走市场 UI，
+用 CLI 前先核对 `node_modules/.modules.yaml` 的 `storeDir` 与 `pnpm store path` 一致。
+
+---
 # 闭环轮转面板（原型 v0.6 · 可读写 rotation/v1）
 
 > 一个工作区一张闭环卡：`闭环 → 目标 → 构思 → 执行`，自下而上确认关闭，全部关闭后闭环收敛归档。
