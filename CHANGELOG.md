@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.3.3 — 修工作区路径
+
+- 修：`DSH_HOME` 缺省时直接用了 home 目录，拼出 `/Users/<user>/storages/workspace.json`（ENOENT）
+- 现在缺省拼 `~/.dsh`，且兼容 `DSH_HOME` 指向 `~/.dsh` 或它的父目录；文件不存在时再回退到 `~/.dsh/storages/workspace.json`
+- 实测：端点返回 15 个工作区，弹窗下拉 15 项，无「读取失败」提示
+
 ## 0.3.2 — 只列未登记的工作区
 
 - `/rotation/api/workspaces` 过滤掉已登记进轮转的目录，并返回 `total` / `registeredCount`
