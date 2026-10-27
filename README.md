@@ -49,6 +49,26 @@ curl -s localhost:4180/rotation/api/health
 
 迁移样例：`npm run migrate`（干跑），`npm run migrate -- --write` 真正写入，幂等（目标已存在就跳过）。
 
+## M2 会话（已完成，等待真机验证）
+
+执行器 `lib/runner.mjs` 走 **DSH 进程内 agent 服务**，不再 spawn `dsh --profile headless`：
+
+```
+ctx.agentDefaultModel.currentSelection()      → { provider, model }（GUI 里选的那套）
+ctx.agents.create({ sessionId, agentOptions, meta:{cwd}, setup })
+agent.followup(<user message>)
+ctx.on('session/event', …)                    → turn/start · assistant/message · turn/end
+```
+
+- 事件映射：`turn/start` → 运行中；`assistant/message` → 结果预览；`turn/end(completed)` → 完成；其它 reason → 失败
+- 结束后把 `session{ id,status,cwd,task_id,started_at,ended_at,result,error }` 写回卡片
+- 15 分钟超时自动中断；同节点单运行；全局并发上限 3
+- 接口：`GET /rotation/api/run-config`、`POST /rotation/api/run`、`GET /rotation/api/runs`、`POST /rotation/api/run/cancel`
+
+因为走进程内服务，凭据、provider 路由、模型选择都沿用 GUI 配置——这同时满足「模型调用必须走网关」的本机铁律。
+
+验证：`scripts/dev-session-mock.mjs` 用假 ctx 跑三种路径（done / failed / cancelled），全部 PASS。
+
 ---
 # 闭环轮转面板（原型 v0.6 · 可读写 rotation/v1）
 
