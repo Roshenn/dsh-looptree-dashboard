@@ -778,21 +778,48 @@ let API_BASE = (() => {
 })();
 
 /** 非 http 协议（桌面外壳 dsh-app://）时，按候选地址探测哪个能通 */
+const API_ATTEMPTS = [];
+window.__rotationApiAttempts = API_ATTEMPTS;
+
 async function resolveApiBase() {
   if (/^https?:/.test(location.protocol)) return API_BASE;
   const list = Array.isArray(window.__ROTATION_API_CANDIDATES__) ? window.__ROTATION_API_CANDIDATES__ : [];
   for (const raw of list) {
     const candidate = String(raw).replace(/\/$/, '');
-    const abs = /^https?:/.test(candidate) ? candidate : new URL(candidate, location.href).toString().replace(/\/$/, '');
+    let abs = candidate;
+    try { abs = /^https?:/.test(candidate) ? candidate : new URL(candidate, location.href).toString().replace(/\/$/, ''); }
+    catch (e) { API_ATTEMPTS.push({ candidate, abs, error: 'URL 解析失败: ' + e.message }); continue; }
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 1500);
       const r = await fetch(abs + '/health', { signal: ctrl.signal });
       clearTimeout(timer);
+      API_ATTEMPTS.push({ candidate, abs, status: r.status });
       if (r.ok) { API_BASE = abs; return abs; }
-    } catch { /* try next */ }
+    } catch (e) {
+      API_ATTEMPTS.push({ candidate, abs, error: (e && (e.name + ': ' + e.message)) || String(e) });
+    }
   }
   return API_BASE;
+}
+
+/** 连不上时的诊断面板：把探测过程摊开，便于远程定位（桌面外壳 dsh-app:// 场景） */
+function apiDiagnostics() {
+  const parentGlobals = (() => {
+    try {
+      return Object.keys(window.parent || {}).filter((k) => k.startsWith('__')).slice(0, 20);
+    } catch { return ['(跨源，读不到)']; }
+  })();
+  const lines = [
+    '页面：' + location.href,
+    '协议：' + location.protocol + '　origin：' + location.origin,
+    '注入的候选：' + JSON.stringify(window.__ROTATION_API_CANDIDATES__ || null),
+    '注入的版本：' + JSON.stringify(window.__ROTATION_VERSION__ || null),
+    '探测记录：' + JSON.stringify(API_ATTEMPTS, null, 1),
+    '父窗口 URL：' + (() => { try { return window.parent.location.href; } catch (e) { return '(跨源: ' + e.message + ')'; } })(),
+    '父窗口 __ 全局：' + JSON.stringify(parentGlobals),
+  ];
+  return lines.join('\n');
 }
 const api = (path) => (API_BASE ? API_BASE + path : 'api' + path);
 window.__rotationLastApiError = '';
@@ -2643,7 +2670,18 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   if (src) src.textContent = source === 'server'
     ? '数据源：项目 .dsh/rotation.json（可写回）'
     : source === 'static' ? '数据源：cards.js（只读样例）' : '数据源：内置 mock';
-  if (source !== 'server') markSave(`未连接 ${location.origin} 的保存服务 · 用「导出 JSON」保存（若 DSH 换过端口，请从当前地址重新打开面板）`, 'warn');
+  if (source !== 'server') {
+    markSave(`未连接 ${location.origin} 的保存服务 · 点击这里看诊断`, 'warn');
+    const st = $('#save-state');
+    if (st) {
+      st.style.cursor = 'pointer';
+      st.title = '点击查看 API 探测诊断';
+      st.addEventListener('click', () => askConfirm('连接诊断',
+        `<pre class="pgen" style="white-space:pre-wrap;max-height:340px">${esc(apiDiagnostics())}</pre>
+         <div class="mnote">把这段发我即可定位。数据源：cards.js 只是只读样例，不影响面板其它功能。</div>`,
+        '关闭', null));
+    }
+  }
   else markSave('已连接：改动会写回项目 .dsh/rotation.json', 'ok');
   if (location.protocol.startsWith('http')){
     try {
