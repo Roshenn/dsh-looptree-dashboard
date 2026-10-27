@@ -328,9 +328,12 @@
   #launch-prompt{width:100%;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx1);
     background:var(--l1);border:1px solid var(--b2);border-radius:7px;padding:8px 9px;resize:vertical;min-height:180px}
   #launch-prompt:focus{outline:2px solid var(--brand);outline-offset:1px}
-  .pgen{margin:7px 0 0;padding:8px 9px;border-radius:7px;border:1px solid var(--b1);background:var(--l1);
-    color:var(--tx2);font-size:10.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
-    max-height:180px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .pgen-wrap{margin:7px 0 0}
+  .pgen-input{width:100%;max-height:200px;min-height:120px;resize:vertical;font:10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--tx2);background:var(--l1);border:1px solid var(--b2);border-radius:7px;padding:8px 9px}
+  .pgen-input:focus{outline:2px solid var(--brand);outline-offset:1px;color:var(--tx1)}
+  .pgen-bar{display:flex;align-items:center;gap:6px;margin-top:4px}
+  .pgen-hint{font-size:9.5px;color:var(--tx4);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .detail-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
   .tnode.is-active{border-color:color-mix(in srgb,var(--brand) 60%,var(--b3));box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 26%,transparent)}
 
@@ -658,6 +661,9 @@ function cardToProject(card, file){
 let RUN_CFG = null;                 // { token, maxConcurrent, timeoutMs }
 const runMap = new Map();           // `${file}::${nodeId}` -> run
 const runKey = (p, n) => `${p.file || ''}::${n.id}`;
+const promptEdits = new Map();      // `${nodeId}::<taskId>` -> 手改后的 prompt
+let pgenOpen = null;                // 展开中的内联编辑：{ nid, task }
+const promptKey = (nid, tid) => `${nid}::${tid}`;
 function staticRun(n){
   const sess = n.raw && n.raw.session;
   if (!sess) return null;
@@ -1618,21 +1624,41 @@ function detailMarkup(p, n){
       <div class="prompt-list">
         ${tasks.list.map(t => `<div class="prow" data-task="${t.id}">
           <button class="ptitle" data-preview-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}">${esc(t.title)}</button>
-          <button class="pbtn" data-prompt-edit="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="先改 prompt 再决定">修改</button>
           <button class="pbtn" data-copy-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
           <button class="pbtn run" data-prompt-run="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="用这条 prompt 发起会话">发起</button>
         </div>`).join('')}
       </div>
-      <pre class="pgen" id="pgen" hidden></pre>
+      <div class="pgen-wrap" id="pgen-wrap" hidden>
+        <textarea class="pgen-input" id="pgen-input" spellcheck="false"></textarea>
+        <div class="pgen-bar">
+          <span class="pgen-hint" id="pgen-hint">点模板名展开，可直接改；「发起」会带上改过的内容</span>
+          <button class="pbtn" data-pgen-reset="1">重置</button>
+        </div>
+      </div>
     </div>
     <div class="detail-acts">${acts}</div>`;
 }
 
 let detailNode = null;
+function restorePgen(p, n){
+  if (!pgenOpen || pgenOpen.nid !== n.id) return;
+  const task = taskListFor(p, n).list.find(t => t.id === pgenOpen.task);
+  const wrap = $('#pgen-wrap');
+  if (!task || !wrap) return;
+  const key = promptKey(n.id, task.id);
+  wrap.dataset.task = task.id; wrap.dataset.nid = n.id; wrap.dataset.proj = p.id;
+  $('#pgen-input').value = promptEdits.get(key) ?? composePrompt(p, n, task);
+  $('#pgen-hint').textContent = promptEdits.has(key)
+    ? '已手动修改（会带进「发起」）'
+    : '点模板名展开，可直接改；「发起」会带上改过的内容';
+  wrap.hidden = false;
+}
+
 function closeDetail(){
   const d = $('#detail');
   if (!d || d.hidden) return;
   d.dataset.show = 'false';
+  pgenOpen = null;
   const c0 = d.querySelector('.detail-card');
   if (c0){ c0.style.opacity = ''; c0.style.transform = ''; }
   document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
@@ -1661,6 +1687,7 @@ function openDetail(id){
   card.style.left = left + 'px';
   card.style.top = top + 'px';
   card.style.transformOrigin = left > ar.right ? '0 26px' : '100% 26px';
+  restorePgen(p, n);
   const showIt = () => {
     if (detailNode !== id) return;
     d.dataset.show = 'true';
@@ -1754,6 +1781,11 @@ function openLaunch(opts){
     const badge = $('#launch-edited'); if (badge) badge.hidden = true;
   };
   fill();
+  if (opts && typeof opts.initialText === 'string' && opts.initialText.trim()){
+    ta.value = opts.initialText;
+    launchCtx.edited = true;
+    const badge = $('#launch-edited'); if (badge) badge.hidden = false;
+  }
   ta.addEventListener('input', () => {
     launchCtx.edited = true;
     const badge = $('#launch-edited'); if (badge) badge.hidden = false;
@@ -1795,18 +1827,21 @@ async function doLaunch(){
 
 function showModal(m){
   m.hidden = false;
+  m.style.opacity = '';
   const card = m.querySelector('.modal-card');
   if (card){ card.style.transition = ''; card.style.opacity = ''; card.style.transform = ''; }
   requestAnimationFrame(() => { m.dataset.show = 'true'; });
   setTimeout(() => {
     if (m.hidden) return;
     m.dataset.show = 'true';
+    m.style.opacity = '1';                       // 外层也落终态，否则 parent opacity 会乘出半透明
     if (card){ card.style.transition = 'none'; card.style.opacity = '1'; card.style.transform = 'scale(1)'; }
   }, 200);
 }
 function hideModal(m){
   if (!m || m.hidden) return;
   m.dataset.show = 'false';
+  m.style.opacity = '';
   const card = m.querySelector('.modal-card');
   if (card){ card.style.transition = ''; card.style.opacity = ''; card.style.transform = ''; }
   setTimeout(() => { m.hidden = true; }, 150);
@@ -1928,6 +1963,21 @@ function exportCard(p){
 }
 
 /* ─────────── toast ─────────── */
+document.addEventListener('input', (e) => {
+  if (!e.target.closest('#pgen-input')) return;
+  const wrap = $('#pgen-wrap');
+  if (!wrap || !wrap.dataset.task) return;
+  const v = e.target.value;
+  const key = promptKey(wrap.dataset.nid, wrap.dataset.task);
+  const p0 = PROJECTS.find(x => x.id === wrap.dataset.proj);
+  const n0 = p0 && findNode(p0.root, wrap.dataset.nid);
+  const task = p0 && n0 && taskListFor(p0, n0).list.find(t => t.id === wrap.dataset.task);
+  if (p0 && n0 && task && v === composePrompt(p0, n0, task)) promptEdits.delete(key);
+  else promptEdits.set(key, v);
+  const hint = $('#pgen-hint');
+  if (hint) hint.textContent = promptEdits.has(key) ? '已手动修改（会带进「发起」）' : '点模板名展开，可直接改；「发起」会带上改过的内容';
+});
+
 document.addEventListener('change', (e) => {
   const sel = e.target.closest('[data-status]');
   if (!sel) return;
@@ -1991,10 +2041,26 @@ document.addEventListener('click', (e)=>{
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');
   if (titleEl){ startEdit('title', titleEl); return; }
+  if (e.target.closest('[data-pgen-reset]')){
+    const wrap = $('#pgen-wrap');
+    if (wrap && wrap.dataset.task){
+      promptEdits.delete(promptKey(wrap.dataset.nid, wrap.dataset.task));
+      const p0 = PROJECTS.find(x => x.id === wrap.dataset.proj);
+      const n0 = p0 && findNode(p0.root, wrap.dataset.nid);
+      const task = p0 && n0 && taskListFor(p0, n0).list.find(t => t.id === wrap.dataset.task);
+      if (p0 && n0 && task){ $('#pgen-input').value = composePrompt(p0, n0, task); $('#pgen-hint').textContent = '已恢复默认'; }
+    }
+    return;
+  }
   const runBtn = e.target.closest('[data-prompt-run]');
   if (runBtn){
     const p0 = PROJECTS.find(x => x.id === runBtn.dataset.proj);
-    if (p0) openLaunch({ nodeId: runBtn.dataset.nid, taskId: runBtn.dataset.promptRun, mode:'run' });
+    if (p0) openLaunch({
+      nodeId: runBtn.dataset.nid,
+      taskId: runBtn.dataset.promptRun,
+      mode:'run',
+      initialText: promptEdits.get(promptKey(runBtn.dataset.nid, runBtn.dataset.promptRun)),
+    });
     return;
   }
   const editBtn = e.target.closest('[data-prompt-edit]');
@@ -2036,7 +2102,7 @@ document.addEventListener('click', (e)=>{
     const n0 = p0 && findNode(p0.root, copyPrompt.dataset.nid);
     const task = taskListFor(p0, n0).list.find(t => t.id === copyPrompt.dataset.copyPrompt);
     if (p0 && n0 && task){
-      const txt = composePrompt(p0, n0, task);
+      const txt = promptEdits.get(promptKey(n0.id, task.id)) ?? composePrompt(p0, n0, task);
       copyText(txt).then(ok => {
         if (ok) { toast(`已复制「${task.title}」prompt`); return; }
         // 剪贴板被拒：展开原文并选中，方便手动 ⌘C
@@ -2056,14 +2122,20 @@ document.addEventListener('click', (e)=>{
     const p0 = PROJECTS.find(x => x.id === previewPrompt.dataset.proj);
     const n0 = p0 && findNode(p0.root, previewPrompt.dataset.nid);
     const task = taskListFor(p0, n0).list.find(t => t.id === previewPrompt.dataset.previewPrompt);
-    const pre = $('#pgen');
-    if (p0 && n0 && task && pre){
-      const same = pre.dataset.task === task.id;
-      if (same && !pre.hidden){ pre.hidden = true; pre.dataset.task = ''; return; }
-      pre.textContent = composePrompt(p0, n0, task);
-      pre.dataset.task = task.id;
-      pre.hidden = false;
-      pre.scrollIntoView({ block:'nearest' });
+    const wrap = $('#pgen-wrap');
+    if (p0 && n0 && task && wrap){
+      const same = wrap.dataset.task === task.id;
+      if (same && !wrap.hidden){ wrap.hidden = true; wrap.dataset.task = ''; pgenOpen = null; return; }
+      pgenOpen = { nid: n0.id, task: task.id };
+      const key = promptKey(n0.id, task.id);
+      $('#pgen-input').value = promptEdits.get(key) ?? composePrompt(p0, n0, task);
+      wrap.dataset.task = task.id;
+      wrap.dataset.nid = n0.id;
+      wrap.dataset.proj = p0.id;
+      wrap.hidden = false;
+      $('#pgen-hint').textContent = promptEdits.has(key) ? '已手动修改（会带进「发起」）' : '点模板名展开，可直接改；「发起」会带上改过的内容';
+      $('#pgen-input').focus();
+      wrap.scrollIntoView({ block:'nearest' });
     }
     return;
   }
