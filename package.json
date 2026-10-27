@@ -43,6 +43,7 @@
     "mock:session": "node scripts/dev-session-mock.mjs",
     "mock:client": "node scripts/dev-client-mock.mjs",
     "lint:plugin": "node scripts/lint-plugin.mjs",
-    "preflight": "npm run lint:plugin && npm run mock:client && ROTATION_HOME=\"$(mktemp -d)\" MOCK_WS=\"$(mktemp -d)\" PORT=$((4100 + RANDOM % 800)) node scripts/dev-session-mock.mjs && npm run validate:samples"
+    "preflight": "npm run lint:plugin && npm run mock:client && ROTATION_HOME=\"$(mktemp -d)\" MOCK_WS=\"$(mktemp -d)\" PORT=$((4100 + RANDOM % 800)) node scripts/dev-session-mock.mjs && npm run validate:samples && npm run verify:tarball",
+    "verify:tarball": "node scripts/verify-tarball.mjs"
   }
 }

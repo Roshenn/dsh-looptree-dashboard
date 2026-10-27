@@ -91,7 +91,9 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 - **后台标签页也会刷新**：切走再切回立刻同步一次，不再显示过期状态
 - **服务日志**：服务块里出现「日志」按钮（有输出时），弹窗看最近 1500 字符
 - **打包自检**：`npm run lint:plugin`（27 项：清单字段、patch、files、host/client 契约）
-- **一条命令全跑**：`npm run preflight`
+- **打包产物验证**：`npm run verify:tarball` —— 解包到临时 node_modules，用**装进去的那份文件**跑
+  health / panel / cards 三个真实请求 + client 半契约（抓 `files` 白名单漏项、相对路径错位这类事故）
+- **一条命令全跑**：`npm run preflight`（lint → client → 会话状态机 → 样例 → tarball）
 
 
 - 空注册表时面板显示引导卡片（「添加第一个项目」），不再退回样例数据：
