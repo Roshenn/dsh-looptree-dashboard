@@ -9,6 +9,16 @@ const ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 const iso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 
 const KINDS = ['loop', 'goal', 'idea', 'exec'];
+const SESSION_STATUS = new Set(['idle','starting','running','done','failed','cancelled','stale']);
+function checkSession(sess, at, errors) {
+  if (typeof sess !== 'object' || Array.isArray(sess)) { errors.push(`${at}: 必须是对象`); return; }
+  if (!sess.id || typeof sess.id !== 'string') errors.push(`${at}.id: 必填`);
+  if (sess.status != null && !SESSION_STATUS.has(sess.status)) errors.push(`${at}.status: 非法（${sess.status}）`);
+  ['started_at', 'ended_at'].forEach(k => {
+    if (sess[k] != null && !iso(sess[k])) errors.push(`${at}.${k}: 必须是 ISO 时间`);
+  });
+  if (sess.exit_code != null && !Number.isInteger(sess.exit_code)) errors.push(`${at}.exit_code: 必须是整数`);
+}
 const CTX_KEYS = new Set([
   'project','loop','loop.intent','loop.acceptance','goal','goal.acceptance',
   'idea','idea.approach','siblings','node','node.acceptance','node.approach',
@@ -87,6 +97,7 @@ export function validateCard(doc) {
     }
     if (n.prompts != null) checkPromptList(n.prompts, `${at}.prompts`, errors, warnings);
     if (n.prompt_context != null) checkPromptContext(n.prompt_context, `${at}.prompt_context`, errors, warnings);
+    if (n.session != null) checkSession(n.session, `${at}.session`, errors);
     if (n.status === 'doing' && n.closed_at == null && n.started_at == null) {
       warnings.push(`${at}: doing 但缺 started_at，面板算不出在途时长`);
     }

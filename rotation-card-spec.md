@@ -54,6 +54,28 @@
 | `issues[]` | exec | ➖ | `{ "text", "at", "resolved_at?" }`，未 resolved 即阻塞 |
 | `children[]` | loop, goal, idea, exec | ➖ | 顺序即展示顺序 |
 
+## 节点会话（可选，面板写入）
+
+节点上可挂 `session`，记录「这个节点对应的 DSH 会话」：
+
+```json
+"session": {
+  "id": "session-12409905-c4cd-408b-8471-22726a34ba44",
+  "status": "done",                     // idle|starting|running|done|failed|cancelled|stale
+  "cwd": "/Users/julian/agentic/projects/storyweft",
+  "task_id": "plan",                    // 用了哪条 prompt 模板
+  "started_at": "2026-10-27T18:19:08+08:00",
+  "ended_at": "2026-10-27T18:19:09+08:00",
+  "exit_code": 0,
+  "result": "final.text 的前 4000 字",
+  "error": "失败原因（仅 failed/stale）"
+}
+```
+
+- 由面板/服务写入，人不需要手写；缺这个字段的卡行为完全不变。
+- `status` 非终态（starting/running）时，面板会按心跳判 `stale`（进程不在了）。
+- 执行器 = `dsh --profile headless --json`，`cwd` 固定取 `project.workspace`。
+
 ## Prompt 模板（可选，存进卡里）
 
 模板可以写进 `rotation.json`，改模板不用改代码。三层优先级：**节点级 > 卡片级（按类型）> 内置**。
@@ -137,6 +159,7 @@
 11. `prompts` 每条必须有 `id`（字母数字 `-_`）、`title`、`ask`；未知节点类型的 `prompts.<kind>` 只警告。
 12. `prompt_context.fields` 必须是已知键数组（未知键只警告）；`prompt_context.siblings` 需为 0–10 的整数。
 13. `prompt_context.refs` 必须是节点 id 数组，且每个 id 都要能在同一张卡里找到，否则报错。
+14. `session.status` 必须是上面 7 个枚举之一；`started_at` / `ended_at` 必须是 ISO；`exit_code` 必须是整数。
 
 ## 最短实现遇到的问题与增量改进（Problems & Incremental Changes）
 

@@ -8,3 +8,6 @@
 
 # 本地导出
 *.local.json
+
+# 会话运行快照（本地生成）
+runs.json

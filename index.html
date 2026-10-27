@@ -164,6 +164,14 @@
   .bars i{width:10px;height:3px;border-radius:2px;background:var(--b3)}
   .bars i.on{background:var(--green)}
   .blk{font-size:10.5px;color:var(--red)}
+  .runbad{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--tone);
+    padding:1px 6px;border-radius:5px;background:color-mix(in srgb,var(--tone) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--tone) 26%,transparent)}
+  .runbad .rdot{width:4px;height:4px;border-radius:50%;background:var(--tone)}
+  .lsel{display:flex;flex-direction:column;gap:2px}
+  .lopt{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:6px;font-size:12px;color:var(--tx2);cursor:pointer}
+  .lopt:hover{background:var(--hover)}
+  .lopt input{accent-color:var(--brand)}
   .late{font-size:10.5px;color:var(--amber)}
   .folded{margin-top:5px;display:flex;flex-direction:column;gap:2px;border-left:1px dashed var(--b2);padding-left:7px}
   .frow{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--tx3);min-width:0}
@@ -427,6 +435,18 @@
   <div class="detail-card" role="dialog" aria-label="节点详情"></div>
 </div>
 
+<div class="modal" id="launch" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="launch-title" style="width:min(560px,94vw)">
+    <div class="modal-head"><span id="launch-title">发起会话</span>
+      <button class="modal-x" id="launch-x" aria-label="关闭">✕</button></div>
+    <div class="modal-body" id="launch-body"></div>
+    <div class="modal-foot">
+      <button class="tbtn" id="launch-cancel">取消</button>
+      <button class="tbtn primary-converge" id="launch-ok">发起会话</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-head">
@@ -627,6 +647,27 @@ function cardToProject(card, file){
     root,
   };
 }
+let RUN_CFG = null;                 // { token, maxConcurrent, timeoutMs }
+const runMap = new Map();           // `${file}::${nodeId}` -> run
+const runKey = (p, n) => `${p.file || ''}::${n.id}`;
+function staticRun(n){
+  const sess = n.raw && n.raw.session;
+  if (!sess) return null;
+  const started = sess.started_at ? Date.parse(sess.started_at) : null;
+  const ended = sess.ended_at ? Date.parse(sess.ended_at) : null;
+  return {
+    key: '', file: '', nodeId: n.id, sessionId: sess.id, cwd: sess.cwd || '',
+    taskId: sess.task_id || '', status: sess.status || 'done',
+    startedAt: sess.started_at || '', endedAt: sess.ended_at || '',
+    exitCode: sess.exit_code, result: sess.result || '', error: sess.error || '',
+    elapsedMs: started ? (ended || Date.now()) - started : 0,
+    lastEventAt: '', tail: [],
+  };
+}
+const runFor = (p, n) => runMap.get(runKey(p, n)) || staticRun(n);
+const RUN_LABEL = { starting:'启动中', running:'运行中', done:'完成', failed:'失败', cancelled:'已取消', stale:'进程已不在' };
+const RUN_TONE = { starting:'var(--brand-2)', running:'var(--brand-2)', done:'var(--green)', failed:'var(--red)', cancelled:'var(--tx3)', stale:'var(--amber)' };
+
 const CARDS = Array.isArray(window.ROTATION_CARDS) ? window.ROTATION_CARDS : [];
 let PROJECTS = CARDS.length ? CARDS.map(cardToProject) : MOCK_PROJECTS;
 const USING_REAL = CARDS.length > 0;
@@ -902,7 +943,18 @@ function lateBadge(n){
   return `<div class="tnode-meta"><span class="late" title="开始于 ${n.raw.started_at}">⏳ 在途 ${days.toFixed(0)} 天</span></div>`;
 }
 
-function nodeMarkup(n){
+function runBadge(p, n){
+  const r = runFor(p, n);
+  if (!r) return '';
+  const tone = RUN_TONE[r.status] || 'var(--tx3)';
+  const secs = Math.round((r.elapsedMs || 0) / 1000);
+  const el = r.status === 'running' || r.status === 'starting'
+    ? (secs >= 60 ? `${Math.floor(secs/60)}m${secs%60}s` : `${secs}s`) : '';
+  return `<div class="tnode-meta"><span class="runbad" style="--tone:${tone}">
+    <i class="rdot"></i>${RUN_LABEL[r.status] || r.status}${el ? ' · ' + el : ''}</span></div>`;
+}
+
+function nodeMarkup(n, p){
   const st = stateOf(n), tone = nodeTone(n), pr = progressOf(n);
   const hasKids = (n.children||[]).length>0;
   const canClose = !n.closed && (!hasKids || readyToClose(n));
@@ -926,6 +978,7 @@ function nodeMarkup(n){
     ${n.meta ? `<div class="tnode-meta mono">${n.meta}</div>` : ''}
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
     ${lateBadge(n)}
+    ${p ? runBadge(p, n) : ''}
     ${issues}
     ${foldedMarkup(n)}
     ${(bars||foot) ? `<div class="tfootline">${bars}<span class="grow"></span>${foot}</div>` : ''}
@@ -951,7 +1004,7 @@ function mountCanvas(project, canvas){
   canvas.style.height = '';
   const { nodes } = treeLayout(project.root);
   canvas.__nodes = nodes;
-  canvas.innerHTML = `<svg class="edges" aria-hidden="true"></svg>` + nodes.map(nodeMarkup).join('');
+  canvas.innerHTML = `<svg class="edges" aria-hidden="true"></svg>` + nodes.map(n => nodeMarkup(n, project)).join('');
 }
 
 function layoutCanvas(project, canvas, cols){
@@ -1465,6 +1518,30 @@ function pathTo(root, id){
   })(root, []);
   return arr;
 }
+function sessionMarkup(p, n){
+  const r = runFor(p, n);
+  const st = r ? (RUN_LABEL[r.status] || r.status) : '无会话';
+  const tone = r ? (RUN_TONE[r.status] || 'var(--tx3)') : 'var(--tx4)';
+  const secs = r ? Math.round((r.elapsedMs || 0) / 1000) : 0;
+  const busy = r && (r.status === 'running' || r.status === 'starting');
+  const tail = r && r.tail && r.tail.length ? r.tail[r.tail.length - 1] : null;
+  const btn = busy
+    ? `<button class="tbtn" data-run-cancel="1">取消</button>`
+    : `<button class="tbtn primary-converge" data-run-start="1">${r ? '再跑一轮' : '发起会话'}</button>`;
+  return `<div class="detail-sec">
+    <div class="detail-k">会话<span class="psrc" style="color:${tone}">${st}${busy ? ' · ' + (secs >= 60 ? Math.floor(secs/60) + 'm' : secs + 's') : ''}</span></div>
+    ${r ? `<div class="detail-row"><dt>会话</dt><dd class="mono">${r.sessionId || '—'}</dd></div>
+      <div class="detail-row"><dt>目录</dt><dd class="mono">${r.cwd || '—'}</dd></div>
+      ${tail ? `<div class="detail-row"><dt>最后</dt><dd>${tail.brief}</dd></div>` : ''}
+      ${r.error ? `<div class="detail-row"><dt>问题</dt><dd style="color:var(--red)">${esc(r.error)}</dd></div>` : ''}
+      ${r.result ? `<pre class="pgen" style="max-height:120px">${esc(r.result.slice(0, 1200))}</pre>` : ''}`
+      : `<div class="detail-row"><dt>说明</dt><dd>还没有跑过会话，发起后会在这里显示进度与结果</dd></div>`}
+    <div class="detail-acts" style="margin-top:8px">${btn}
+      ${r && r.result && n.kind === 'exec' ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
+    </div>
+  </div>`;
+}
+
 function detailMarkup(p, n){
   const r = n.raw || {};
   const st = stateOf(n);
@@ -1526,6 +1603,8 @@ function detailMarkup(p, n){
     </dl>
     ${issues ? `<div class="detail-sec"><div class="detail-k">问题反馈</div>${issues}</div>` : ''}
     ${kidsHtml}
+    ${sessionMarkup(p, n)}
+
     <div class="detail-sec">
       <div class="detail-k">Prompt 模板 · 点复制直接粘给模型<span class="psrc">${tasks.from}</span></div>
       <div class="prompt-list">
@@ -1633,6 +1712,65 @@ function startEdit(field, anchor){
   });
 }
 
+let launchCtx = null;   // { p, n, tasks, selected }
+function openLaunch(){
+  const id = detailNode; if (!id) return;
+  const p = findProjectByNode(id); const n = p && findNode(p.root, id);
+  if (!p || !n) return;
+  const tasks = taskListFor(p, n).list;
+  launchCtx = { p, n, tasks, selected: tasks[0] && tasks[0].id };
+  if (!RUN_CFG){ toast('服务未连接：无法发起会话'); return; }
+  $('#launch-title').textContent = `发起会话 · ${KIND[n.kind]}「${n.title}」`;
+  $('#launch-body').innerHTML = `
+    <div class="detail-k" style="margin-bottom:5px">用哪条 prompt</div>
+    <div class="lsel">${tasks.map(t => `<label class="lopt"><input type="radio" name="ltask" value="${t.id}" ${t.id===launchCtx.selected?'checked':''}>
+      <span>${esc(t.title)}</span></label>`).join('')}</div>
+    <div class="detail-k" style="margin:11px 0 5px">将发送到 <span class="mono">${esc(p.card && p.card.project && p.card.project.workspace || p.workspace || '')}</span></div>
+    <pre class="pgen" id="launch-preview" style="max-height:180px"></pre>
+    ${RUN_CFG.hasApiKey === false ? `<div class="mnote" style="color:var(--amber)">⚠ 运行器没拿到模型凭据（服务进程环境里没有 DEEPSEEK_API_KEY），现在发起大概率会失败。用 <code>DEEPSEEK_API_KEY=… node serve.mjs</code> 启动服务即可。</div>` : ''}
+    <div class="mnote">会话会真实调用模型并按 headless profile 执行，可能需要一两分钟。同一节点同时只允许一个会话，并发上限 ${RUN_CFG.maxConcurrent}。</div>`;
+  const renderPreview = () => {
+    const t = tasks.find(x => x.id === launchCtx.selected) || tasks[0];
+    $('#launch-preview').textContent = t ? composePrompt(p, n, t) : '';
+  };
+  $('#launch-body').querySelectorAll('input[name=ltask]').forEach(r => r.addEventListener('change', () => {
+    launchCtx.selected = r.value; renderPreview();
+  }));
+  renderPreview();
+  const m = $('#launch');
+  m.hidden = false;
+  requestAnimationFrame(() => { m.dataset.show = 'true'; });
+}
+function closeLaunch(){
+  const m = $('#launch');
+  if (!m || m.hidden) return;
+  m.dataset.show = 'false';
+  setTimeout(() => { m.hidden = true; }, 150);
+}
+async function doLaunch(){
+  if (!launchCtx || !RUN_CFG) return;
+  const { p, n, tasks, selected } = launchCtx;
+  const task = tasks.find(x => x.id === selected) || tasks[0];
+  const prompt = composePrompt(p, n, task);
+  closeLaunch();
+  toast('会话启动中…');
+  try {
+    const res = await fetch('api/run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-rotation-token': RUN_CFG.token },
+      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt, taskId: task && task.id }),
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (j.run) runMap.set(j.run.key, j.run);
+    paintRunBadges(); refreshRuns();
+    if (detailNode === n.id) openDetail(n.id);
+    toast('会话已启动');
+  } catch (e) {
+    toast('发起失败：' + e.message);
+  }
+}
+
 function openConfirm(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
@@ -1662,13 +1800,18 @@ function closeConfirm(){
   setTimeout(() => { m.hidden = true; }, 160);
   pendingClose = null;
 }
+$('#launch-x').addEventListener('click', closeLaunch);
+$('#launch-cancel').addEventListener('click', closeLaunch);
+$('#launch-ok').addEventListener('click', doLaunch);
+$('#launch').addEventListener('click', (e) => { if (e.target.id === 'launch') closeLaunch(); });
 $('#modal-x').addEventListener('click', closeConfirm);
 $('#modal-cancel').addEventListener('click', closeConfirm);
 $('#modal-ok').addEventListener('click', () => { const id = pendingClose; closeConfirm(); if (id) doClose(id); });
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeConfirm(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (!$('#modal').hidden) closeConfirm();
+  if (!$('#launch').hidden) closeLaunch();
+  else if (!$('#modal').hidden) closeConfirm();
   else closeDetail();
 });
 
@@ -1678,6 +1821,36 @@ function markSave(msg, kind){
   el.textContent = msg;
   el.dataset.state = kind || '';
 }
+function paintRunBadges(){
+  document.querySelectorAll('.tnode').forEach(el => {
+    const nid = el.dataset.nid;
+    const p = findProjectByNode(nid); const n = p && findNode(p.root, nid);
+    if (!p || !n) return;
+    const old = el.querySelector('.runbad');
+    const html = runBadge(p, n);
+    if (!html){ if (old) old.closest('.tnode-meta').remove(); return; }
+    if (old){
+      const wrap = old.closest('.tnode-meta');
+      wrap.outerHTML = html;
+    } else {
+      el.insertAdjacentHTML('beforeend', html);
+    }
+  });
+  if (detailNode) openDetail(detailNode);
+}
+let refreshTimer = null;
+async function refreshRuns(){
+  if (!RUN_CFG) return;
+  try {
+    const res = await fetch('api/runs');
+    if (!res.ok) return;
+    const j = await res.json();
+    runMap.clear();
+    (j.runs || []).forEach(r => runMap.set(r.key, r));
+    paintRunBadges();
+  } catch {}
+}
+
 async function persist(p){
   if (!p.card) return { ok:false, error:'没有可写回的 card' };
   p.card.updated = new Date().toISOString();
@@ -1776,6 +1949,27 @@ document.addEventListener('click', (e)=>{
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');
   if (titleEl){ startEdit('title', titleEl); return; }
+  if (e.target.closest('[data-run-start]')){ openLaunch(); return; }
+  if (e.target.closest('[data-run-cancel]')){
+    const id = detailNode; const p0 = findProjectByNode(id); const n0 = p0 && findNode(p0.root, id);
+    if (p0 && n0 && RUN_CFG){
+      fetch('api/run/cancel', { method:'POST',
+        headers: { 'content-type':'application/json', 'x-rotation-token': RUN_CFG.token },
+        body: JSON.stringify({ file: p0.file, nodeId: n0.id }) })
+        .then(r => r.json()).then(j => { if (j.ok){ toast('已取消'); refreshRuns(); } else toast(j.error || '取消失败'); })
+        .catch(err => toast('取消失败：' + err.message));
+    }
+    return;
+  }
+  if (e.target.closest('[data-run-write]')){
+    const id = detailNode; const p0 = findProjectByNode(id); const n0 = p0 && findNode(p0.root, id);
+    const r0 = p0 && n0 && runFor(p0, n0);
+    if (p0 && n0 && r0 && r0.result){
+      n0.raw = n0.raw || {}; n0.raw.proof = r0.result.slice(0, 600);
+      persist(p0).then(res => { toast(res.ok ? '结果已写进证据' : '写入失败：' + res.error); render(); });
+    }
+    return;
+  }
   const copyPrompt = e.target.closest('[data-copy-prompt]');
   if (copyPrompt){
     const p0 = PROJECTS.find(x => x.id === copyPrompt.dataset.proj);
@@ -1902,6 +2096,19 @@ if (qs.get('filter')) state.filter = qs.get('filter');
     : source === 'static' ? '数据源：cards.js（只读）' : '数据源：内置 mock';
   if (source !== 'server') markSave('未连接保存服务 · 用「导出 JSON」保存', 'warn');
   else markSave('已连接：改动会写回 samples/', 'ok');
+  if (location.protocol.startsWith('http')){
+    try {
+      const r = await fetch('api/run-config');
+      if (r.ok) RUN_CFG = await r.json();
+    } catch {}
+    if (RUN_CFG){
+      await refreshRuns();
+      refreshTimer = setInterval(() => {
+        const busy = [...runMap.values()].some(x => x.status === 'running' || x.status === 'starting');
+        if (!document.hidden && (busy || Math.random() < 0.2)) refreshRuns();
+      }, 2000);
+    }
+  }
   // 便于分享/截图：?open=<nodeId> 载入后直接展开该节点详情
   const openId = qs.get('open');
   if (openId) setTimeout(() => openDetail(openId), 250);

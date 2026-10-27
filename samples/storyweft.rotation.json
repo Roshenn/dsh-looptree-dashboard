@@ -59,7 +59,17 @@
         "proof": "实测 210ms",
         "status": "done",
         "closed_at": "2026-10-26T16:03:15.932Z",
-        "issues": []
+        "issues": [],
+        "session": {
+         "id": "session-11111111-2222-3333-4444-555555555555",
+         "status": "done",
+         "cwd": "/Users/julian/agentic/projects/storyweft",
+         "task_id": "steps",
+         "started_at": "2026-10-25T10:02:00+08:00",
+         "ended_at": "2026-10-25T10:09:31+08:00",
+         "exit_code": 0,
+         "result": "已给单层渲染拆出 3 步：先建 layer 容器，再复用节点缓存，最后接通 hover。bench 210ms → 96ms。"
+        }
        }
       ],
       "started_at": "2026-10-21T21:00:00+08:00"

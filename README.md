@@ -16,6 +16,23 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 ```
 刷新页面即出现新泳道。文件名必须以 `.rotation.json` 结尾。
 
+## 节点 ↔ 会话（发起 / 等待 / 处理结果）
+
+详情卡的「会话」段可以直接驱动一次真实 DSH 会话：
+
+| 动作 | 行为 |
+|---|---|
+| 发起会话 / 再跑一轮 | 选一条 prompt 模板 → 确认弹窗预排完整 prompt → 在 `project.workspace` 下跑 `dsh --profile headless --json` |
+| 等待 | 节点卡片显示状态点（启动中 / 运行中 · 12s / 完成 / 失败 / 进程已不在），面板每 2s 拉一次状态 |
+| 取消 | 杀子进程，状态置「已取消」 |
+| 处理结果 | 结果预览 + 「写进证据」（exec 节点写入 `proof`）+「再跑一轮」 |
+
+状态来源是**子进程事件流**（`session` / `step/*` / `tool/*` / `turn/end` / `final`），不是解析日志文件；离开页面再回来靠卡片里的 `session.status` 兜底，超过 60s 无心跳判「进程已不在」。
+
+> ⚠️ 运行器需要模型凭据：headless profile 没有 credentials 插件，服务进程环境里要有 `DEEPSEEK_API_KEY`，否则发起必然失败（面板会在确认弹窗里提前警告）。启动示例：`DEEPSEEK_API_KEY=... node serve.mjs`
+
+接口：`POST /api/run`、`GET /api/runs`、`POST /api/run/cancel`，写接口要求同源 + `X-Rotation-Token`。
+
 ## 点节点看详情卡
 
 点任意节点（卡片空白处，不是按钮）会弹出详情卡：
