@@ -61,7 +61,13 @@ const ctx = {
 
 apply(ctx, { basePath: BASE });
 
-const project = await addProject({ id: 'mockrun', name: 'MockRun', workspace: process.env.MOCK_WS || '/tmp/ws-mockrun' });
+const WS = process.env.MOCK_WS || '/tmp/ws-mockrun';
+const project = await addProject({ id: 'mockrun', name: 'MockRun', workspace: WS })
+  .catch(async (error) => {
+    if (error.status !== 409) throw error;
+    const { findProject } = await import('../lib/store.mjs');
+    return findProject('mockrun');
+  });
 
 const server = createServer((req, res) => {
   const { pathname } = new URL(req.url, 'http://127.0.0.1');

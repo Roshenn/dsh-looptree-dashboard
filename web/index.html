@@ -840,6 +840,7 @@ function svcRows(p){
         ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}">一键拉起</button>` : ''}
         ${canStop ? `<button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}">停止</button>` : ''}
         <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
+        ${svc.output ? `<button class="pbtn" data-svc-log="${svc.id}" data-file="${esc(p.file)}">日志</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2331,6 +2332,15 @@ document.addEventListener('click', (e)=>{
         .then(r => r.json()).then(j => { toast(j.ok ? `已停止 ${svc.name}` : (j.error || '停止失败')); setTimeout(refreshServices, 600); })
         .catch(e => toast('停止失败：' + e.message));
     }
+    return;
+  }
+  const svcLog = e.target.closest('[data-svc-log]');
+  if (svcLog){
+    const { svc } = svcFor(svcLog);
+    if (svc) askConfirm(`${svc.name} · 最近日志`,
+      `<pre class="pgen" style="max-height:320px;white-space:pre-wrap">${esc(svc.output || '(暂无输出)')}</pre>
+       <div class="mnote">只保留最近 1500 字符；完整日志在服务自己的终端里。</div>`,
+      '关闭', null);
     return;
   }
   const svcStart = e.target.closest('[data-svc-start]');

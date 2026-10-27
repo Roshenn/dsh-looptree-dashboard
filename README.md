@@ -88,6 +88,9 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 - **client 契约**：`npm run mock:client`（9 项断言，含无 slots 降级）
 - **调试钩子**：页面里 `window.__rotation.refreshRuns()` / `.runs` / `.state` 可手动触发刷新与查状态
 - **后台标签页也会刷新**：切走再切回立刻同步一次，不再显示过期状态
+- **服务日志**：服务块里出现「日志」按钮（有输出时），弹窗看最近 1500 字符
+- **打包自检**：`npm run lint:plugin`（27 项：清单字段、patch、files、host/client 契约）
+- **一条命令全跑**：`npm run preflight`
 
 
 - 空注册表时面板显示引导卡片（「添加第一个项目」），不再退回样例数据：
