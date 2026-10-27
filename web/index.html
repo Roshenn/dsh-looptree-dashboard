@@ -2284,7 +2284,9 @@ document.addEventListener('click', (e)=>{
   if (svcOpen){
     const { svc } = svcFor(svcOpen);
     if (svc && RUN_CFG){
-      const u = svc.health ? new URL(svc.health, svc.url).toString() : svc.url;
+      const u = svc.health
+        ? new URL(String(svc.health).replace(/^\//, ''), svc.url.endsWith('/') ? svc.url : svc.url + '/').toString()
+        : svc.url;
       window.open(u, '_blank', 'noopener');
     } else if (svc){ window.open(svc.url, '_blank', 'noopener'); }
     return;

@@ -10,6 +10,9 @@
 package.json          插件清单：dsh.bundle.patch + dsh.client
 cordis.patch.yml      安装后由 profile 自动挂载 host 半
 lib/index.js          host 半：/rotation/app/*（面板）、/rotation/api/*（数据/会话/服务）
+lib/store.mjs         注册表 + 卡片读写（validate → .bak → tmp+rename）
+lib/runner.mjs        节点会话执行器（ctx.agents + session/event）
+lib/services.mjs      服务探活 / 一键拉起 / 停止
 lib/client.js         client 半：DSH Web 右栏「轮转」入口（__ModuleLoader__ 形态）
 lib/core.mjs          rotation/v1 校验与树工具（host 与 CLI 共用）
 web/                  面板本体：index.html + cards.js（file:// 兜底数据）
@@ -68,6 +71,15 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 因为走进程内服务，凭据、provider 路由、模型选择都沿用 GUI 配置——这同时满足「模型调用必须走网关」的本机铁律。
 
 验证：`scripts/dev-session-mock.mjs` 用假 ctx 跑三种路径（done / failed / cancelled），全部 PASS。
+
+## M3 服务（已完成）
+
+`lib/services.mjs`：探活（1.2s 超时，HTTP <500 算在线）、一键拉起（shell + 独立进程组）、
+停止（SIGTERM → 3s 后 SIGKILL）。`health` 以 `/` 开头时按「相对卡片 url 的路径」拼接。
+
+接口：`GET /rotation/api/services?file=<id>`、`POST /rotation/api/service/start`、`POST /rotation/api/service/stop`。
+
+实测：`host` 探活 200·9ms；`web` 从 down → 拉起后 up·200ms（pid 8444）→ 停止后 down 且端口释放。
 
 ---
 # 闭环轮转面板（原型 v0.6 · 可读写 rotation/v1）
