@@ -46,6 +46,50 @@ const SAFE_FILE = /^[A-Za-z0-9._-]+\.rotation\.json$/;
 
 /** key = `<file>::<nodeId>` */
 const runs = new Map();
+/** key = `<file>::<serviceId>` → { child, pid, startedAt, stopped, output, exitCode } */
+const services = new Map();
+const PROBE_TIMEOUT_MS = Number(process.env.PROBE_TIMEOUT_MS || 1200);
+
+async function probe(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'manual' });
+    return { ok: res.status < 500, httpStatus: res.status, latencyMs: Date.now() - t0 };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message, latencyMs: Date.now() - t0 };
+  } finally { clearTimeout(t); }
+}
+function svcRuntime(file, id) { return services.get(`${file}::${id}`) || null; }
+function svcView(file, svc, probeRes, runtime) {
+  const age = runtime ? Date.now() - Date.parse(runtime.startedAt) : null;
+  let status = probeRes.ok ? 'up' : 'down';
+  if (!probeRes.ok && runtime && !runtime.stopped && runtime.exitCode == null && age < 30000) status = 'starting';
+  if (!probeRes.ok && runtime && runtime.stopped) status = 'down';
+  else if (!probeRes.ok && runtime && runtime.exitCode != null && runtime.exitCode !== 0) status = 'failed';
+  return {
+    id: svc.id, name: svc.name || svc.id, url: svc.url, health: svc.health || '',
+    start: svc.start || '', stop: svc.stop || '',
+    status, httpStatus: probeRes.httpStatus, latencyMs: probeRes.latencyMs, error: probeRes.error,
+    pid: runtime ? runtime.pid : null,
+    startedAt: runtime ? runtime.startedAt : null,
+    uptimeMs: runtime && !runtime.exitCode ? Date.now() - Date.parse(runtime.startedAt) : null,
+    checkedAt: new Date().toISOString(),
+    output: runtime ? (runtime.output || '').slice(-1500) : '',
+  };
+}
+async function servicesFor(file) {
+  const card = await loadCard(file);
+  const list = Array.isArray(card.services) ? card.services : [];
+  const out = [];
+  for (const svc of list) {
+    const url = String(svc.health ? new URL(svc.health, svc.url).toString() : svc.url);
+    const probeRes = await probe(url);
+    out.push(svcView(file, svc, probeRes, svcRuntime(file, svc.id)));
+  }
+  return out;
+}
 
 const send = (res, code, body, type = 'application/json; charset=utf-8') => {
   res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
@@ -278,6 +322,54 @@ const server = createServer(async (req, res) => {
   if (url.pathname === '/api/runs' && req.method === 'GET') {
     sweepStale();
     return send(res, 200, { ok: true, runs: [...runs.values()].map(runView) });
+  }
+
+  if (url.pathname === '/api/services' && req.method === 'GET') {
+    const file = url.searchParams.get('file') || '';
+    if (!SAFE_FILE.test(file || '')) return send(res, 400, { ok: false, error: 'file 不合法' });
+    try { return send(res, 200, { ok: true, services: await servicesFor(file) }); }
+    catch (e) { return send(res, 404, { ok: false, error: e.message }); }
+  }
+
+  if (url.pathname === '/api/service/start' && req.method === 'POST') {
+    if (!authed(req)) return send(res, 403, { ok: false, error: 'forbidden' });
+    let body; try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, { ok: false, error: 'bad json' }); }
+    const { file, id } = body || {};
+    if (!SAFE_FILE.test(file || '') || !id) return send(res, 400, { ok: false, error: '缺 file / id' });
+    let card; try { card = await loadCard(file); } catch (e) { return send(res, 404, { ok: false, error: e.message }); }
+    const svc = (card.services || []).find(x => x.id === id);
+    if (!svc) return send(res, 404, { ok: false, error: '找不到服务 ' + id });
+    if (!svc.start) return send(res, 400, { ok: false, error: '这个服务没有配置 start 命令' });
+    const key = `${file}::${id}`;
+    const prev = services.get(key);
+    if (prev && prev.exitCode == null && !prev.stopped) return send(res, 409, { ok: false, error: '该服务已在运行（pid ' + prev.pid + '）' });
+    const cwd = svc.cwd || (card.project && card.project.workspace) || ROOT;
+    try {
+      const child = spawn(svc.start, {
+        cwd, shell: true, detached: true,
+        env: { ...process.env, NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const rt = { child, pid: child.pid, startedAt: new Date().toISOString(), stopped: false, output: '', exitCode: null };
+      const push = (c) => { rt.output = (rt.output + String(c)).slice(-4000); };
+      child.stdout.on('data', push); child.stderr.on('data', push);
+      child.on('exit', (code, signal) => { rt.exitCode = code == null ? -1 : code; rt.exitedAt = new Date().toISOString(); rt.signal = signal; });
+      child.on('error', (e) => { push('spawn error: ' + e.message); rt.exitCode = -1; });
+      services.set(key, rt);
+      return send(res, 200, { ok: true, service: { id, pid: child.pid, cwd, command: svc.start } });
+    } catch (e) { return send(res, 500, { ok: false, error: e.message }); }
+  }
+
+  if (url.pathname === '/api/service/stop' && req.method === 'POST') {
+    if (!authed(req)) return send(res, 403, { ok: false, error: 'forbidden' });
+    let body; try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, { ok: false, error: 'bad json' }); }
+    const { file, id } = body || {};
+    const key = `${file}::${id}`;
+    const rt = services.get(key);
+    if (!rt) return send(res, 404, { ok: false, error: '没有在跑的服务' });
+    rt.stopped = true;
+    try { process.kill(-rt.pid, 'SIGTERM'); } catch { try { rt.child.kill('SIGTERM'); } catch {} }
+    setTimeout(() => { try { process.kill(-rt.pid, 'SIGKILL'); } catch {} }, 3000);
+    return send(res, 200, { ok: true });
   }
 
   if (url.pathname === '/api/run' && req.method === 'POST') {

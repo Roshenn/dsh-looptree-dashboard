@@ -10,6 +10,22 @@ const iso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 
 const KINDS = ['loop', 'goal', 'idea', 'exec'];
 const SESSION_STATUS = new Set(['idle','starting','running','done','failed','cancelled','stale']);
+function checkServices(list, at, errors) {
+  if (!Array.isArray(list)) { errors.push(`${at}: 必须是数组`); return; }
+  const seen = new Set();
+  list.forEach((svc, i) => {
+    const a = `${at}[${i}]`;
+    if (!svc || typeof svc !== 'object') { errors.push(`${a}: 不是对象`); return; }
+    if (!svc.id || !/^[A-Za-z0-9_-]+$/.test(String(svc.id))) errors.push(`${a}.id: 只允许字母数字与 -_`);
+    else if (seen.has(svc.id)) errors.push(`${a}.id: 重复`);
+    else seen.add(svc.id);
+    if (!svc.name || !String(svc.name).trim()) errors.push(`${a}.name: 必填`);
+    if (!svc.url || !/^https?:\/\/[^\s]+$/.test(String(svc.url))) errors.push(`${a}.url: 必须是 http(s) 地址`);
+    if (svc.health != null && typeof svc.health !== 'string') errors.push(`${a}.health: 必须是字符串路径`);
+    if (svc.start != null && typeof svc.start !== 'string') errors.push(`${a}.start: 必须是命令字符串`);
+    if (svc.cwd != null && typeof svc.cwd !== 'string') errors.push(`${a}.cwd: 必须是路径字符串`);
+  });
+}
 function checkSession(sess, at, errors) {
   if (typeof sess !== 'object' || Array.isArray(sess)) { errors.push(`${at}: 必须是对象`); return; }
   if (!sess.id || typeof sess.id !== 'string') errors.push(`${at}.id: 必填`);
@@ -118,6 +134,7 @@ export function validateCard(doc) {
   if (doc.schema !== 'rotation/v1') errors.push(`schema 必须是 rotation/v1，实际 ${doc.schema}`);
   if (!doc.project || !doc.project.name) errors.push('缺少 project.name');
   if (!doc.project?.workspace) warnings.push('缺少 project.workspace（面板按路径匹配工作区会失败）');
+  if (doc.services != null) checkServices(doc.services, 'services', errors);
   if (doc.prompt_context != null) checkPromptContext(doc.prompt_context, 'prompt_context', errors, warnings);
   if (doc.prompts != null) {
     if (typeof doc.prompts !== 'object' || Array.isArray(doc.prompts)) errors.push('prompts 必须是对象（按节点类型分组）');

@@ -54,6 +54,32 @@
 | `issues[]` | exec | ➖ | `{ "text", "at", "resolved_at?" }`，未 resolved 即阻塞 |
 | `children[]` | loop, goal, idea, exec | ➖ | 顺序即展示顺序 |
 
+## 服务（可选，面板用于探活与一键拉起）
+
+```json
+"services": [
+  { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config" },
+  { "id": "web5800", "name": "本地预览 5800", "url": "http://127.0.0.1:5800",
+    "start": "python3 -m http.server 5800", "cwd": "/tmp/rt-workspace" }
+]
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `id` | ✅ | 字母数字与 `-_`，卡内唯一 |
+| `name` | ✅ | 信息栏里显示的名字 |
+| `url` | ✅ | `http(s)://host:port/...`，**就是访问方式**；信息栏里点一下即在浏览器打开 |
+| `health` | ➖ | 相对路径，探活用（拼在 url 后），缺省直接探测 url 本身 |
+| `start` | ➖ | 一键拉起的命令（shell），在 `cwd` 或 `project.workspace` 下执行 |
+| `cwd` | ➖ | 启动目录，缺省用 `project.workspace` |
+
+面板侧的语义：
+
+- **状态**：每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒。
+- **打开**：直接用浏览器打开 `url`（有 `health` 时打开 `url + health`）。
+- **一键拉起**：弹窗确认命令与工作目录后 `spawn(shell)`，进程组独立，可「停止」。
+- **复制地址**：复制 `url`，方便贴到别处验证。
+
 ## 节点会话（可选，面板写入）
 
 节点上可挂 `session`，记录「这个节点对应的 DSH 会话」：

@@ -228,5 +228,20 @@
   "refs": [
    "sw-e4"
   ]
- }
+ },
+ "services": [
+  {
+   "id": "panel",
+   "name": "轮转面板 4173",
+   "url": "http://127.0.0.1:4173",
+   "health": "/api/run-config"
+  },
+  {
+   "id": "web5800",
+   "name": "本地预览 5800",
+   "url": "http://127.0.0.1:5800",
+   "start": "python3 -m http.server 5800",
+   "cwd": "/tmp/rt-workspace"
+  }
+ ]
 }

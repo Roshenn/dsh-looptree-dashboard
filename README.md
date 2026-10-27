@@ -16,6 +16,27 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 ```
 刷新页面即出现新泳道。文件名必须以 `.rotation.json` 结尾。
 
+## 服务：访问方式 + 一键拉起
+
+信息 · 操作列新增「服务」块：每个服务显示 **访问地址、实时状态、延迟**，以及 `打开 / 一键拉起 / 停止 / 复制地址`。目的是「要验证时一秒能打开，服务没起也能一键拉起」，不用回想怎么启动。
+
+配置写在 `rotation.json` 的 `services`：
+
+```json
+"services": [
+  { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config" },
+  { "id": "web5800", "name": "本地预览 5800", "url": "http://127.0.0.1:5800",
+    "start": "python3 -m http.server 5800", "cwd": "/tmp/rt-workspace" }
+]
+```
+
+- 状态由服务端每 5s 探活（首次 1.2s 超时），显示 `运行中 · 2ms / 未启动 / 启动中 / 启动失败`。
+- 「一键拉起」会先弹窗显示**将执行的命令与工作目录**，确认后才 `spawn`；进程独立成组，可「停止」。
+- 「打开」直接新开标签；「复制地址」复制 `url`。
+- 没配 `services` 的卡会显示提示，不影响其它功能。
+
+接口：`GET /api/services?file=`、`POST /api/service/start`、`POST /api/service/stop`。
+
 ## 节点 ↔ 会话（发起 / 等待 / 处理结果）
 
 详情卡的「会话」段可以直接驱动一次真实 DSH 会话：

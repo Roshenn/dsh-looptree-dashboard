@@ -215,6 +215,16 @@
   .archive-row .acts{display:flex;gap:5px;justify-self:end}
   .archive-empty{padding:10px 16px 14px;font-size:11.5px;color:var(--tx4)}
 
+  /* ───────── 服务 ───────── */
+  .svc{border:1px solid var(--b1);border-radius:7px;padding:6px 7px;margin-bottom:5px;background:var(--l2)}
+  .svc-top{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--tx2)}
+  .svc-dot{width:6px;height:6px;border-radius:50%;background:var(--tone);flex:0 0 auto}
+  .svc-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .svc-st{margin-left:auto;font-size:10px;flex:0 0 auto}
+  .svc-url{display:block;text-align:left;font-size:10.5px;color:var(--tx3);padding:1px 0 3px;word-break:break-all}
+  .svc-url:hover{color:var(--link,var(--brand-2));text-decoration:underline}
+  .svc-acts{display:flex;gap:4px;flex-wrap:wrap}
+
   /* ───────── footer ───────── */
   .footer{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:7px 16px;border-top:1px solid var(--b2);
     background:var(--l1);font-size:11.5px;color:var(--tx4)}
@@ -445,6 +455,18 @@
   <div class="detail-card" role="dialog" aria-label="节点详情"></div>
 </div>
 
+<div class="modal" id="ask" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ask-title" style="width:min(520px,94vw)">
+    <div class="modal-head"><span id="ask-title">确认</span>
+      <button class="modal-x" id="ask-x" aria-label="关闭">✕</button></div>
+    <div class="modal-body" id="ask-body"></div>
+    <div class="modal-foot">
+      <button class="tbtn" id="ask-cancel">取消</button>
+      <button class="tbtn primary-converge" id="ask-ok">确认</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="launch" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="launch-title" style="width:min(560px,94vw)">
     <div class="modal-head"><span id="launch-title">发起会话</span>
@@ -661,6 +683,9 @@ function cardToProject(card, file){
 let RUN_CFG = null;                 // { token, maxConcurrent, timeoutMs }
 const runMap = new Map();           // `${file}::${nodeId}` -> run
 const runKey = (p, n) => `${p.file || ''}::${n.id}`;
+const serviceMap = new Map();      // file -> [{ id, name, url, status, latencyMs, ... }]
+const SVC_LABEL = { up:'运行中', down:'未启动', starting:'启动中', failed:'启动失败' };
+const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)', failed:'var(--red)' };
 const promptEdits = new Map();      // `${nodeId}::<taskId>` -> 手改后的 prompt
 let pgenOpen = null;                // 展开中的内联编辑：{ nid, task }
 const promptKey = (nid, tid) => `${nid}::${tid}`;
@@ -734,6 +759,40 @@ function progressOf(n){
   return { closed, kids: kids.length, doneLeaves: lv.filter(l=>l.closed).length, totalLeaves: lv.length };
 }
 function hasBlocked(p){ return anyBlocked(p.root); }
+
+function svcRows(p){
+  const list = serviceMap.get(p.file);
+  if (!list) return `<div class="info-empty">检测中…</div>`;
+  if (!list.length) return `<div class="info-empty">这张卡没配 services（在 rotation.json 里加 url / start）</div>`;
+  return list.map(svc => {
+    const tone = SVC_TONE[svc.status] || 'var(--tx4)';
+    const st = SVC_LABEL[svc.status] || svc.status;
+    const lat = svc.status === 'up' && svc.latencyMs != null ? ` · ${svc.latencyMs}ms` : '';
+    const canStart = svc.start && svc.status !== 'up' && svc.status !== 'starting';
+    const canStop = (svc.status === 'up' || svc.status === 'starting') && svc.pid;
+    return `<div class="svc">
+      <div class="svc-top">
+        <i class="svc-dot" style="--tone:${tone}"></i>
+        <span class="svc-name">${esc(svc.name)}</span>
+        <span class="svc-st" style="color:${tone}">${st}${lat}</span>
+      </div>
+      <button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>
+      <div class="svc-acts">
+        <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
+        ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}">一键拉起</button>` : ''}
+        ${canStop ? `<button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}">停止</button>` : ''}
+        <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function servicesSection(p){
+  if (!p.file) return '';
+  return `<div class="info-sec" data-svc="${esc(p.id)}">
+    <div class="info-k">服务</div>
+    ${svcRows(p)}
+  </div>`;
+}
 
 /* ─────────── 项目统计 ─────────── */
 function projectStats(p){
@@ -925,6 +984,8 @@ function infoMarkup(p){
       <div class="info-row">缺验收 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
       <div class="hub-note" style="display:none">${goalPct}</div>
     </div>
+
+    ${servicesSection(p)}
 
     <div class="info-acts">
       <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
@@ -1873,6 +1934,10 @@ function closeConfirm(){
   hideModal($('#modal'));
   pendingClose = null;
 }
+$('#ask-x').addEventListener('click', () => hideModal($('#ask')));
+$('#ask-cancel').addEventListener('click', () => hideModal($('#ask')));
+$('#ask-ok').addEventListener('click', () => { const cb = askCb; hideModal($('#ask')); if (cb) cb(); });
+$('#ask').addEventListener('click', (e) => { if (e.target.id === 'ask') hideModal($('#ask')); });
 $('#launch-x').addEventListener('click', closeLaunch);
 $('#launch-cancel').addEventListener('click', closeLaunch);
 $('#launch-ok').addEventListener('click', doLaunch);
@@ -1887,7 +1952,8 @@ $('#modal-ok').addEventListener('click', () => { const id = pendingClose; closeC
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeConfirm(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (!$('#launch').hidden) closeLaunch();
+  if (!$('#ask').hidden) hideModal($('#ask'));
+  else if (!$('#launch').hidden) closeLaunch();
   else if (!$('#modal').hidden) closeConfirm();
   else closeDetail();
 });
@@ -1916,6 +1982,38 @@ function paintRunBadges(){
   if (detailNode) openDetail(detailNode);
 }
 let refreshTimer = null;
+async function refreshServices(){
+  for (const p of PROJECTS){
+    if (!p.file || !p.file.endsWith('.rotation.json')) continue;
+    try {
+      const res = await fetch('api/services?file=' + encodeURIComponent(p.file));
+      if (!res.ok) continue;
+      const j = await res.json();
+      if (j.ok) serviceMap.set(p.file, j.services || []);
+    } catch {}
+  }
+  document.querySelectorAll('[data-svc]').forEach(el => {
+    const p0 = PROJECTS.find(x => x.id === el.dataset.svc);
+    if (!p0) return;
+    const head = '<div class="info-k">服务</div>';
+    el.innerHTML = head + svcRows(p0);
+  });
+}
+function svcFor(btn){
+  const p0 = PROJECTS.find(x => x.file === btn.dataset.file);
+  const list = p0 && (serviceMap.get(p0.file) || []);
+  const svc = list && list.find(x => x.id === (btn.dataset.svcOpen || btn.dataset.svcStart || btn.dataset.svcStop || btn.dataset.svcCopy));
+  return { p0, svc };
+}
+function askConfirm(title, bodyHtml, okLabel, onOk){
+  $('#ask-title').textContent = title;
+  $('#ask-body').innerHTML = bodyHtml;
+  $('#ask-ok').textContent = okLabel || '确认';
+  askCb = onOk;
+  showModal($('#ask'));
+}
+let askCb = null;
+
 async function refreshRuns(){
   if (!RUN_CFG) return;
   try {
@@ -2055,6 +2153,55 @@ document.addEventListener('click', (e)=>{
       const n0 = p0 && findNode(p0.root, wrap.dataset.nid);
       const task = p0 && n0 && taskListFor(p0, n0).list.find(t => t.id === wrap.dataset.task);
       if (p0 && n0 && task){ $('#pgen-input').value = composePrompt(p0, n0, task); $('#pgen-hint').textContent = '已恢复默认'; }
+    }
+    return;
+  }
+  const svcOpen = e.target.closest('[data-svc-open]');
+  if (svcOpen){
+    const { svc } = svcFor(svcOpen);
+    if (svc && RUN_CFG){
+      const u = svc.health ? new URL(svc.health, svc.url).toString() : svc.url;
+      window.open(u, '_blank', 'noopener');
+    } else if (svc){ window.open(svc.url, '_blank', 'noopener'); }
+    return;
+  }
+  const svcCopy = e.target.closest('[data-svc-copy]');
+  if (svcCopy){
+    const { svc } = svcFor(svcCopy);
+    if (svc) copyText(svc.url).then(ok => toast(ok ? '已复制服务地址' : '复制失败'));
+    return;
+  }
+  const svcStop = e.target.closest('[data-svc-stop]');
+  if (svcStop){
+    const { p0, svc } = svcFor(svcStop);
+    if (p0 && svc && RUN_CFG){
+      fetch('api/service/stop', { method:'POST',
+        headers: { 'content-type':'application/json', 'x-rotation-token': RUN_CFG.token },
+        body: JSON.stringify({ file: p0.file, id: svc.id }) })
+        .then(r => r.json()).then(j => { toast(j.ok ? `已停止 ${svc.name}` : (j.error || '停止失败')); setTimeout(refreshServices, 600); })
+        .catch(e => toast('停止失败：' + e.message));
+    }
+    return;
+  }
+  const svcStart = e.target.closest('[data-svc-start]');
+  if (svcStart){
+    const { p0, svc } = svcFor(svcStart);
+    if (p0 && svc && RUN_CFG){
+      askConfirm(`一键拉起：${svc.name}`,
+        `<div class="detail-row"><dt>命令</dt><dd class="mono">${esc(svc.start)}</dd></div>
+         <div class="detail-row"><dt>地址</dt><dd class="mono">${esc(svc.url)}</dd></div>
+         <div class="mnote">会在 ${esc((p0.card && p0.card.project && p0.card.project.workspace) || '项目目录')} 下启动，日志可在卡片里查看状态；启动后可点「停止」结束。</div>`,
+        '启动', async () => {
+          try {
+            const res = await fetch('api/service/start', { method:'POST',
+              headers: { 'content-type':'application/json', 'x-rotation-token': RUN_CFG.token },
+              body: JSON.stringify({ file: p0.file, id: svc.id }) });
+            const j = await res.json();
+            toast(j.ok ? `已启动 ${svc.name}（pid ${j.service.pid}）` : ('启动失败：' + (j.error || '')));
+            setTimeout(refreshServices, 800);
+            setTimeout(refreshServices, 2500);
+          } catch (e) { toast('启动失败：' + e.message); }
+        });
     }
     return;
   }
@@ -2241,6 +2388,8 @@ if (qs.get('filter')) state.filter = qs.get('filter');
     } catch {}
     if (RUN_CFG){
       await refreshRuns();
+      await refreshServices();
+      setInterval(() => { if (!document.hidden) refreshServices(); }, 5000);
       refreshTimer = setInterval(() => {
         const busy = [...runMap.values()].some(x => x.status === 'running' || x.status === 'starting');
         if (!document.hidden && (busy || Math.random() < 0.2)) refreshRuns();
