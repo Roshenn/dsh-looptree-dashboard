@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.2.3 — 主题跟随 + 桌面端 API 地址
+
+- **主题跟随 DSH**：client 半读宿主 `html[data-theme]`（并观察变化 + 系统偏好），
+  通过 `?theme=` 与 `postMessage` 同步给面板；面板首屏即按宿主主题渲染
+- 修：空注册表时 boot 跳过 render，导致主题停在默认 dark（嵌入浅色 DSH 里发黑）
+- 修：`updateKpis`/`render` 在空项目列表下抛错（`Cannot read properties of undefined`）
+- **桌面端 API 地址**：host 半把 `http://<Host>/rotation/api` 注入到 index.html
+  （`window.__ROTATION_API_ABS__`），面板在非 http(s) 协议下优先用它；API 加 CORS
+  与 OPTIONS 预检，解决 `dsh-app://app` 里相对路径到不了 HTTP 服务的问题
+- 注入值做 `</script>` 转义，防 Host 头注入
+
 ## 0.2.2 — 去掉浮标
 
 - 移除右下角「轮转」浮标（DOM 注入、弹窗兜底、激活隐藏逻辑一并删除）

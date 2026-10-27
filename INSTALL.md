@@ -1,13 +1,13 @@
 # 安装与验证
 
-插件包：`dsh-rotation-dashboard@0.2.0`（`npm pack` 产物：`dsh-rotation-dashboard-0.2.2.tgz`，约 62 KB）。
+插件包：`dsh-rotation-dashboard@0.2.0`（`npm pack` 产物：`dsh-rotation-dashboard-0.2.3.tgz`，约 62 KB）。
 
 ## 一、安装（二选一）
 
 ### A. 市场 UI 本地安装（推荐，符合本机规矩）
 
 1. 打开 DSH 桌面端 → 市场 / 插件页 → 找「本地安装 / 从文件安装」。
-2. 选本目录下的 `dsh-rotation-dashboard-0.2.2.tgz`。
+2. 选本目录下的 `dsh-rotation-dashboard-0.2.3.tgz`。
 3. 重启 DSH（`dsh web` 或桌面端重启，让 profile 重新合并 patch）。
 
 > 本机规矩：插件增删改默认只走市场 UI。用 CLI 前必须先核对
@@ -21,7 +21,7 @@ cd ~/.dsh/reports/rotation-panel
 npm pack                                   # 生成 tgz
 pnpm store path                            # 记下这个路径
 grep storeDir ~/.dsh/profiles/web/node_modules/.modules.yaml   # 必须与上一行逐字一致
-dsh plugin --profile web add ./dsh-rotation-dashboard-0.2.2.tgz
+dsh plugin --profile web add ./dsh-rotation-dashboard-0.2.3.tgz
 ```
 
 ## 二、验证清单（按顺序做，任一步失败就停）
@@ -100,7 +100,7 @@ DSH 默认的 `deepseek-official` 直连厂商（本机铁律要求走网关）�
 
 ```bash
 dsh plugin --profile <name> remove dsh-rotation-dashboard
-dsh plugin --profile <name> add ./dsh-rotation-dashboard-0.2.2.tgz
+dsh plugin --profile <name> add ./dsh-rotation-dashboard-0.2.3.tgz
 ```
 
 ## 六、回滚

@@ -769,12 +769,17 @@ const RUN_LABEL = { starting:'启动中', running:'运行中', done:'完成', fa
 const RUN_TONE = { starting:'var(--brand-2)', running:'var(--brand-2)', done:'var(--green)', failed:'var(--red)', cancelled:'var(--tx3)', stale:'var(--amber)' };
 
 const API_BASE = (() => {
+  // 桌面外壳里页面可能跑在 dsh-app://app，相对路径到不了 HTTP 服务；
+  // host 半会把真实地址注入成 __ROTATION_API_ABS__，优先用它。
+  const injected = window.__ROTATION_API_ABS__;
+  if (injected && !/^https?:/.test(location.protocol)) return String(injected).replace(/\/$/, '');
   try {
     const u = new URL('../api/', location.href);
     return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href.replace(/\/$/, '') : '';
   } catch { return ''; }
 })();
 const api = (path) => (API_BASE ? API_BASE + path : 'api' + path);
+window.__rotationLastApiError = '';
 
 const CARDS = Array.isArray(window.ROTATION_CARDS) ? window.ROTATION_CARDS : [];
 let PROJECTS = CARDS.length ? CARDS.map(cardToProject) : MOCK_PROJECTS;
@@ -1479,6 +1484,12 @@ function render(){
     ? '闭环 → 目标 → 构思 → 执行；叶子完成后逐级「确认关闭」，全关闭则闭环收敛'
     : '聚焦单项目：从执行项开始，一层层确认关闭，直到闭环收敛';
   focusSwitch();
+  const emptyEl = $('#empty'), matrixEl = $('#matrix'), focusEl = $('#focus');
+  const isEmpty = PROJECTS.length === 0;
+  if (emptyEl) emptyEl.hidden = !isEmpty;
+  if (matrixEl) matrixEl.hidden = isEmpty || state.view !== 'matrix';
+  if (focusEl) focusEl.hidden = isEmpty || state.view !== 'focus';
+  if (isEmpty) { updateKpis(); return; }
   if (state.view==='matrix') renderMatrix(); else renderFocus();
   updateKpis();
   if (keepDetail && findProjectByNode(keepDetail)){
@@ -1497,8 +1508,8 @@ function updateKpis(){
   $('#k-blocked').textContent = blocked;
   $('#k-done').textContent = converged;
   const next = PROJECTS.find(hasBlocked) || PROJECTS.find(p=>!p.root.closed) || PROJECTS[0];
-  $('#next-project').textContent = next.name;
-  $('#next-reason').textContent = hasBlocked(next) ? '有阻断未处置，先看它' : (next.root.closed ? '已收敛' : '闭环仍在推进');
+  $('#next-project').textContent = next ? next.name : '—';
+  $('#next-reason').textContent = !next ? '还没有项目，先添加一个' : (hasBlocked(next) ? '有阻断未处置，先看它' : (next.root.closed ? '已收敛' : '闭环仍在推进'));
 }
 
 /* ─────────── 关闭 / 重开 / 加节点 ─────────── */
@@ -2560,6 +2571,12 @@ window.addEventListener('resize', ()=>render());
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
 if (qs.get('theme')) state.theme = qs.get('theme');
+// 被 DSH 主区嵌入时，主题跟随宿主：宿主通过 postMessage 推送
+window.addEventListener('message', (e) => {
+  const msg = e.data;
+  if (!msg || msg.type !== 'rotation-theme') return;
+  if (msg.theme && msg.theme !== state.theme){ state.theme = msg.theme; render(); }
+});
 if (qs.get('project')) state.focusId = qs.get('project');
 if (qs.get('filter')) state.filter = qs.get('filter');
 
@@ -2567,7 +2584,8 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   let source = 'mock';
   if (location.protocol.startsWith('http')){
     try {
-      const r = await fetch(api('/cards'));
+      const r = await fetch(api('/cards')).catch((e) => { window.__rotationLastApiError = api('/cards') + ' → ' + e.message; throw e; });
+      if (!r.ok) window.__rotationLastApiError = api('/cards') + ' → HTTP ' + r.status;
       if (r.ok){
         const j = await r.json();
         // 服务端能答就算连上了：空注册表是「还没有项目」，不是「连不上」——
@@ -2595,7 +2613,8 @@ if (qs.get('filter')) state.filter = qs.get('filter');
     }
   }
   if (!PROJECTS.some(p => p.id === state.focusId)) state.focusId = PROJECTS[0] ? PROJECTS[0].id : '';
-  if (!isEmpty) render();
+  document.documentElement.dataset.theme = state.theme;
+  render();
   const src = $('#data-src');
   if (src) src.textContent = source === 'server'
     ? '数据源：项目 .dsh/rotation.json（可写回）'
