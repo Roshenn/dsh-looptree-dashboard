@@ -53,6 +53,7 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 | 构思 | 重新生成构思 / 梳理执行计划 / 预演失败点 |
 | 执行 | 给出执行步骤 / 补齐证据 / 定位阻塞 |
 
+- 模板可写进 `rotation.json`：卡根 `prompts.<类型>` 或节点上 `prompts` 数组，**节点级 > 卡片级 > 内置**；详情卡标注来源。
 - 点模板名 = 展开完整 prompt 预览；点「复制」= 写入剪贴板。
 - 剪贴板被拒（无用户激活 / 无权限）时自动展开并选中原文，提示按 ⌘C。
 

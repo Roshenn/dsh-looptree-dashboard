@@ -54,6 +54,38 @@
 | `issues[]` | exec | ➖ | `{ "text", "at", "resolved_at?" }`，未 resolved 即阻塞 |
 | `children[]` | loop, goal, idea, exec | ➖ | 顺序即展示顺序 |
 
+## Prompt 模板（可选，存进卡里）
+
+模板可以写进 `rotation.json`，改模板不用改代码。三层优先级：**节点级 > 卡片级（按类型）> 内置**。
+
+```json
+{
+  "prompts": {
+    "idea": [
+      { "id": "regen",   "title": "重新生成构思（保留验收）", "ask": "保留闭环意图与目标验收，重新给出 2 个替代构思……" },
+      { "id": "contract", "title": "写成接口契约",            "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码……" }
+    ]
+  },
+  "loop": {
+    "id": "sw-loop", "kind": "loop", "title": "…",
+    "children": [
+      { "id": "sw-e4", "kind": "exec", "title": "…",
+        "prompts": [ { "id": "repro", "title": "给我最小复现步骤", "ask": "列出最小复现步骤与期望/实际结果。" } ] }
+    ]
+  }
+}
+```
+
+| 字段 | 位置 | 说明 |
+|---|---|---|
+| `prompts` | 卡根 | 按节点类型分组 `loop/goal/idea/exec`，**整组替换**内置模板 |
+| `prompts` | 单个节点 | 数组，**整组替换**该节点的模板（优先级最高） |
+| `id` | 每条 | 字母数字与 `-` `_`，同类型内唯一 |
+| `title` | 每条 | 详情卡上显示的按钮名（≤ 12 字较好） |
+| `ask` | 每条 | 任务指令原文；上下文与输出要求由面板自动拼 |
+
+详情卡会标出来源：`内置` / `rotation.json` / `节点自定义`。
+
 ## 不变量（validator 会拦）
 
 1. `schema` 必须为 `rotation/v1`。
@@ -66,6 +98,7 @@
 8. `issues` 只能出现在 `exec` 上。
 9. `started_at` 必须是 ISO 或 `null`，且**不能晚于** `closed_at`（否则在途为负）。
 10. `status: doing` 且未关闭时建议带 `started_at`（缺了只警告：面板算不出在途）。
+11. `prompts` 每条必须有 `id`（字母数字 `-_`）、`title`、`ask`；未知节点类型的 `prompts.<kind>` 只警告。
 
 ## 最短实现遇到的问题与增量改进（Problems & Incremental Changes）
 

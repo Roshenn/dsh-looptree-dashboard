@@ -8,6 +8,19 @@ const STATUS = new Set(['plan', 'ready', 'doing', 'blocked', 'done']);
 const ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 const iso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 
+const KINDS = ['loop', 'goal', 'idea', 'exec'];
+function checkPromptList(list, at, errors, warnings) {
+  if (!Array.isArray(list)) { errors.push(`${at}: 必须是数组`); return; }
+  if (!list.length) { warnings.push(`${at}: 空数组，等同不使用自定义模板`); return; }
+  list.forEach((t, i) => {
+    const a = `${at}[${i}]`;
+    if (!t || typeof t !== 'object') { errors.push(`${a}: 不是对象`); return; }
+    if (!t.id || !/^[A-Za-z0-9_-]+$/.test(String(t.id))) errors.push(`${a}: id 只允许字母数字与 -_`);
+    if (!String(t.title || '').trim()) errors.push(`${a}: 缺 title`);
+    if (!String(t.ask || '').trim()) errors.push(`${a}: 缺 ask（任务指令）`);
+  });
+}
+
 export function validateCard(doc) {
   const errors = [];
   const warnings = [];
@@ -48,6 +61,7 @@ export function validateCard(doc) {
         errors.push(`${at}: started_at 晚于 closed_at（在途时长为负）`);
       }
     }
+    if (n.prompts != null) checkPromptList(n.prompts, `${at}.prompts`, errors, warnings);
     if (n.status === 'doing' && n.closed_at == null && n.started_at == null) {
       warnings.push(`${at}: doing 但缺 started_at，面板算不出在途时长`);
     }
@@ -68,6 +82,13 @@ export function validateCard(doc) {
   if (doc.schema !== 'rotation/v1') errors.push(`schema 必须是 rotation/v1，实际 ${doc.schema}`);
   if (!doc.project || !doc.project.name) errors.push('缺少 project.name');
   if (!doc.project?.workspace) warnings.push('缺少 project.workspace（面板按路径匹配工作区会失败）');
+  if (doc.prompts != null) {
+    if (typeof doc.prompts !== 'object' || Array.isArray(doc.prompts)) errors.push('prompts 必须是对象（按节点类型分组）');
+    else Object.entries(doc.prompts).forEach(([k, list]) => {
+      if (!KINDS.includes(k)) warnings.push(`prompts.${k}: 未知节点类型，会被忽略`);
+      checkPromptList(list, `prompts.${k}`, errors, warnings);
+    });
+  }
   if (!doc.loop) errors.push('缺少 loop 根节点');
   else walk(doc.loop, 1, 'loop');
 

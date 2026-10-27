@@ -303,6 +303,8 @@
   .dchip:hover{border-color:var(--b3);color:var(--tx1)}
   .dchip i{width:5px;height:5px;border-radius:50%;background:var(--tone);flex:0 0 auto}
   .dchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .psrc{margin-left:6px;text-transform:none;letter-spacing:0;color:var(--tx3);font-size:9.5px;
+    padding:1px 5px;border-radius:4px;background:var(--l3);border:1px solid var(--b1)}
   .prompt-list{display:flex;flex-direction:column;gap:1px}
   .prow{display:flex;align-items:center;gap:6px;border-radius:6px;transition:background-color 140ms var(--ease-out)}
   .prow:hover{background:var(--hover)}
@@ -1333,6 +1335,16 @@ const PROMPT_TASKS = {
 };
 const PROMPT_OUTPUT = '输出用 Markdown，小节标题固定；不要复述上下文，直接给结论与步骤。';
 
+function taskListFor(p, n){
+  const cardPrompts = p.card && p.card.prompts;
+  const nodePrompts = n.raw && n.raw.prompts;
+  if (Array.isArray(nodePrompts) && nodePrompts.length) return { list: nodePrompts, from: '节点自定义' };
+  if (cardPrompts && Array.isArray(cardPrompts[n.kind]) && cardPrompts[n.kind].length) {
+    return { list: cardPrompts[n.kind], from: 'rotation.json' };
+  }
+  return { list: PROMPT_TASKS[n.kind] || [], from: '内置' };
+}
+
 function composePrompt(p, n, task){
   const trail = pathTo(p.root, n.id);
   const loop = trail[0], goal = trail.find(x => x.kind === 'goal'), idea = trail.find(x => x.kind === 'idea');
@@ -1430,6 +1442,7 @@ function detailMarkup(p, n){
     .concat(trail.slice(1).map(x => `<span>›</span><button data-jump="${x.id}" data-proj="${p.id}">${x.title}</button>`)).join('');
 
   const issues = (r.issues || []).map(i => `<div class="issue">⚠ ${i.text}${i.resolved_at ? ' · 已处置' : ''}</div>`).join('');
+  const tasks = taskListFor(p, n);
   const kidsHtml = kids.length
     ? `<div class="detail-sec"><div class="detail-k">子节点 ${kids.length}</div><div class="detail-chips">
         ${kids.map(k => {
@@ -1468,10 +1481,10 @@ function detailMarkup(p, n){
     ${issues ? `<div class="detail-sec"><div class="detail-k">问题反馈</div>${issues}</div>` : ''}
     ${kidsHtml}
     <div class="detail-sec">
-      <div class="detail-k">Prompt 模板 · 点复制直接粘给模型</div>
+      <div class="detail-k">Prompt 模板 · 点复制直接粘给模型<span class="psrc">${tasks.from}</span></div>
       <div class="prompt-list">
-        ${(PROMPT_TASKS[n.kind] || []).map(t => `<div class="prow" data-task="${t.id}">
-          <button class="ptitle" data-preview-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}">${t.title}</button>
+        ${tasks.list.map(t => `<div class="prow" data-task="${t.id}">
+          <button class="ptitle" data-preview-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}">${esc(t.title)}</button>
           <button class="pcopy" data-copy-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
         </div>`).join('')}
       </div>
@@ -1721,7 +1734,7 @@ document.addEventListener('click', (e)=>{
   if (copyPrompt){
     const p0 = PROJECTS.find(x => x.id === copyPrompt.dataset.proj);
     const n0 = p0 && findNode(p0.root, copyPrompt.dataset.nid);
-    const task = (PROMPT_TASKS[n0.kind] || []).find(t => t.id === copyPrompt.dataset.copyPrompt);
+    const task = taskListFor(p0, n0).list.find(t => t.id === copyPrompt.dataset.copyPrompt);
     if (p0 && n0 && task){
       const txt = composePrompt(p0, n0, task);
       copyText(txt).then(ok => {
@@ -1742,7 +1755,7 @@ document.addEventListener('click', (e)=>{
   if (previewPrompt){
     const p0 = PROJECTS.find(x => x.id === previewPrompt.dataset.proj);
     const n0 = p0 && findNode(p0.root, previewPrompt.dataset.nid);
-    const task = (PROMPT_TASKS[n0.kind] || []).find(t => t.id === previewPrompt.dataset.previewPrompt);
+    const task = taskListFor(p0, n0).list.find(t => t.id === previewPrompt.dataset.previewPrompt);
     const pre = $('#pgen');
     if (p0 && n0 && task && pre){
       const same = pre.dataset.task === task.id;
