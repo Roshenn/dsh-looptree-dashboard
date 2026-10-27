@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.3.0 — 添加项目可直接选目录
+
+- 添加项目弹窗新增「选择…」：优先用宿主自带的 `__DSH_DIRECTORY_PICKER__`（桌面端），
+  否则调用 host 的 `POST /rotation/api/pick-directory`（macOS `osascript choose folder`）
+- 目录输入框接 `<datalist>`：已在轮转里的项目目录自动成为下拉建议
+- 实测：弹窗结构、按钮与 datalist 均存在；独立面板下 GET 端点返回 501（仅接受 POST）
+
 ## 0.2.9 — 桌面外壳真正连上
 
 - 根因：boot 里用 `location.protocol.startsWith('http')` 作为「能不能调 API」的判据，
