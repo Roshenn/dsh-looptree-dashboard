@@ -122,8 +122,12 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 - 通过面板自己的接口注册项目：`200 {id:"project-z48d", …}`，刷新后项目出现在泳道里
 - 控制台零错误
 
-因此当前可用入口是 **URL**：`http://<dsh-host>:<port>/rotation/app/`（`/rotation` 会 302 过去），
-建议加书签。右栏入口作为待解问题保留，不阻塞使用。
+**入口（已实测）**：client 半会在 DSH 右下角挂一个常驻「轮转」按钮（与框架无关的 DOM 注入，
+位置在应用自带圆形按钮下方，不遮挡），点一下就在新标签打开面板。真机验证：
+按钮存在 → 点击 → popup 的 URL 是 `/rotation/app/`、标题正确、页面零报错。
+
+也可以直接用 URL：`http://<dsh-host>:<port>/rotation/app/`（`/rotation` 会 302 过去）。
+右栏 `sidebar.right.pane.tab` 标签不显示（该标签条只列运行时 pane），不再作为主入口。
 
 ## M4 准备（进行中）
 

@@ -34,7 +34,8 @@ curl -s http://127.0.0.1:64517/rotation/api/health
 # 2) 面板是否可打开
 open http://127.0.0.1:64517/rotation/app/
 
-# 3) 直接打开面板（这是当前**唯一可靠入口**）
+# 3) 入口：DSH 右下角应有「轮转」按钮（与自带圆形按钮上下相邻）
+#    点它会在新标签打开面板；也可以直接访问：
 open http://127.0.0.1:64517/rotation/app/
 #    右栏「轮转」标签在 0.2.1-rc.3 实测没有渲染出来（见 README「入口结论」），
 #    以 URL 为准；client 半是否激活可看 document.documentElement.dataset.dshRotation
