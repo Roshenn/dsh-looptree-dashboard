@@ -111,6 +111,26 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 > 若要把某个项目钉到网关路由：注册时带 `provider`/`model`，注册表会存下来，runner 优先用它：
 > `POST /rotation/api/projects {"name":"x","workspace":"/w","provider":"<网关 provider>","model":"<模型>"}`
 
+**会话已跑通（真机、真模型）**：把 profile 里 `llm-deepseek` 的 `baseURL` 指到网关后：
+
+```yaml
+# ~/.dsh/profiles/<profile>/cordis.patch.yml
+- id: llm-deepseek
+  config:
+    baseURL: http://llm.riverbegin.cn/v1
+```
+
+一次真实会话的结果（本机实测）：
+
+```
+POST /rotation/api/run → status running
+→ assistant/message: {"content":[{"type":"text","text":"OK"}]}
+→ turn/end: {reason:{kind:"completed"}}
+卡片: session = {status:"done", result:"OK", id:"session-2877a494-…"}
+```
+
+即：`ctx.agents.create` → `followup` → `session/event` → 结果写回卡片，全链路在真实 DSH 里成立。
+
 **入口结论（0.2.1-rc.3 实测）**：client 半激活正常（`document.documentElement.dataset.dshRotation === '1'`，
 控制台零错误），但 `sidebar.right.pane.tab` 注册的「轮转」标签**没有出现在右栏标签条里**
 （右栏开「工作区文件」时只有 `文件` 一个标签）。右栏标签条似乎只列运行时打开的 pane，

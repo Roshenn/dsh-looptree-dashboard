@@ -77,6 +77,23 @@ cat ~/agentic/projects/chunks/.dsh/rotation.json | head -20
 已用这套验证过：host 半挂载 200、client 半进 boot 清单（`plugins/??dsh-rotation-dashboard/client.js`）、
 中文项目名注册、卡片改标题落盘。
 
+## 让会话真正跑起来：provider 指向网关
+
+DSH 默认的 `deepseek-official` 直连厂商（本机铁律要求走网关）。在 profile 的 patch 层改 baseURL 即可：
+
+```yaml
+# ~/.dsh/profiles/<profile>/cordis.patch.yml（先备份）
+- id: llm-deepseek
+  config:
+    baseURL: http://llm.riverbegin.cn/v1
+```
+
+改完重启 DSH；然后从卡片发起会话，成功时卡片上 `session.result` 会有模型回复。
+验证过的最小流程：`POST /rotation/api/run`（prompt「只回复 OK」）→ 约 5 秒 → `status: done, result: "OK"`。
+
+不想改全局 provider，也可以给单个项目钉路由：
+`POST /rotation/api/projects {"name":"x","workspace":"/w","provider":"<provider>","model":"<model>"}`。
+
 ## 五、升级插件（重要）
 
 用 `file:` 方式装的同版本 tgz，**pnpm 会复用旧包**：直接 `add` 不会更新文件。升级必须：
