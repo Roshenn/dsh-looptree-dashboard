@@ -2324,36 +2324,44 @@ try {
 $('#add-project').addEventListener('click', async () => {
   if (!API_BASE) return toast('未连接服务：需在 DSH 或本地服务里打开面板');
 
-  // 先拿 DSH 自己的工作区列表，缺端点时退回手输
-  let workspaces = [];
+  let payload = null;
+  let failure = '';
   try {
     const r = await fetch(api('/workspaces'));
-    const j = await r.json();
-    workspaces = (j.workspaces || []).filter((w) => w.path);
-  } catch { /* 忽略 */ }
+    payload = await r.json().catch(() => null);
+    if (!r.ok || !payload || payload.ok === false) {
+      failure = (payload && payload.error) || ('HTTP ' + r.status);
+    }
+  } catch (e) { failure = e.message; }
 
-  const selectHtml = workspaces.length
-    ? `<select class="dfield" id="np-ws-select" style="width:100%">
-         ${workspaces.map((w) => `<option value="${esc(w.path)}" data-title="${esc(w.title)}">${esc(w.title)}　—　${esc(w.path)}</option>`).join('')}
-         <option value="" data-manual="1">手动输入 / 选择其它目录…</option>
-       </select>`
-    : '';
+  const workspaces = (payload && payload.workspaces) || [];
+  const total = (payload && payload.total) || 0;
+  const registeredCount = (payload && payload.registeredCount) || 0;
+
+  if (!workspaces.length) {
+    const why = failure
+      ? `读取工作区失败：${failure}（可能是插件还没重启，端点尚未加载）`
+      : `DSH 里的 ${total} 个工作区都已在轮转里（已登记 ${registeredCount} 个）`;
+    askConfirm('添加项目',
+      `<div class="mnote">${esc(why)}</div>
+       <div class="mnote">要新增项目：先在 DSH 里添加工作区，再回来点「+ 项目」。</div>`,
+      '知道了', null);
+    return;
+  }
 
   askConfirm('添加项目',
-    `<div class="detail-row"><dt>工作区</dt><dd>${selectHtml ||
-        `<input class="dfield mono" id="np-ws" placeholder="/Users/you/project" style="width:100%">`}</dd></div>
-     <div class="detail-row" id="np-manual-row" ${workspaces.length ? 'hidden' : ''}><dt>目录</dt><dd style="display:flex;gap:6px">
-       <input class="dfield mono" id="np-ws" placeholder="/Users/you/project" style="width:100%;flex:1;min-width:0">
-       <button class="tbtn" id="np-pick" type="button">选择…</button>
+    `<div class="detail-row"><dt>工作区</dt><dd>
+       <select class="dfield" id="np-ws-select" style="width:100%">
+         ${workspaces.map((w) => `<option value="${esc(w.path)}" data-title="${esc(w.title)}">${esc(w.title)}　—　${esc(w.path)}</option>`).join('')}
+       </select>
      </dd></div>
-     <div class="detail-row"><dt>名称</dt><dd><input class="dfield" id="np-name" placeholder="默认取工作区名" style="width:100%"></dd></div>
-     <div class="mnote">优先选 DSH 里已有的工作区；不在列表里的目录才用「选择…」。会在该目录下创建 <code>.dsh/rotation.json</code>（不存在时）。</div>`,
+     <div class="detail-row"><dt>名称</dt><dd><input class="dfield" id="np-name" placeholder="${esc(workspaces[0].title)}" style="width:100%"></dd></div>
+     <div class="mnote">只列出还没登记进轮转的工作区（共 ${total} 个，已登记 ${registeredCount} 个）。会在该目录下创建 <code>.dsh/rotation.json</code>（不存在时）。</div>`,
     '添加', async () => {
       const select = $('#np-ws-select');
-      const manual = $('#np-ws');
-      const workspace = (select && select.value) ? select.value : ((manual && manual.value) || '');
+      const workspace = (select && select.value) || '';
       let name = ($('#np-name') || {}).value || '';
-      if (!name && select && select.value) {
+      if (!name && select) {
         const opt = select.selectedOptions && select.selectedOptions[0];
         name = (opt && opt.dataset.title) || '';
       }
@@ -2370,38 +2378,12 @@ $('#add-project').addEventListener('click', async () => {
       } catch (error) { toast('添加失败：' + error.message); }
     });
 
+  // 切换工作区时同步名称占位
   const select = $('#np-ws-select');
-  const manualRow = $('#np-manual-row');
-  const syncManual = () => {
-    if (!select) return;
-    const manual = !select.value;
-    if (manualRow) manualRow.hidden = !manual;
+  select?.addEventListener('change', () => {
+    const opt = select.selectedOptions && select.selectedOptions[0];
     const name = $('#np-name');
-    if (name && !name.value) {
-      const opt = select.selectedOptions && select.selectedOptions[0];
-      if (opt && !opt.dataset.manual) name.placeholder = opt.dataset.title || '默认取工作区名';
-    }
-  };
-  select?.addEventListener('change', syncManual);
-  syncManual();
-
-  $('#np-pick')?.addEventListener('click', async () => {
-    const input = $('#np-ws');
-    const fill = (value) => {
-      const path = typeof value === 'string' ? value : (value && (value.path || value.directory));
-      if (path && input) input.value = String(path).replace(/\/$/, '');
-    };
-    try {
-      const host = window.parent && window.parent.__DSH_DIRECTORY_PICKER__;
-      if (typeof host === 'function') { fill(await host()); if (input && input.value) return; }
-      else if (host && typeof host.pick === 'function') { fill(await host.pick()); if (input && input.value) return; }
-    } catch { /* fall through */ }
-    try {
-      const res = await fetch(api('/pick-directory'), { method: 'POST' });
-      const j = await res.json();
-      if (j.ok) fill(j.path);
-      else if (j.error && j.error !== '已取消') toast('选择目录失败：' + j.error);
-    } catch (error) { toast('选择目录失败：' + error.message); }
+    if (name && opt) name.placeholder = opt.dataset.title || '名称';
   });
 });
 
