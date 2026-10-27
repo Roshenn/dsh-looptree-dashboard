@@ -14,3 +14,6 @@ runs.json
 
 # 临时探针（调试用，不入库）
 _probe*.html
+
+# 打包产物
+*.tgz
