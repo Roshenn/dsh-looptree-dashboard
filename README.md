@@ -116,6 +116,12 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 （右栏开「工作区文件」时只有 `文件` 一个标签）。右栏标签条似乎只列运行时打开的 pane，
 不列插件静态注册的 tab。
 
+**面板在真机里可用**（Playwright 跑真实浏览器 + 真实宿主）：
+
+- `GET /rotation/app/` 正常渲染，空状态→添加项目→卡片树→「数据源：项目 .dsh/rotation.json（可写回）」
+- 通过面板自己的接口注册项目：`200 {id:"project-z48d", …}`，刷新后项目出现在泳道里
+- 控制台零错误
+
 因此当前可用入口是 **URL**：`http://<dsh-host>:<port>/rotation/app/`（`/rotation` 会 302 过去），
 建议加书签。右栏入口作为待解问题保留，不阻塞使用。
 
