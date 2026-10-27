@@ -14,7 +14,7 @@
     --brand:#5686fe; --brand-2:#4d93f8; --brand-dim:#26324a;
     --blue-300:#93c5fd; --amber:#f7ad31; --green:#4ed17e; --red:#f25a5a;
     --corner:superellipse(1.5);
-    --lane-head:190px;
+    --lane-head:224px;
     --info-col:272px;
     --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
     --ease-out:cubic-bezier(.23,1,.32,1);
@@ -215,7 +215,13 @@
   .archive-row .acts{display:flex;gap:5px;justify-self:end}
   .archive-empty{padding:10px 16px 14px;font-size:11.5px;color:var(--tx4)}
 
-  /* ───────── 服务 ───────── */
+  /* ───────── 服务（挂在第一列） ───────── */
+  .lane-svc{margin-top:8px;padding-top:8px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
+  .lane-svc .svc{margin-bottom:0;padding:5px 6px;background:color-mix(in srgb,var(--l2) 70%,transparent)}
+  .lane-svc .svc-name{font-size:11px}
+  .lane-svc .svc-url{font-size:10px;padding:0 0 2px}
+  .lane-svc .svc-acts{gap:3px}
+  .lane-svc .pbtn{height:19px;padding:0 6px;font-size:10px}
   .svc{border:1px solid var(--b1);border-radius:7px;padding:6px 7px;margin-bottom:5px;background:var(--l2)}
   .svc-top{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--tx2)}
   .svc-dot{width:6px;height:6px;border-radius:50%;background:var(--tone);flex:0 0 auto}
@@ -786,10 +792,10 @@ function svcRows(p){
     </div>`;
   }).join('');
 }
-function servicesSection(p){
+function laneServices(p){
   if (!p.file) return '';
-  return `<div class="info-sec" data-svc="${esc(p.id)}">
-    <div class="info-k">服务</div>
+  return `<div class="lane-svc" data-svc="${esc(p.id)}">
+    <div class="info-k" style="margin-bottom:4px">服务</div>
     ${svcRows(p)}
   </div>`;
 }
@@ -984,8 +990,6 @@ function infoMarkup(p){
       <div class="info-row">缺验收 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
       <div class="hub-note" style="display:none">${goalPct}</div>
     </div>
-
-    ${servicesSection(p)}
 
     <div class="info-acts">
       <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
@@ -1182,6 +1186,7 @@ function laneMarkup(p){
       <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
+      ${laneServices(p)}
     </div>
     <div class="canvas"></div>
     ${infoMarkup(p)}
@@ -1299,6 +1304,7 @@ function renderFocus(){
           <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
+          ${laneServices(p)}
         </div>
         <div class="canvas"></div>
         ${infoMarkup(p)}
