@@ -56,7 +56,32 @@ cat ~/agentic/projects/chunks/.dsh/rotation.json | head -20
 | 发起会话 503「会话服务不可用」 | DSH 版本缺少 `ctx.agents`；确认 `dsh --version` 与 `package.json` 的 `engines.dsh` 匹配 |
 | 一键拉起无反应 | 服务的 `cwd` 不存在或缺 `start` 命令；看卡片 `services` 配置 |
 
-## 四、回滚
+## 四、真机联调（不进你的日常 profile）
+
+`scripts/real-plugin-check.sh` 会复制一份 web profile 成一次性的 `rotationtest`，把 tgz 装进去、
+起在 64600 端口，用来在**真实 DSH 进程**里验证插件（不碰你在用的 web profile）：
+
+```bash
+./scripts/real-plugin-check.sh install   # 复制 profile + 安装插件（约 400MB 副本）
+./scripts/real-plugin-check.sh boot      # 起在 :64600，打印带 token 的 URL
+./scripts/real-plugin-check.sh probe     # health / app / cards 三个 200
+./scripts/real-plugin-check.sh stop
+./scripts/real-plugin-check.sh clean     # 删掉一次性 profile
+```
+
+已用这套验证过：host 半挂载 200、client 半进 boot 清单（`plugins/??dsh-rotation-dashboard/client.js`）、
+中文项目名注册、卡片改标题落盘。
+
+## 五、升级插件（重要）
+
+用 `file:` 方式装的同版本 tgz，**pnpm 会复用旧包**：直接 `add` 不会更新文件。升级必须：
+
+```bash
+dsh plugin --profile <name> remove dsh-rotation-dashboard
+dsh plugin --profile <name> add ./dsh-rotation-dashboard-0.1.0.tgz
+```
+
+## 六、回滚
 
 ```bash
 dsh plugin --profile web remove dsh-rotation-dashboard

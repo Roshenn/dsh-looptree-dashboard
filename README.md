@@ -82,6 +82,21 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 
 实测：`host` 探活 200·9ms；`web` 从 down → 拉起后 up·200ms（pid 8444）→ 停止后 down 且端口释放。
 
+## 真机验证（已完成一部分）
+
+用 `scripts/real-plugin-check.sh` 在**真实 DSH 进程**里验证过（复制 web profile 成一次性 `rotationtest`）：
+
+| 验证 | 结果 |
+|---|---|
+| 插件装进 profile | `node_modules/dsh-rotation-dashboard` ✓，bundles 尾项写入 ✓ |
+| host 半挂载 | `/rotation/api/health` 200、`/rotation/app/` 200、`/rotation/api/cards` 200 ✓ |
+| client 半加载 | boot 清单里有 `{"id":"dsh-rotation-dashboard","url":"plugins/??dsh-rotation-dashboard/client.js…"}` ✓ |
+| 中文项目名 | `真机项目` → id `project-y85w`，注册 + 建卡 ✓ |
+| 卡片写回 | PUT 改标题 200，磁盘 `.dsh/rotation.json` 同步 ✓ |
+| 清理 | 测试项目已移除，真实注册表回到 `[]` ✓ |
+
+尚未验证：右栏 tab 的实际渲染（需要开一个会话看右栏）、以及 `ctx.agents` 真机事件序列。
+
 ## M4 准备（进行中）
 
 - **联调宿主**：`MOCK_AGENTS=1 node scripts/dev-host.mjs` 会在假 ctx 里挂一个 mock agent，
