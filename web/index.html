@@ -443,7 +443,7 @@
       </span>
       <div>
         <h1>闭环轮转</h1>
-        <p>LOOP ROTATION · 原型 v0.3 · 树形收敛</p>
+        <p id="brand-sub">LOOP ROTATION · 树形收敛</p>
       </div>
     </div>
     <div class="grow"></div>
@@ -796,6 +796,13 @@ async function resolveApiBase() {
 }
 const api = (path) => (API_BASE ? API_BASE + path : 'api' + path);
 window.__rotationLastApiError = '';
+// 顶部副标题显示真实插件版本（host 半注入 __ROTATION_VERSION__）
+if (window.__ROTATION_VERSION__) {
+  const v = 'v' + window.__ROTATION_VERSION__;
+  const sub = document.getElementById('brand-sub');
+  if (sub) sub.textContent = 'LOOP ROTATION · ' + v + ' · 树形收敛';
+  document.title = '闭环轮转 · ' + v;
+}
 
 const CARDS = Array.isArray(window.ROTATION_CARDS) ? window.ROTATION_CARDS : [];
 let PROJECTS = CARDS.length ? CARDS.map(cardToProject) : MOCK_PROJECTS;
