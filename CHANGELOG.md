@@ -30,6 +30,8 @@
 
 ### 真机验证记录
 - host 三路由 200；client 半进 boot 清单并零错误激活
+- 服务链路（真机）：探活 `down` → 拉起 `up pid=…` → 停止 `down`，5822 端口释放
+- `npm run check` 在真机实例上三项全绿
 - 面板在真实浏览器里：空状态 → 注册项目 → 泳道渲染 → 数据源可写回
 - 真实会话：`POST /api/run` → `assistant/message "OK"` → `turn/end completed` → 卡片 `session.result = "OK"`
 
