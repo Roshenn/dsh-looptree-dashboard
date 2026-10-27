@@ -259,6 +259,12 @@
   .svc-url:hover{color:var(--link,var(--brand-2));text-decoration:underline}
   .svc-acts{display:flex;gap:4px;flex-wrap:wrap}
 
+  /* ───────── 嵌入 DSH 主区时的紧凑模式 ───────── */
+  html[data-embed="1"] .topbar{padding:6px 10px;gap:8px}
+  html[data-embed="1"] .toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:5px;padding-bottom:2px}
+  html[data-embed="1"] .toolbar .chip{height:22px;padding:0 7px;font-size:11px;flex:0 0 auto}
+  html[data-embed="1"] .brand-sub{display:none}
+
   /* ───────── 空状态 ───────── */
   .empty-wrap{display:flex;align-items:flex-start;justify-content:center;padding:56px 24px}
   .empty-wrap[hidden],.matrix[hidden]{display:none}
@@ -2233,9 +2239,14 @@ $('#tab-focus').addEventListener('click', ()=>{ state.view='focus'; render(); })
 $('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
 $('#btn-refresh').addEventListener('click', ()=>{ state.stamp = new Date().toLocaleString('sv-SE').slice(0,16); render(); toast('已刷新（原型：数据仍是 mock）'); });
 $('#export-json').addEventListener('click', () => exportCard());
-// 「返回」：只要页面是插件提供的（路径含 /rotation/）就显示，且永远能回到 DSH
+// 嵌在 DSH 主区 iframe 里时：不需要「返回」，并启用紧凑工具栏
+let EMBEDDED = false;
+try { EMBEDDED = window.self !== window.top; } catch { EMBEDDED = true; }
+if (EMBEDDED) document.documentElement.dataset.embed = '1';
+
+// 「返回」：只要页面是插件提供的（路径含 /rotation/）且不是嵌入模式
 try {
-  const servedByPlugin = location.pathname.includes('/rotation/');
+  const servedByPlugin = location.pathname.includes('/rotation/') && !EMBEDDED;
   if (servedByPlugin){
     const back = $('#back-to-dsh');
     back.hidden = false;

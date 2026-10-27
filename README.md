@@ -142,7 +142,9 @@ POST /rotation/api/run → status running
 - 通过面板自己的接口注册项目：`200 {id:"project-z48d", …}`，刷新后项目出现在泳道里
 - 控制台零错误
 
-**入口（已实测）**：client 半会在 DSH 右下角挂一个常驻「轮转」按钮（与框架无关的 DOM 注入，
+**入口（0.2.1，已实测）**：左栏「闭环轮转」——`sidebar.panellist` 注册条目，点击在主区用 iframe
+打开面板（`main` 槽，key=`rotation`）。面板激活时右下角浮标会自动隐藏。
+client 半同时保留一个右下角常驻「轮转」按钮（与框架无关的 DOM 注入，
 位置在应用自带圆形按钮下方，不遮挡），点一下就在新标签打开面板。真机验证：
 按钮存在 → 点击 → popup 的 URL 是 `/rotation/app/`、标题正确、页面零报错。
 

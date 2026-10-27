@@ -1,13 +1,13 @@
 # 安装与验证
 
-插件包：`dsh-rotation-dashboard@0.2.0`（`npm pack` 产物：`dsh-rotation-dashboard-0.2.0.tgz`，约 62 KB）。
+插件包：`dsh-rotation-dashboard@0.2.0`（`npm pack` 产物：`dsh-rotation-dashboard-0.2.1.tgz`，约 62 KB）。
 
 ## 一、安装（二选一）
 
 ### A. 市场 UI 本地安装（推荐，符合本机规矩）
 
 1. 打开 DSH 桌面端 → 市场 / 插件页 → 找「本地安装 / 从文件安装」。
-2. 选本目录下的 `dsh-rotation-dashboard-0.2.0.tgz`。
+2. 选本目录下的 `dsh-rotation-dashboard-0.2.1.tgz`。
 3. 重启 DSH（`dsh web` 或桌面端重启，让 profile 重新合并 patch）。
 
 > 本机规矩：插件增删改默认只走市场 UI。用 CLI 前必须先核对
@@ -21,7 +21,7 @@ cd ~/.dsh/reports/rotation-panel
 npm pack                                   # 生成 tgz
 pnpm store path                            # 记下这个路径
 grep storeDir ~/.dsh/profiles/web/node_modules/.modules.yaml   # 必须与上一行逐字一致
-dsh plugin --profile web add ./dsh-rotation-dashboard-0.2.0.tgz
+dsh plugin --profile web add ./dsh-rotation-dashboard-0.2.1.tgz
 ```
 
 ## 二、验证清单（按顺序做，任一步失败就停）
@@ -34,8 +34,8 @@ curl -s http://127.0.0.1:64517/rotation/api/health
 # 2) 面板是否可打开
 open http://127.0.0.1:64517/rotation/app/
 
-# 3) 入口：DSH 右下角应有「轮转」按钮（与自带圆形按钮上下相邻）
-#    点它会在新标签打开面板；也可以直接访问：
+# 3) 入口：左栏应出现「闭环轮转」（在「插件 / 自动化任务」之后）
+#    点它 → 主区打开面板；右下角另有「轮转」浮标作为兜底；也可以直接访问：
 open http://127.0.0.1:64517/rotation/app/
 #    右栏「轮转」标签在 0.2.1-rc.3 实测没有渲染出来（见 README「入口结论」），
 #    以 URL 为准；client 半是否激活可看 document.documentElement.dataset.dshRotation
@@ -100,7 +100,7 @@ DSH 默认的 `deepseek-official` 直连厂商（本机铁律要求走网关）�
 
 ```bash
 dsh plugin --profile <name> remove dsh-rotation-dashboard
-dsh plugin --profile <name> add ./dsh-rotation-dashboard-0.2.0.tgz
+dsh plugin --profile <name> add ./dsh-rotation-dashboard-0.2.1.tgz
 ```
 
 ## 六、回滚
