@@ -166,6 +166,11 @@
   .bars i{width:10px;height:3px;border-radius:2px;background:var(--b3)}
   .bars i.on{background:var(--green)}
   .blk{font-size:10.5px;color:var(--red)}
+  .foldchip{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;margin-top:5px;
+    height:20px;padding:0 7px;border-radius:5px;corner-shape:var(--corner);border:1px dashed var(--b2);
+    background:transparent;color:var(--tx4);font-size:10px;transition:color 140ms var(--ease-out),border-color 140ms var(--ease-out)}
+  .foldchip:hover{color:var(--tx2);border-color:var(--b3)}
+  .foldchip.on{border-style:solid;color:var(--tx3)}
   .runbad{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--tone);
     padding:1px 6px;border-radius:5px;background:color-mix(in srgb,var(--tone) 12%,transparent);
     border:1px solid color-mix(in srgb,var(--tone) 26%,transparent)}
@@ -1092,6 +1097,8 @@ function nodeMarkup(n, p){
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
     ${lateBadge(n)}
     ${p ? runBadge(p, n) : ''}
+    ${n.hiddenClosed ? `<button class="foldchip" data-fold="${n.id}" title="把 ${n.hiddenClosed} 个已关闭节点收在这里">▸ 已关闭 ${n.hiddenClosed}</button>` : ''}
+    ${n.closedShown ? `<button class="foldchip on" data-fold="${n.id}" title="收起 ${n.closedShown} 个已关闭节点">▾ 收起已关闭 ${n.closedShown}</button>` : ''}
     ${issues}
     ${foldedMarkup(n)}
     ${(bars||foot) ? `<div class="tfootline">${bars}<span class="grow"></span>${foot}</div>` : ''}
@@ -1099,6 +1106,37 @@ function nodeMarkup(n, p){
 }
 
 /* ─────────── 布局与连线 ─────────── */
+const foldedClosed = new Set();   // 展开「已关闭子节点」的父节点 id
+function visibleRoot(root){
+  const clone = (n) => {
+    const kids = [];
+    let hidden = 0, shown = 0;
+    for (const k of (n.children || [])){
+      if (k.closed && !foldedClosed.has(n.id)){ hidden++; continue; }
+      if (k.closed) shown++;
+      kids.push(clone(k));
+    }
+    return Object.assign({}, n, { children: kids, hiddenClosed: hidden, closedShown: shown });
+  };
+  return clone(root);
+}
+function ensureVisible(nid){
+  const p = findProjectByNode(nid);
+  if (!p) return false;
+  let found = false;
+  (function walk(n, ancestors){
+    for (const k of (n.children || [])){
+      if (k.id === nid){
+        ancestors.forEach(a => foldedClosed.add(a));
+        found = true; return true;
+      }
+      if (walk(k, ancestors.concat([n.id]))) return true;
+    }
+    return false;
+  })(p.root, []);
+  return found;
+}
+
 function treeLayout(root){
   const nodes=[]; let row=0;
   (function rec(n, depth){
@@ -1115,13 +1153,13 @@ function treeLayout(root){
 function mountCanvas(project, canvas){
   canvas.classList.remove('canvas--collapsed');
   canvas.style.height = '';
-  const { nodes } = treeLayout(project.root);
+  const { nodes } = treeLayout(visibleRoot(project.root));
   canvas.__nodes = nodes;
   canvas.innerHTML = `<svg class="edges" aria-hidden="true"></svg>` + nodes.map(n => nodeMarkup(n, project)).join('');
 }
 
 function layoutCanvas(project, canvas, cols){
-  const nodes = canvas.__nodes || treeLayout(project.root).nodes;
+  const nodes = canvas.__nodes || treeLayout(visibleRoot(project.root)).nodes;
   let maxH = 56;
   for (const n of nodes){
     const el = canvas.querySelector(`[data-nid="${n.id}"]`);
@@ -1768,7 +1806,11 @@ function closeDetail(){
   setTimeout(() => { if (d.dataset.show === 'false') d.hidden = true; }, 150);
   detailNode = null;
 }
-function openDetail(id){
+function openDetail(id, skipEnsure){
+  if (!skipEnsure) ensureVisible(id);
+  return _openDetail(id);
+}
+function _openDetail(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
   const anchor = document.querySelector(`.tnode[data-nid="${id}"]`);
@@ -2196,6 +2238,13 @@ document.addEventListener('click', (e)=>{
       const task = p0 && n0 && taskListFor(p0, n0).list.find(t => t.id === wrap.dataset.task);
       if (p0 && n0 && task){ $('#pgen-input').value = composePrompt(p0, n0, task); $('#pgen-hint').textContent = '已恢复默认'; }
     }
+    return;
+  }
+  const foldBtn = e.target.closest('[data-fold]');
+  if (foldBtn){
+    const id = foldBtn.dataset.fold;
+    if (foldedClosed.has(id)) foldedClosed.delete(id); else foldedClosed.add(id);
+    render();
     return;
   }
   const svcOpen = e.target.closest('[data-svc-open]');
