@@ -81,6 +81,14 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 
 实测：`host` 探活 200·9ms；`web` 从 down → 拉起后 up·200ms（pid 8444）→ 停止后 down 且端口释放。
 
+## M4 准备（进行中）
+
+- 空注册表时面板显示引导卡片（「添加第一个项目」），不再退回样例数据：
+  服务端能应答就算连上，空注册表是「还没有项目」而不是「连不上」
+- `dsh.engines.dsh >= 0.2.1-rc.3`：把插件依赖的宿主版本写进清单
+- runner 在拿不到 provider/model 时不传 agentOptions，交给宿主默认选择
+- `npm run mock:client`：用假浏览器环境验证 client 半契约（9 项断言）
+
 ---
 # 闭环轮转面板（原型 v0.6 · 可读写 rotation/v1）
 

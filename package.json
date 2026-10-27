@@ -28,6 +28,9 @@
       "inject": [
         "@deepseek-ai/dsh-client-modules"
       ]
+    },
+    "engines": {
+      "dsh": ">=0.2.1-rc.3"
     }
   },
   "scripts": {
@@ -37,6 +40,7 @@
     "validate:samples": "for f in samples/*.rotation.json; do node validate-rotation.mjs \"$f\" --quiet || exit 1; done",
     "migrate": "node scripts/migrate-samples.mjs",
     "check": "node scripts/check-install.mjs",
-    "mock:session": "node scripts/dev-session-mock.mjs"
+    "mock:session": "node scripts/dev-session-mock.mjs",
+    "mock:client": "node scripts/dev-client-mock.mjs"
   }
 }

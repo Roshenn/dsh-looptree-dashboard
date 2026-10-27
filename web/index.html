@@ -255,6 +255,16 @@
   .svc-url:hover{color:var(--link,var(--brand-2));text-decoration:underline}
   .svc-acts{display:flex;gap:4px;flex-wrap:wrap}
 
+  /* ───────── 空状态 ───────── */
+  .empty-wrap{display:flex;align-items:flex-start;justify-content:center;padding:56px 24px}
+  .empty-wrap[hidden],.matrix[hidden]{display:none}
+  .empty-card{max-width:560px;width:100%;border:1px solid var(--b2);border-radius:10px;background:var(--l1);
+    padding:22px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+  .empty-k{font-size:15px;font-weight:600;color:var(--tx1)}
+  .empty-card p{margin:0;font-size:12px;line-height:1.75;color:var(--tx3)}
+  .empty-card code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx2)}
+  .empty-card .hint{font-size:11px;color:var(--tx4)}
+
   /* ───────── footer ───────── */
   .footer{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:7px 16px;border-top:1px solid var(--b2);
     background:var(--l1);font-size:11.5px;color:var(--tx4)}
@@ -468,6 +478,15 @@
   </div>
 
   <main class="scroll" id="stage">
+    <div class="empty-wrap" id="empty" hidden>
+      <div class="empty-card">
+        <div class="empty-k">还没有项目</div>
+        <p>轮转面板按项目工作：每个项目在自己的目录下放一份 <code>.dsh/rotation.json</code>，
+        面板通过注册表找到它们，读写都直接落在项目里。</p>
+        <button class="tbtn primary-converge" id="empty-add">添加第一个项目</button>
+        <div class="hint" style="margin-top:10px">也可以先点工具栏「+ 项目」，或把窗口缩到一半用「载入 JSON」看样例。</div>
+      </div>
+    </div>
     <div class="matrix" id="matrix"></div>
     <div class="focus-wrap" id="focus" hidden></div>
   </main>
@@ -2486,11 +2505,11 @@ if (qs.get('filter')) state.filter = qs.get('filter');
       const r = await fetch(api('/cards'));
       if (r.ok){
         const j = await r.json();
+        // 服务端能答就算连上了：空注册表是「还没有项目」，不是「连不上」——
+        // 不能退回 cards.js 样例，否则用户永远看不到空状态引导。
         const list = (j.cards || []).filter(x => x.card);
-        if (list.length){
-          PROJECTS = list.map(x => cardToProject(x.card, x.file));
-          source = 'server';
-        }
+        PROJECTS = list.map(x => cardToProject(x.card, x.file));
+        source = 'server';
       }
     } catch {}
   }
@@ -2499,8 +2518,19 @@ if (qs.get('filter')) state.filter = qs.get('filter');
     source = 'static';
   }
   PROJECTS.forEach(p => { if (!p.card) return; });
+  const isEmpty = PROJECTS.length === 0;
+  const emptyEl = $('#empty'), matrixEl = $('#matrix');
+  if (emptyEl) emptyEl.hidden = !isEmpty;
+  if (matrixEl) matrixEl.hidden = isEmpty;
+  if (isEmpty) {
+    const btn = $('#empty-add');
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => $('#add-project').click());
+    }
+  }
   if (!PROJECTS.some(p => p.id === state.focusId)) state.focusId = PROJECTS[0] ? PROJECTS[0].id : '';
-  render();
+  if (!isEmpty) render();
   const src = $('#data-src');
   if (src) src.textContent = source === 'server'
     ? '数据源：项目 .dsh/rotation.json（可写回）'
