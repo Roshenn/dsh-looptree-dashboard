@@ -111,7 +111,13 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 > 若要把某个项目钉到网关路由：注册时带 `provider`/`model`，注册表会存下来，runner 优先用它：
 > `POST /rotation/api/projects {"name":"x","workspace":"/w","provider":"<网关 provider>","model":"<模型>"}`
 
-尚未验证：右栏 tab 的实际渲染（需要开一个会话看右栏）。
+**入口结论（0.2.1-rc.3 实测）**：client 半激活正常（`document.documentElement.dataset.dshRotation === '1'`，
+控制台零错误），但 `sidebar.right.pane.tab` 注册的「轮转」标签**没有出现在右栏标签条里**
+（右栏开「工作区文件」时只有 `文件` 一个标签）。右栏标签条似乎只列运行时打开的 pane，
+不列插件静态注册的 tab。
+
+因此当前可用入口是 **URL**：`http://<dsh-host>:<port>/rotation/app/`（`/rotation` 会 302 过去），
+建议加书签。右栏入口作为待解问题保留，不阻塞使用。
 
 ## M4 准备（进行中）
 

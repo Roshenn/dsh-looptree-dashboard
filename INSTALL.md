@@ -34,8 +34,10 @@ curl -s http://127.0.0.1:64517/rotation/api/health
 # 2) 面板是否可打开
 open http://127.0.0.1:64517/rotation/app/
 
-# 3) 右栏是否出现「轮转」入口（client 半）
-#    打开任意会话的右栏，应看到一个含「打开面板」按钮的标签页
+# 3) 直接打开面板（这是当前**唯一可靠入口**）
+open http://127.0.0.1:64517/rotation/app/
+#    右栏「轮转」标签在 0.2.1-rc.3 实测没有渲染出来（见 README「入口结论」），
+#    以 URL 为准；client 半是否激活可看 document.documentElement.dataset.dshRotation
 
 # 4) 注册第一个真实项目（把路径换成你自己的项目）
 curl -s -X POST http://127.0.0.1:64517/rotation/api/projects \
