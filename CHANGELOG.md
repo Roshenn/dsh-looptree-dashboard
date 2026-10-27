@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.2.4 — 候选 API 地址探测
+
+- host 半在 index.html 注入**候选** API 地址（Host 头 / 探测到的监听端口 / 相对路径），
+  面板在非 http 协议下逐个探 `/health`，第一个通的就用
+- 服务端口探测：`ctx.webServer.port|listeningPort|address()|server.address()` 与 `--port` 参数
+- `/health` 增加 `server` 段（port / argvPort / 可用键），便于排查桌面端地址问题
+
 ## 0.2.3 — 主题跟随 + 桌面端 API 地址
 
 - **主题跟随 DSH**：client 半读宿主 `html[data-theme]`（并观察变化 + 系统偏好），

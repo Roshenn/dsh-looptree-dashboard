@@ -768,16 +768,32 @@ const runFor = (p, n) => runMap.get(runKey(p, n)) || staticRun(n);
 const RUN_LABEL = { starting:'启动中', running:'运行中', done:'完成', failed:'失败', cancelled:'已取消', stale:'进程已不在' };
 const RUN_TONE = { starting:'var(--brand-2)', running:'var(--brand-2)', done:'var(--green)', failed:'var(--red)', cancelled:'var(--tx3)', stale:'var(--amber)' };
 
-const API_BASE = (() => {
-  // 桌面外壳里页面可能跑在 dsh-app://app，相对路径到不了 HTTP 服务；
-  // host 半会把真实地址注入成 __ROTATION_API_ABS__，优先用它。
-  const injected = window.__ROTATION_API_ABS__;
-  if (injected && !/^https?:/.test(location.protocol)) return String(injected).replace(/\/$/, '');
+let API_BASE = (() => {
   try {
     const u = new URL('../api/', location.href);
-    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href.replace(/\/$/, '') : '';
-  } catch { return ''; }
+    if (u.protocol === 'http:' || u.protocol === 'https:') return u.href.replace(/\/$/, '');
+  } catch { /* noop */ }
+  const injected = window.__ROTATION_API_ABS__;
+  return injected ? String(injected).replace(/\/$/, '') : '';
 })();
+
+/** 非 http 协议（桌面外壳 dsh-app://）时，按候选地址探测哪个能通 */
+async function resolveApiBase() {
+  if (/^https?:/.test(location.protocol)) return API_BASE;
+  const list = Array.isArray(window.__ROTATION_API_CANDIDATES__) ? window.__ROTATION_API_CANDIDATES__ : [];
+  for (const raw of list) {
+    const candidate = String(raw).replace(/\/$/, '');
+    const abs = /^https?:/.test(candidate) ? candidate : new URL(candidate, location.href).toString().replace(/\/$/, '');
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 1500);
+      const r = await fetch(abs + '/health', { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (r.ok) { API_BASE = abs; return abs; }
+    } catch { /* try next */ }
+  }
+  return API_BASE;
+}
 const api = (path) => (API_BASE ? API_BASE + path : 'api' + path);
 window.__rotationLastApiError = '';
 
@@ -2581,6 +2597,7 @@ if (qs.get('project')) state.focusId = qs.get('project');
 if (qs.get('filter')) state.filter = qs.get('filter');
 
 (async function boot(){
+  await resolveApiBase();
   let source = 'mock';
   if (location.protocol.startsWith('http')){
     try {
