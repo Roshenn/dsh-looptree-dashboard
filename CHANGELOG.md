@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.2.7 — 私有网络预检
+
+- API 的 CORS 响应补 `Access-Control-Allow-Private-Network: true`：
+  桌面外壳（`dsh-app://`）跨源访问 `127.0.0.1` 时，Chromium 的 PNA 预检可能拦下请求
+
 ## 0.2.6 — 版本标签真的生效
 
 - 0.2.5 只注入了 `__ROTATION_VERSION__`，但面板侧消费代码的目标串不匹配（静默没插进去），
