@@ -83,6 +83,13 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 
 ## M4 准备（进行中）
 
+- **联调宿主**：`MOCK_AGENTS=1 node scripts/dev-host.mjs` 会在假 ctx 里挂一个 mock agent，
+  于是面板的「发起会话」可以真的被点下去，状态点会走 运行中 → 完成
+- **client 契约**：`npm run mock:client`（9 项断言，含无 slots 降级）
+- **调试钩子**：页面里 `window.__rotation.refreshRuns()` / `.runs` / `.state` 可手动触发刷新与查状态
+- **后台标签页也会刷新**：切走再切回立刻同步一次，不再显示过期状态
+
+
 - 空注册表时面板显示引导卡片（「添加第一个项目」），不再退回样例数据：
   服务端能应答就算连上，空注册表是「还没有项目」而不是「连不上」
 - `dsh.engines.dsh >= 0.2.1-rc.3`：把插件依赖的宿主版本写进清单

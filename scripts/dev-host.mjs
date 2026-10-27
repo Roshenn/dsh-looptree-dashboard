@@ -15,8 +15,37 @@ const PORT = Number(process.env.PORT || 4180);
 const BASE = process.env.BASE || '/rotation';
 
 const routes = [];
+const eventHandlers = new Set();
+const MOCK_AGENTS = process.env.MOCK_AGENTS === '1';
+
 const ctx = {
   logger: console,
+  on(event, handler) {
+    if (event === 'session/event') eventHandlers.add(handler);
+    return () => eventHandlers.delete(handler);
+  },
+  agentDefaultModel: { currentSelection: () => ({ provider: 'mock-provider', model: 'mock-model' }) },
+  sessions: { get: () => null },
+  agents: MOCK_AGENTS ? {
+    async create({ sessionId, meta }) {
+      const emit = (event) => { for (const fn of eventHandlers) fn({ id: sessionId, header: { cwd: meta?.cwd } }, event); };
+      return {
+        agent: {
+          id: sessionId,
+          async followup() {
+            setTimeout(() => emit({ type: 'turn/start', data: { turn: 1 } }), 150);
+            setTimeout(() => emit({ type: 'step/start', data: { turn: 1, step: 1 } }), 300);
+            setTimeout(() => emit({
+              type: 'assistant/message',
+              data: { content: [{ type: 'text', text: 'MOCK：这里是一段会话结果，用来验证面板的状态与写回。' }] },
+            }), 900);
+            setTimeout(() => emit({ type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } }), 1400);
+          },
+          interrupt() {},
+        },
+      };
+    },
+  } : undefined,
   webServer: {
     register(options) {
       routes.push(options);

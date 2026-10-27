@@ -2079,22 +2079,27 @@ function markSave(msg, kind){
   el.dataset.state = kind || '';
 }
 function paintRunBadges(){
+  // 先清掉旧的状态点再重画：避免 replace/append 混用留下重复或过期的徽标
+  document.querySelectorAll('.tnode .runbad').forEach(el => {
+    const meta = el.closest('.tnode-meta');
+    if (meta) meta.remove(); else el.remove();
+  });
   document.querySelectorAll('.tnode').forEach(el => {
     const nid = el.dataset.nid;
     const p = findProjectByNode(nid); const n = p && findNode(p.root, nid);
     if (!p || !n) return;
-    const old = el.querySelector('.runbad');
     const html = runBadge(p, n);
-    if (!html){ if (old) old.closest('.tnode-meta').remove(); return; }
-    if (old){
-      const wrap = old.closest('.tnode-meta');
-      wrap.outerHTML = html;
-    } else {
-      el.insertAdjacentHTML('beforeend', html);
-    }
+    if (html) el.insertAdjacentHTML('beforeend', html);
   });
   if (detailNode) openDetail(detailNode);
 }
+// 调试/自检钩子：从控制台或测试脚本手动触发刷新
+window.__rotation = {
+  refreshRuns: () => refreshRuns(),
+  refreshServices: () => refreshServices(),
+  runs: runMap,
+  state,
+};
 let refreshTimer = null;
 async function refreshServices(){
   for (const p of PROJECTS){
@@ -2547,9 +2552,15 @@ if (qs.get('filter')) state.filter = qs.get('filter');
       await refreshServices();
       setInterval(() => { if (!document.hidden) refreshServices(); }, 5000);
       refreshTimer = setInterval(() => {
+        // 后台标签页也要刷新：否则切回来看到的是旧状态；本地接口，代价可以忽略
         const busy = [...runMap.values()].some(x => x.status === 'running' || x.status === 'starting');
-        if (!document.hidden && (busy || Math.random() < 0.2)) refreshRuns();
+        if (busy || Math.random() < 0.2) refreshRuns();
       }, 2000);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        refreshRuns();
+        refreshServices();
+      });
     }
   }
   // 便于分享/截图：?open=<nodeId> 载入后直接展开该节点详情
