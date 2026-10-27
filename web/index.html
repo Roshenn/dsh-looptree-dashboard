@@ -93,6 +93,10 @@
     border-right:1px solid var(--b2);position:sticky;left:0;z-index:7;background:inherit;
     border-radius:9px 0 0 9px}
   .lane-name{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--tx1)}
+  .lane-x{margin-left:auto;width:16px;height:16px;line-height:14px;border-radius:4px;border:1px solid transparent;
+    background:transparent;color:var(--tx4);font-size:10px;opacity:0;transition:opacity 140ms var(--ease-out),color 140ms var(--ease-out)}
+  .lane:hover .lane-x{opacity:1}
+  .lane-x:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
   .lane-tag{font-size:10.5px;color:var(--tx4);letter-spacing:.04em}
   .lane-prog{margin-top:2px;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--tx4)}
   .lane-actions{display:flex;gap:5px;margin-top:4px}
@@ -1286,7 +1290,8 @@ function laneMarkup(p){
   const pr = progressOf(p.root);
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${p.root.closed}">
     <div class="lane-head">
-      <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
+      <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}
+        ${p.file ? `<button class="lane-x" data-project-remove="${esc(p.file)}" title="从轮转列表移除（不删项目文件）">✕</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
       ${laneServices(p)}
@@ -1405,7 +1410,8 @@ function renderFocus(){
     <div class="focus-lane">
       <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}">
         <div class="lane-head">
-          <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
+          <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}
+        ${p.file ? `<button class="lane-x" data-project-remove="${esc(p.file)}" title="从轮转列表移除（不删项目文件）">✕</button>` : ''}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
           ${laneServices(p)}
@@ -2332,6 +2338,23 @@ document.addEventListener('click', (e)=>{
         .then(r => r.json()).then(j => { toast(j.ok ? `已停止 ${svc.name}` : (j.error || '停止失败')); setTimeout(refreshServices, 600); })
         .catch(e => toast('停止失败：' + e.message));
     }
+    return;
+  }
+  const prjRemove = e.target.closest('[data-project-remove]');
+  if (prjRemove){
+    const file = prjRemove.dataset.projectRemove;
+    askConfirm('从轮转列表移除',
+      `<div class="detail-row"><dt>卡片</dt><dd class="mono">${esc(file)}</dd></div>
+       <div class="mnote">只从注册表移除，项目里的 <code>.dsh/rotation.json</code> 不会被删除；下次可以再「添加项目」加回来。</div>`,
+      '移除', async () => {
+        try {
+          const res = await fetch(api('/projects/') + encodeURIComponent(file), { method: 'DELETE' });
+          const j = await res.json();
+          if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+          toast('已移除，正在重新载入');
+          setTimeout(() => location.reload(), 500);
+        } catch (error) { toast('移除失败：' + error.message); }
+      });
     return;
   }
   const svcLog = e.target.closest('[data-svc-log]');

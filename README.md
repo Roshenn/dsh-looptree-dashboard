@@ -45,9 +45,10 @@ curl -s localhost:4180/rotation/api/health
 | GET | `/rotation/api/projects` | 注册表 + 卡片是否存在 |
 | POST | `/rotation/api/projects` | `{name, workspace}` 注册项目，自动建 `.dsh/rotation.json` 模板 |
 | GET | `/rotation/api/cards` | 所有项目的卡片 |
+| DELETE | `/rotation/api/projects/<id或文件名>` | 从注册表移除（不删项目里的卡片文件） |
 | PUT | `/rotation/api/cards/<id或文件名>` | 校验 → `.bak` → 原子写；校验不过 422 |
 
-面板变化：工具栏多了「+ 项目」；数据源文案改成「项目 .dsh/rotation.json（可写回）」；
+面板变化：工具栏多了「+ 项目」、泳道悬停出现「✕」移除；数据源文案改成「项目 .dsh/rotation.json（可写回）」；
 所有请求走 `api()` 前缀，插件下是 `/rotation/api`，旧 `:4173` 服务下是 `/api`。
 
 迁移样例：`npm run migrate`（干跑），`npm run migrate -- --write` 真正写入，幂等（目标已存在就跳过）。
