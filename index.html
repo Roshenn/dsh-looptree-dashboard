@@ -260,6 +260,38 @@
   html[data-density="compact"] .tnode-meta{font-size:10px}
   html[data-density="compact"] .canvas{padding:8px 0 10px}
 
+  /* ───────── 节点详情卡 ───────── */
+  .detail{position:fixed;inset:0;z-index:45;pointer-events:none}
+  .detail[hidden]{display:none}
+  .detail-card{position:fixed;width:336px;max-height:calc(100vh - 24px);overflow:auto;pointer-events:auto;
+    border:1px solid var(--b3);border-radius:12px;corner-shape:var(--corner);background:var(--l2);
+    box-shadow:0 24px 60px -28px rgba(0,0,0,.9);padding:12px 13px 11px;
+    opacity:0;transform:scale(.96);transition:opacity 150ms var(--ease-out),transform 150ms var(--ease-out)}
+  .detail[data-show="true"] .detail-card{opacity:1;transform:scale(1)}
+  .detail-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .detail-head .kind{font-size:9.5px;letter-spacing:.07em;color:var(--tone);text-transform:uppercase}
+  .detail-head .nid{font-size:9.5px;color:var(--tx4)}
+  .detail-close{margin-left:auto;width:20px;height:20px;border-radius:5px;color:var(--tx4);font-size:11px;line-height:1}
+  .detail-close:hover{background:var(--hover);color:var(--tx1)}
+  .detail h3{margin:0 0 6px;font-size:14px;line-height:1.4;font-weight:500;color:var(--tx1)}
+  .detail-path{display:flex;flex-wrap:wrap;align-items:center;gap:3px;font-size:10.5px;color:var(--tx4);margin-bottom:9px}
+  .detail-path button{color:var(--tx3);font-size:10.5px;padding:1px 4px;border-radius:4px}
+  .detail-path button:hover{background:var(--hover);color:var(--tx1)}
+  .detail-sec{margin-top:9px;padding-top:9px;border-top:1px solid var(--b1)}
+  .detail-k{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tx4);margin-bottom:5px}
+  .detail-row{display:flex;gap:8px;font-size:11.5px;line-height:1.55;margin-bottom:4px}
+  .detail-row dt{flex:0 0 40px;color:var(--tx4)}
+  .detail-row dd{margin:0;color:var(--tx2);word-break:break-word}
+  .detail-row dd.mono{font-variant-numeric:tabular-nums;color:var(--tx3);font-size:11px}
+  .detail-chips{display:flex;flex-wrap:wrap;gap:5px}
+  .dchip{display:inline-flex;align-items:center;gap:5px;height:23px;padding:0 8px;border-radius:6px;corner-shape:var(--corner);
+    border:1px solid var(--b2);background:var(--l3);font-size:11px;color:var(--tx2);max-width:100%}
+  .dchip:hover{border-color:var(--b3);color:var(--tx1)}
+  .dchip i{width:5px;height:5px;border-radius:50%;background:var(--tone);flex:0 0 auto}
+  .dchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .detail-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+  .tnode.is-active{border-color:color-mix(in srgb,var(--brand) 60%,var(--b3));box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 26%,transparent)}
+
   /* ───────── modal ───────── */
   .modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--b3);
     backdrop-filter:blur(3px);opacity:0;transition:opacity 160ms var(--ease-out)}
@@ -364,6 +396,10 @@
     <span>父子关系用连线表示 · 关闭自下而上传播 · 全部关闭后闭环收敛</span>
   </footer>
 </div>
+<div class="detail" id="detail" hidden>
+  <div class="detail-card" role="dialog" aria-label="节点详情"></div>
+</div>
+
 <div class="modal" id="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-head">
@@ -1150,6 +1186,8 @@ function renderFocus(){
 }
 
 function render(){
+  const keepDetail = detailNode;   // 重渲染后把详情卡重新挂回原节点（窗口 resize / 切主题都会走这里）
+  closeDetail();
   document.documentElement.dataset.theme = state.theme;
   $('#tab-matrix').setAttribute('aria-pressed', state.view==='matrix');
   $('#tab-focus').setAttribute('aria-pressed', state.view==='focus');
@@ -1164,6 +1202,10 @@ function render(){
   focusSwitch();
   if (state.view==='matrix') renderMatrix(); else renderFocus();
   updateKpis();
+  if (keepDetail && findProjectByNode(keepDetail)){
+    requestAnimationFrame(() => openDetail(keepDetail));
+    setTimeout(() => { if (!detailNode) openDetail(keepDetail); }, 60);
+  }
 }
 
 function updateKpis(){
@@ -1237,6 +1279,124 @@ function addChild(id){
   persist(p);
 }
 
+const fmtTs = (iso) => new Date(iso).toLocaleString('sv-SE').slice(5, 16);
+function pathTo(root, id){
+  const arr = [];
+  (function walkPath(n, trail){
+    const next = trail.concat([n]);
+    if (n.id === id){ arr.push(...next); return true; }
+    return (n.children || []).some(c => walkPath(c, next));
+  })(root, []);
+  return arr;
+}
+function detailMarkup(p, n){
+  const r = n.raw || {};
+  const st = stateOf(n);
+  const tone = nodeTone(n);
+  const kids = n.children || [];
+  const rows = [];
+  if (r.intent)     rows.push(['意图', r.intent]);
+  if (r.acceptance) rows.push(['验收', r.acceptance]);
+  if (r.approach)   rows.push(['方案', r.approach]);
+  if (r.verify)     rows.push(['验证', r.verify]);
+  if (r.proof)      rows.push(['证据', r.proof]);
+  if (r.closed_at)  rows.push(['关闭', fmtTs(r.closed_at)]);
+  if (r.started_at) rows.push(['开始', fmtTs(r.started_at)]);
+  const inFlight = (!r.closed_at && r.started_at)
+    ? ((Date.now() - Date.parse(r.started_at)) / 86400000) : null;
+  if (inFlight != null) rows.push(['在途', fmtDays(inFlight)]);
+
+  const trail = pathTo(p.root, n.id);
+  const pathHtml = [`<button data-jump="${p.root.id}" data-proj="${p.id}">${p.name}</button>`]
+    .concat(trail.slice(1).map(x => `<span>›</span><button data-jump="${x.id}" data-proj="${p.id}">${x.title}</button>`)).join('');
+
+  const issues = (r.issues || []).map(i => `<div class="issue">⚠ ${i.text}${i.resolved_at ? ' · 已处置' : ''}</div>`).join('');
+  const kidsHtml = kids.length
+    ? `<div class="detail-sec"><div class="detail-k">子节点 ${kids.length}</div><div class="detail-chips">
+        ${kids.map(k => {
+          const ks = stateOf(k);
+          return `<button class="dchip" data-jump="${k.id}" data-proj="${p.id}" style="--tone:${ks.tone}">
+            <i></i><span>${k.title}</span></button>`;
+        }).join('')}
+      </div></div>`
+    : '';
+  const canClose = !n.closed && (!kids.length || readyToClose(n));
+  const acts = [
+    canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' ? '确认收敛' : (kids.length ? '确认关闭' : '完成')}</button>` : '',
+    n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
+    `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
+    `<button class="tbtn" data-gofocus="${p.id}">聚焦项目</button>`,
+  ].filter(Boolean).join('');
+
+  return `<div class="detail-head">
+      <span class="kind" style="--tone:${tone}">${KIND[n.kind]}</span>
+      <span class="nid mono">${n.id}</span>
+      <span class="st" style="--st-tone:${st.tone}">${st.label}</span>
+      <button class="detail-close" id="detail-x" aria-label="关闭详情">✕</button>
+    </div>
+    <h3>${n.title}</h3>
+    <div class="detail-path">${pathHtml}</div>
+    <dl class="detail-sec" style="margin-top:0;padding-top:0;border-top:0">
+      ${rows.map(([k, v]) => `<div class="detail-row"><dt>${k}</dt><dd class="${k==='关闭'||k==='开始'||k==='在途'?'mono':''}">${v}</dd></div>`).join('')}
+      ${rows.length ? '' : '<div class="detail-row"><dt>说明</dt><dd>这张卡没有填写验收/证据字段</dd></div>'}
+    </dl>
+    ${issues ? `<div class="detail-sec"><div class="detail-k">问题反馈</div>${issues}</div>` : ''}
+    ${kidsHtml}
+    <div class="detail-acts">${acts}</div>`;
+}
+
+let detailNode = null;
+function closeDetail(){
+  const d = $('#detail');
+  if (!d || d.hidden) return;
+  d.dataset.show = 'false';
+  const c0 = d.querySelector('.detail-card');
+  if (c0){ c0.style.opacity = ''; c0.style.transform = ''; }
+  document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
+  setTimeout(() => { if (d.dataset.show === 'false') d.hidden = true; }, 150);
+  detailNode = null;
+}
+function openDetail(id){
+  const p = findProjectByNode(id); if (!p) return;
+  const n = findNode(p.root, id); if (!n) return;
+  const anchor = document.querySelector(`.tnode[data-nid="${id}"]`);
+  if (!anchor) return;
+  const d = $('#detail'), card = d.querySelector('.detail-card');
+  card.innerHTML = detailMarkup(p, n);
+  d.hidden = false;
+  document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
+  anchor.classList.add('is-active');
+  detailNode = id;
+  // 同步测量 + 定位（不依赖 RAF），再用 RAF 触发入场动画，另加定时兜底
+  const ar = anchor.getBoundingClientRect();
+  const W = card.offsetWidth, H = card.offsetHeight;
+  let left = ar.right + 10;
+  if (left + W > innerWidth - 12) left = ar.left - W - 10;
+  if (left < 12) left = Math.max(12, Math.min(innerWidth - W - 12, ar.left));
+  let top = ar.top - 6;
+  if (top + H > innerHeight - 12) top = Math.max(12, innerHeight - H - 12);
+  card.style.left = left + 'px';
+  card.style.top = top + 'px';
+  card.style.transformOrigin = left > ar.right ? '0 26px' : '100% 26px';
+  const showIt = () => {
+    if (detailNode !== id) return;
+    d.dataset.show = 'true';
+    // 显式落终态：不依赖 CSS transition 是否被浏览器推进（无头/后台标签页下可能不推进）
+    card.style.opacity = '1';
+    card.style.transform = 'scale(1)';
+    // 兜底：某些环境（无头截图 / 后台标签页）CSS transition 时钟不推进，
+    // 计算值会一直停在 opacity:0 —— 220ms 后直接落终态（真实浏览器此时动画早已结束，无感）
+    setTimeout(() => {
+      if (detailNode !== id) return;
+      card.style.transition = 'none';
+      card.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+    }, 220);
+  };
+  requestAnimationFrame(showIt);
+  setTimeout(showIt, 48);
+}
+
 function openConfirm(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
@@ -1270,7 +1430,11 @@ $('#modal-x').addEventListener('click', closeConfirm);
 $('#modal-cancel').addEventListener('click', closeConfirm);
 $('#modal-ok').addEventListener('click', () => { const id = pendingClose; closeConfirm(); if (id) doClose(id); });
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeConfirm(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#modal').hidden) closeConfirm(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('#modal').hidden) closeConfirm();
+  else closeDetail();
+});
 
 function markSave(msg, kind){
   const el = $('#save-state');
@@ -1353,6 +1517,26 @@ $('#density').addEventListener('click', (e)=>{
 });
 
 document.addEventListener('click', (e)=>{
+  // 详情卡内部交互
+  if (e.target.closest('#detail-x')){ closeDetail(); return; }
+  const jump = e.target.closest('[data-jump]');
+  if (jump){ openDetail(jump.dataset.jump); return; }
+  const copyBtn = e.target.closest('[data-copy]');
+  if (copyBtn){
+    const p0 = findProjectByNode(copyBtn.dataset.copy);
+    const n0 = p0 && findNode(p0.root, copyBtn.dataset.copy);
+    const txt = n0 && n0.raw ? JSON.stringify(n0.raw, null, 1) : JSON.stringify({ id: copyBtn.dataset.copy, title: n0 && n0.title });
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+      .then(() => toast('已复制节点 JSON'))
+      .catch(() => toast('复制失败：浏览器不允许剪贴板'));
+    return;
+  }
+  const goFocus = e.target.closest('[data-gofocus]');
+  if (goFocus){ state.focusId = goFocus.dataset.gofocus; state.view = 'focus'; closeDetail(); render(); return; }
+  if (e.target.closest('#detail')){
+    if (!e.target.closest('.detail-card')){ closeDetail(); }
+    return;
+  }
   const chip = e.target.closest('[data-filter]');
   if (chip){
     state.filter = chip.dataset.filter;
@@ -1375,6 +1559,8 @@ document.addEventListener('click', (e)=>{
   if (arch && !e.target.closest('[data-act]') && !e.target.closest('[data-reopen]')){
     state.focusId = arch.dataset.arch; state.view='focus'; render(); return;
   }
+  const nodeEl = e.target.closest('.tnode');
+  if (nodeEl && !e.target.closest('button')){ openDetail(nodeEl.dataset.nid); return; }
   const act = e.target.closest('[data-act]');
   if (act){
     const p = PROJECTS.find(x=>x.id===act.dataset.id);
@@ -1422,6 +1608,9 @@ if (qs.get('filter')) state.filter = qs.get('filter');
     : source === 'static' ? '数据源：cards.js（只读）' : '数据源：内置 mock';
   if (source !== 'server') markSave('未连接保存服务 · 用「导出 JSON」保存', 'warn');
   else markSave('已连接：改动会写回 samples/', 'ok');
+  // 便于分享/截图：?open=<nodeId> 载入后直接展开该节点详情
+  const openId = qs.get('open');
+  if (openId) setTimeout(() => openDetail(openId), 250);
 })();
 </script>
 </body>
