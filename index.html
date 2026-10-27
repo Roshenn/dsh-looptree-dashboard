@@ -215,7 +215,15 @@
   .archive-row .acts{display:flex;gap:5px;justify-self:end}
   .archive-empty{padding:10px 16px 14px;font-size:11.5px;color:var(--tx4)}
 
-  /* ───────── 服务（挂在第一列） ───────── */
+  /* ───────── 第一列统计块 ───────── */
+  .lane-stats{margin-top:9px;padding-top:9px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:8px}
+  .lane-stats .info-sec{gap:4px}
+  .lane-stats .health .num{font-size:21px}
+  .lane-stats .health .cap{font-size:9.5px;line-height:1.35}
+  .lane-stats .info-row{font-size:11px}
+  .lane-stats .info-row b{font-size:11.5px}
+
+  /* ───────── 服务（右侧信息列） ───────── */
   .lane-svc{margin-top:8px;padding-top:8px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
   .lane-svc .svc{margin-bottom:0;padding:5px 6px;background:color-mix(in srgb,var(--l2) 70%,transparent)}
   .lane-svc .svc-name{font-size:11px}
@@ -929,6 +937,32 @@ function trendMarkup(p){
 
 const fmtDays = (d) => d == null ? '—' : (d >= 1 ? d.toFixed(1) + ' 天' : (d * 24).toFixed(1) + ' 小时');
 
+function laneStats(p){
+  const s0 = projectStats(p);
+  const nodes = s0.all.length;
+  const goalPct = s0.goals.length ? Math.round(s0.goalClosed / s0.goals.length * 100) : 0;
+  const execPct = s0.execs.length ? Math.round(s0.execDone / s0.execs.length * 100) : 0;
+  return `<div class="lane-stats" data-stats="${esc(p.id)}">
+    <div class="info-sec">
+      <div class="info-k">收敛健康度</div>
+      <div class="health" style="--tone:${s0.health.tone}">
+        <span class="num">${s0.score}</span>
+        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.goalClosed}/${s0.goals.length} 目标</span>
+      </div>
+      <div class="ibar" title="完成度 / 进行中 / 阻塞">
+        <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(s0.stat.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(s0.stat.blocked / (s0.execs.length||1) * 100)}%"></i>
+      </div>
+    </div>
+    <div class="info-sec">
+      <div class="info-k">节点</div>
+      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>闭环 / 目标<b>${s0.kind.loop} / ${s0.kind.goal}</b></div>
+      <div class="info-row"><span class="d" style="--tone:var(--amber)"></span>构思 / 执行<b>${s0.kind.idea} / ${s0.kind.exec}</b></div>
+      <div class="info-row"><span class="d" style="--tone:var(--tx4)"></span>合计<b>${nodes}</b></div>
+      <div class="info-row" style="font-size:11px">执行中 ${s0.stat.doing} · 就绪 ${s0.stat.ready} · 阻塞 ${s0.stat.blocked} · 已关闭 ${s0.stat.closed}</div>
+    </div>
+  </div>`;
+}
+
 function infoMarkup(p){
   const s0 = projectStats(p);
   const nodes = s0.all.length;
@@ -945,25 +979,6 @@ function infoMarkup(p){
     ? guide.slice(0,2).map(g => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:11.5px">${g.text}</span></div>`).join('')
     : `<div class="info-empty">无待办，可考虑收敛或归档</div>`;
   return `<div class="info">
-    <div class="info-sec">
-      <div class="info-k">收敛健康度</div>
-      <div class="health" style="--tone:${s0.health.tone}">
-        <span class="num">${s0.score}</span>
-        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.goalClosed}/${s0.goals.length} 目标</span>
-      </div>
-      <div class="ibar" title="完成度 / 进行中 / 阻塞">
-        <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(s0.stat.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(s0.stat.blocked / (s0.execs.length||1) * 100)}%"></i>
-      </div>
-    </div>
-
-    <div class="info-sec">
-      <div class="info-k">节点</div>
-      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>闭环 / 目标<b>${s0.kind.loop} / ${s0.kind.goal}</b></div>
-      <div class="info-row"><span class="d" style="--tone:var(--amber)"></span>构思 / 执行<b>${s0.kind.idea} / ${s0.kind.exec}</b></div>
-      <div class="info-row"><span class="d" style="--tone:var(--tx4)"></span>合计<b>${nodes}</b></div>
-      <div class="info-row" style="font-size:11px">执行中 ${s0.stat.doing} · 就绪 ${s0.stat.ready} · 阻塞 ${s0.stat.blocked} · 已关闭 ${s0.stat.closed}</div>
-    </div>
-
     <div class="info-sec">
       <div class="info-k">时间</div>
       <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
@@ -990,6 +1005,8 @@ function infoMarkup(p){
       <div class="info-row">缺验收 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
       <div class="hub-note" style="display:none">${goalPct}</div>
     </div>
+
+    ${laneServices(p)}
 
     <div class="info-acts">
       <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
@@ -1186,7 +1203,7 @@ function laneMarkup(p){
       <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
-      ${laneServices(p)}
+      ${laneStats(p)}
     </div>
     <div class="canvas"></div>
     ${infoMarkup(p)}
@@ -1304,7 +1321,7 @@ function renderFocus(){
           <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
-          ${laneServices(p)}
+          ${laneStats(p)}
         </div>
         <div class="canvas"></div>
         ${infoMarkup(p)}
