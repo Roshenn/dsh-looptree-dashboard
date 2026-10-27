@@ -4,7 +4,7 @@
   "name": "StoryWeft",
   "workspace": "/Users/julian/agentic/projects/storyweft"
  },
- "updated": "2026-10-26T16:03:14.664Z",
+ "updated": "2026-10-27T01:36:13.555Z",
  "loop": {
   "id": "sw-loop",
   "kind": "loop",
@@ -128,7 +128,8 @@
           "at": "2026-10-26T22:12:00+08:00"
          }
         ],
-        "started_at": "2026-10-18T00:30:00+08:00"
+        "started_at": "2026-10-18T00:30:00+08:00",
+        "proof": "录屏 3 次切换，残影出现在 2/3 帧"
        }
       ],
       "started_at": "2026-10-21T21:00:00+08:00"

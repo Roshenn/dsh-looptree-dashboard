@@ -283,6 +283,20 @@
   .detail-row dt{flex:0 0 40px;color:var(--tx4)}
   .detail-row dd{margin:0;color:var(--tx2);word-break:break-word}
   .detail-row dd.mono{font-variant-numeric:tabular-nums;color:var(--tx3);font-size:11px}
+  .detail-title{cursor:text;border-radius:5px;padding:1px 3px;margin-left:-3px;transition:background-color 140ms var(--ease-out)}
+  .detail-title:hover{background:var(--hover)}
+  .editval{display:block;width:100%;text-align:left;font-size:11.5px;line-height:1.55;color:var(--tx2);
+    padding:1px 4px;margin:-1px -4px;border-radius:5px;transition:background-color 140ms var(--ease-out)}
+  .editval:hover{background:var(--hover);color:var(--tx1)}
+  .editval.empty{color:var(--tx4);border:1px dashed var(--b2);text-align:center;font-size:11px}
+  .dfield{width:100%;font:inherit;font-size:11.5px;color:var(--tx1);background:var(--l3);
+    border:1px solid var(--b3);border-radius:6px;padding:5px 7px;resize:vertical;min-height:30px}
+  .dfield:focus{outline:2px solid var(--brand);outline-offset:1px}
+  .dedit{display:flex;align-items:center;gap:5px;margin-top:5px}
+  .dedit-hint{font-size:9.5px;color:var(--tx4);margin-left:auto}
+  .dselect{font:inherit;font-size:11.5px;color:var(--tx1);background:var(--l3);border:1px solid var(--b2);
+    border-radius:6px;padding:2px 5px}
+  .dselect:disabled{opacity:.55}
   .detail-chips{display:flex;flex-wrap:wrap;gap:5px}
   .dchip{display:inline-flex;align-items:center;gap:5px;height:23px;padding:0 8px;border-radius:6px;corner-shape:var(--corner);
     border:1px solid var(--b2);background:var(--l3);font-size:11px;color:var(--tx2);max-width:100%}
@@ -1279,6 +1293,12 @@ function addChild(id){
   persist(p);
 }
 
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
+  c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const EDIT_FIELDS = { loop:['intent','acceptance'], goal:['acceptance'], idea:['approach'], exec:['verify','proof'] };
+const FIELD_LABEL = { intent:'意图', acceptance:'验收', approach:'方案', verify:'验证', proof:'证据' };
+const STATUS_OPTS = ['plan','ready','doing','blocked','done'];
+
 const fmtTs = (iso) => new Date(iso).toLocaleString('sv-SE').slice(5, 16);
 function pathTo(root, id){
   const arr = [];
@@ -1294,17 +1314,18 @@ function detailMarkup(p, n){
   const st = stateOf(n);
   const tone = nodeTone(n);
   const kids = n.children || [];
-  const rows = [];
-  if (r.intent)     rows.push(['意图', r.intent]);
-  if (r.acceptance) rows.push(['验收', r.acceptance]);
-  if (r.approach)   rows.push(['方案', r.approach]);
-  if (r.verify)     rows.push(['验证', r.verify]);
-  if (r.proof)      rows.push(['证据', r.proof]);
-  if (r.closed_at)  rows.push(['关闭', fmtTs(r.closed_at)]);
-  if (r.started_at) rows.push(['开始', fmtTs(r.started_at)]);
+  const editable = (EDIT_FIELDS[n.kind] || []).map(f =>
+    `<div class="detail-row editable" data-field="${f}" data-nid="${n.id}" data-proj="${p.id}">
+       <dt>${FIELD_LABEL[f]}</dt>
+       <dd><button class="editval${r[f] ? '' : ' empty'}" data-edit="${f}">${r[f] ? esc(r[f]) : '点击填写'}</button></dd>
+     </div>`).join('');
+  const timeRows = [];
+  if (r.started_at) timeRows.push(['开始', fmtTs(r.started_at), true]);
+  if (r.closed_at)  timeRows.push(['关闭', fmtTs(r.closed_at), true]);
   const inFlight = (!r.closed_at && r.started_at)
     ? ((Date.now() - Date.parse(r.started_at)) / 86400000) : null;
-  if (inFlight != null) rows.push(['在途', fmtDays(inFlight)]);
+  if (inFlight != null) timeRows.push(['在途', fmtDays(inFlight), true]);
+  const rows = timeRows.map(([k, v]) => `<div class="detail-row"><dt>${k}</dt><dd class="mono">${v}</dd></div>`).join('');
 
   const trail = pathTo(p.root, n.id);
   const pathHtml = [`<button data-jump="${p.root.id}" data-proj="${p.id}">${p.name}</button>`]
@@ -1334,11 +1355,17 @@ function detailMarkup(p, n){
       <span class="st" style="--st-tone:${st.tone}">${st.label}</span>
       <button class="detail-close" id="detail-x" aria-label="关闭详情">✕</button>
     </div>
-    <h3>${n.title}</h3>
+    <h3 class="detail-title" data-nid="${n.id}" data-proj="${p.id}" title="点击编辑标题">${esc(n.title)}</h3>
     <div class="detail-path">${pathHtml}</div>
     <dl class="detail-sec" style="margin-top:0;padding-top:0;border-top:0">
-      ${rows.map(([k, v]) => `<div class="detail-row"><dt>${k}</dt><dd class="${k==='关闭'||k==='开始'||k==='在途'?'mono':''}">${v}</dd></div>`).join('')}
-      ${rows.length ? '' : '<div class="detail-row"><dt>说明</dt><dd>这张卡没有填写验收/证据字段</dd></div>'}
+      <div class="detail-row editable" data-field="status" data-nid="${n.id}" data-proj="${p.id}">
+        <dt>状态</dt>
+        <dd><select class="dselect" data-status="${n.id}" ${n.closed ? 'disabled' : ''}>
+          ${STATUS_OPTS.map(x => `<option value="${x}" ${x === (r.status || 'plan') ? 'selected' : ''}>${(STATUS[x]||STATUS.plan).label}${x==='done'?'（待确认）':''}</option>`).join('')}
+        </select></dd>
+      </div>
+      ${editable}
+      ${rows}
     </dl>
     ${issues ? `<div class="detail-sec"><div class="detail-k">问题反馈</div>${issues}</div>` : ''}
     ${kidsHtml}
@@ -1397,6 +1424,48 @@ function openDetail(id){
   setTimeout(showIt, 48);
 }
 
+function startEdit(field, anchor){
+  const row = anchor.closest('.detail-row');
+  if (!row) return;
+  const nid = row.dataset.nid, pid = row.dataset.proj;
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  const val = n0 && n0.raw ? (n0.raw[field] || '') : '';
+  const dd = row.querySelector('dd');
+  const multiline = field === 'acceptance' || field === 'verify' || field === 'approach' || field === 'proof' || field === 'intent';
+  dd.innerHTML = `${multiline
+      ? `<textarea class="dfield" rows="${field === 'proof' ? 2 : 2}" placeholder="${FIELD_LABEL[field]}…">${esc(val)}</textarea>`
+      : `<input class="dfield" type="text" value="${esc(val)}" placeholder="${FIELD_LABEL[field]}…">`}
+    <div class="dedit">
+      <button class="tbtn primary-converge" data-save-edit="1">保存</button>
+      <button class="tbtn" data-cancel-edit="1">取消</button>
+      <span class="dedit-hint">⌘/Ctrl+Enter 保存 · Esc 取消</span>
+    </div>`;
+  const input = dd.querySelector('.dfield');
+  input.focus();
+  input.select && input.select();
+  const commit = () => {
+    const v = input.value.trim();
+    n0.raw[field === 'title' ? 'title' : field] = v;
+    if (field === 'title') n0.title = v;
+    persist(p0).then(res => {
+      if (!res.ok){
+        toast('保存失败：' + res.error);
+      } else if (res.warnings && res.warnings.length){
+        toast('已保存（有警告：' + res.warnings[0] + '）');
+      } else {
+        toast(`已保存「${FIELD_LABEL[field] || field}」`);
+      }
+      render();
+    });
+  };
+  dd.querySelector('[data-save-edit]').addEventListener('click', commit);
+  dd.querySelector('[data-cancel-edit]').addEventListener('click', () => openDetail(nid));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); openDetail(nid); }
+  });
+}
+
 function openConfirm(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
@@ -1443,11 +1512,11 @@ function markSave(msg, kind){
   el.dataset.state = kind || '';
 }
 async function persist(p){
-  if (!p.card) return;
+  if (!p.card) return { ok:false, error:'没有可写回的 card' };
   p.card.updated = new Date().toISOString();
   if (!p.file || !location.protocol.startsWith('http')){
     markSave('未连接保存服务 · 用「导出 JSON」保存', 'warn');
-    return;
+    return { ok:false, error:'未连接保存服务' };
   }
   try {
     const res = await fetch('api/cards/' + encodeURIComponent(p.file), {
@@ -1458,9 +1527,10 @@ async function persist(p){
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status) + (j.errors ? '：' + j.errors[0] : ''));
     markSave(`已写入 ${p.file} · ${new Date().toLocaleTimeString('sv-SE')}`, 'ok');
+    return { ok:true, warnings: j.warnings || [] };
   } catch (e) {
     markSave('写入失败：' + e.message, 'err');
-    toast('写入失败：' + e.message);
+    return { ok:false, error:e.message };
   }
 }
 function exportCard(p){
@@ -1476,6 +1546,22 @@ function exportCard(p){
 }
 
 /* ─────────── toast ─────────── */
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-status]');
+  if (!sel) return;
+  const id = sel.dataset.status;
+  const p0 = findProjectByNode(id), n0 = p0 && findNode(p0.root, id);
+  if (!n0 || !n0.raw) return;
+  const prev = n0.raw.status;
+  n0.raw.status = sel.value;
+  n0.status = sel.value || 'plan';
+  persist(p0).then(res => {
+    if (!res.ok){ n0.raw.status = prev; n0.status = prev; toast('保存失败：' + res.error); }
+    else toast(`状态已改为「${(STATUS[sel.value]||STATUS.plan).label}」`);
+    render();
+  });
+});
+
 let toastTimer;
 function toast(msg){
   $('#toast-text').textContent = msg;
@@ -1519,6 +1605,10 @@ $('#density').addEventListener('click', (e)=>{
 document.addEventListener('click', (e)=>{
   // 详情卡内部交互
   if (e.target.closest('#detail-x')){ closeDetail(); return; }
+  const editVal = e.target.closest('[data-edit]');
+  if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
+  const titleEl = e.target.closest('.detail-title');
+  if (titleEl){ startEdit('title', titleEl); return; }
   const jump = e.target.closest('[data-jump]');
   if (jump){ openDetail(jump.dataset.jump); return; }
   const copyBtn = e.target.closest('[data-copy]');
