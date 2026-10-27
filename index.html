@@ -303,6 +303,17 @@
   .dchip:hover{border-color:var(--b3);color:var(--tx1)}
   .dchip i{width:5px;height:5px;border-radius:50%;background:var(--tone);flex:0 0 auto}
   .dchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prompt-list{display:flex;flex-direction:column;gap:1px}
+  .prow{display:flex;align-items:center;gap:6px;border-radius:6px;transition:background-color 140ms var(--ease-out)}
+  .prow:hover{background:var(--hover)}
+  .ptitle{flex:1;text-align:left;font-size:11.5px;color:var(--tx2);padding:5px 6px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ptitle:hover{color:var(--tx1)}
+  .pcopy{height:22px;padding:0 8px;border-radius:5px;corner-shape:var(--corner);border:1px solid var(--b2);
+    background:var(--l3);color:var(--tx3);font-size:10.5px;flex:0 0 auto}
+  .pcopy:hover{color:var(--tx1);border-color:var(--b3)}
+  .pgen{margin:7px 0 0;padding:8px 9px;border-radius:7px;border:1px solid var(--b1);background:var(--l1);
+    color:var(--tx2);font-size:10.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
+    max-height:180px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
   .detail-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
   .tnode.is-active{border-color:color-mix(in srgb,var(--brand) 60%,var(--b3));box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 26%,transparent)}
 
@@ -1299,6 +1310,93 @@ const EDIT_FIELDS = { loop:['intent','acceptance'], goal:['acceptance'], idea:['
 const FIELD_LABEL = { intent:'意图', acceptance:'验收', approach:'方案', verify:'验证', proof:'证据' };
 const STATUS_OPTS = ['plan','ready','doing','blocked','done'];
 
+/* ─────────── Prompt 模板 ─────────── */
+const PROMPT_TASKS = {
+  loop: [
+    { id:'split',   title:'拆成目标',        ask:'把上面这个闭环拆成 3–5 个目标，每个目标都要能单独验证；并为每个目标给出验收方式（优先写成可直接执行的命令）。' },
+    { id:'closed',  title:'检查是否真闭合',  ask:'检查这个闭环是否真的闭合：每个目标是否都服务于同一个闭环意图、有没有目标其实不属于它、以及缺了哪一环。' },
+  ],
+  goal: [
+    { id:'ideas',   title:'拆出构思',        ask:'针对这个目标给出 2–3 条可选实现路径（构思），每条写清方案要点、风险，以及对目标验收方式的影响。' },
+    { id:'verify',  title:'验收可判定性',    ask:'检查这个目标的验收方式是否可判定；如果不可判定，改写为可执行的检查步骤或命令。' },
+  ],
+  idea: [
+    { id:'regen',   title:'重新生成构思',    ask:'保留目标与约束，重新生成这个构思：给出 1–2 个替代方案，说明与当前方案的差异、代价与适用条件。' },
+    { id:'plan',    title:'梳理执行计划',    ask:'把这个构思拆成执行计划：3–6 个可执行动作，每个动作给出验证方式与预期证据，并标注依赖顺序。' },
+    { id:'risk',    title:'预演失败点',      ask:'预演这个构思落地会遇到什么：列出 3 个最可能的失败点与各自的早期信号。' },
+  ],
+  exec: [
+    { id:'steps',   title:'给出执行步骤',    ask:'把这条执行项拆成具体可执行的操作步骤，每一步给出验证命令与通过标准。' },
+    { id:'proof',   title:'补齐证据',        ask:'这条执行项准备关闭但证据不足。请列出应该采集哪些证据（命令、输出、截图）以及采集方式。' },
+    { id:'blocker', title:'定位阻塞',        ask:'这条执行项当前阻塞。给出 3 个可能原因与各自的验证方法，按最可能优先排序。' },
+  ],
+};
+const PROMPT_OUTPUT = '输出用 Markdown，小节标题固定；不要复述上下文，直接给结论与步骤。';
+
+function composePrompt(p, n, task){
+  const trail = pathTo(p.root, n.id);
+  const loop = trail[0], goal = trail.find(x => x.kind === 'goal'), idea = trail.find(x => x.kind === 'idea');
+  const r = n.raw || {};
+  const L = (x) => x && x.raw ? x.raw : {};
+  const lines = [];
+  lines.push('# 上下文');
+  lines.push(`- 项目：${p.name}`);
+  lines.push(`- 当前待闭环：${loop.title}`);
+  if (L(loop).intent)     lines.push(`  - 闭环意图：${L(loop).intent}`);
+  if (L(loop).acceptance) lines.push(`  - 闭环验收：${L(loop).acceptance}`);
+  if (goal && goal !== n) {
+    lines.push(`- 当前目标：${goal.title}`);
+    if (L(goal).acceptance) lines.push(`  - 目标验收：${L(goal).acceptance}`);
+  }
+  if (idea && idea !== n) {
+    lines.push(`- 当前构思：${idea.title}`);
+    if (L(idea).approach) lines.push(`  - 方案：${L(idea).approach}`);
+  }
+  lines.push('');
+  lines.push('# 当前节点');
+  lines.push(`- 类型：${KIND[n.kind]}（id: ${n.id}）`);
+  lines.push(`- 标题：${n.title}`);
+  lines.push(`- 状态：${stateOf(n).label}`);
+  if (n.kind === 'loop' || n.kind === 'goal') {
+    if (r.acceptance) lines.push(`- 验收：${r.acceptance}`);
+    const kids = (n.children || []).map(k => `${KIND[k.kind]}·${k.title}`).slice(0, 8);
+    if (kids.length) lines.push(`- 已有子节点：${kids.join('；')}`);
+  }
+  if (n.kind === 'idea' && r.approach) lines.push(`- 方案：${r.approach}`);
+  if (n.kind === 'exec') {
+    if (r.verify) lines.push(`- 验证方式：${r.verify}`);
+    lines.push(`- 证据：${r.proof || '（未填写）'}`);
+    const open = (r.issues || []).filter(i => !i.resolved_at).map(i => i.text);
+    if (open.length) lines.push(`- 未处置反馈：${open.join('；')}`);
+  }
+  lines.push('');
+  lines.push('# 任务');
+  lines.push(task.ask);
+  lines.push('');
+  lines.push('# 输出要求');
+  lines.push(PROMPT_OUTPUT);
+  return lines.join('\n');
+}
+
+async function copyText(txt){
+  // 剪贴板 API 在没有用户激活/权限被拒时可能既不 resolve 也不 reject —— 加 600ms 竞速兜底
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    const res = await Promise.race([
+      navigator.clipboard.writeText(txt).then(() => 'ok').catch(() => 'fail'),
+      new Promise(r => setTimeout(() => r('timeout'), 600)),
+    ]);
+    if (res === 'ok') return true;
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch { return false; }
+}
+
 const fmtTs = (iso) => new Date(iso).toLocaleString('sv-SE').slice(5, 16);
 function pathTo(root, id){
   const arr = [];
@@ -1369,6 +1467,16 @@ function detailMarkup(p, n){
     </dl>
     ${issues ? `<div class="detail-sec"><div class="detail-k">问题反馈</div>${issues}</div>` : ''}
     ${kidsHtml}
+    <div class="detail-sec">
+      <div class="detail-k">Prompt 模板 · 点复制直接粘给模型</div>
+      <div class="prompt-list">
+        ${(PROMPT_TASKS[n.kind] || []).map(t => `<div class="prow" data-task="${t.id}">
+          <button class="ptitle" data-preview-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}">${t.title}</button>
+          <button class="pcopy" data-copy-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
+        </div>`).join('')}
+      </div>
+      <pre class="pgen" id="pgen" hidden></pre>
+    </div>
     <div class="detail-acts">${acts}</div>`;
 }
 
@@ -1609,6 +1717,43 @@ document.addEventListener('click', (e)=>{
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');
   if (titleEl){ startEdit('title', titleEl); return; }
+  const copyPrompt = e.target.closest('[data-copy-prompt]');
+  if (copyPrompt){
+    const p0 = PROJECTS.find(x => x.id === copyPrompt.dataset.proj);
+    const n0 = p0 && findNode(p0.root, copyPrompt.dataset.nid);
+    const task = (PROMPT_TASKS[n0.kind] || []).find(t => t.id === copyPrompt.dataset.copyPrompt);
+    if (p0 && n0 && task){
+      const txt = composePrompt(p0, n0, task);
+      copyText(txt).then(ok => {
+        if (ok) { toast(`已复制「${task.title}」prompt`); return; }
+        // 剪贴板被拒：展开原文并选中，方便手动 ⌘C
+        const pre = $('#pgen');
+        if (pre){
+          pre.textContent = txt; pre.dataset.task = task.id; pre.hidden = false;
+          const range = document.createRange(); range.selectNodeContents(pre);
+          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        }
+        toast('剪贴板被拒：已展开并选中文本，按 ⌘C 复制');
+      });
+    }
+    return;
+  }
+  const previewPrompt = e.target.closest('[data-preview-prompt]');
+  if (previewPrompt){
+    const p0 = PROJECTS.find(x => x.id === previewPrompt.dataset.proj);
+    const n0 = p0 && findNode(p0.root, previewPrompt.dataset.nid);
+    const task = (PROMPT_TASKS[n0.kind] || []).find(t => t.id === previewPrompt.dataset.previewPrompt);
+    const pre = $('#pgen');
+    if (p0 && n0 && task && pre){
+      const same = pre.dataset.task === task.id;
+      if (same && !pre.hidden){ pre.hidden = true; pre.dataset.task = ''; return; }
+      pre.textContent = composePrompt(p0, n0, task);
+      pre.dataset.task = task.id;
+      pre.hidden = false;
+      pre.scrollIntoView({ block:'nearest' });
+    }
+    return;
+  }
   const jump = e.target.closest('[data-jump]');
   if (jump){ openDetail(jump.dataset.jump); return; }
   const copyBtn = e.target.closest('[data-copy]');
