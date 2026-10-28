@@ -27,7 +27,10 @@ const check = (label, pass, detail = '') => {
 };
 
 const tgz = process.argv[2] || (() => {
-  const out = execFileSync('npm', ['pack'], { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').pop();
+  // Windows 上 npm 是 .cmd：execFileSync 既不能直接 spawn 也不能省略 shell
+  const win = process.platform === 'win32';
+  const out = execFileSync(win ? 'npm.cmd' : 'npm', ['pack'], { cwd: ROOT, encoding: 'utf8', shell: win })
+    .trim().split(/\r?\n/).pop();
   return join(ROOT, out);
 })();
 

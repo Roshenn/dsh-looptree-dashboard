@@ -10,8 +10,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// Windows 上 npm 是 .cmd，Node 22 起不允许不带 shell 直接 spawn（EINVAL）
+const shell = process.platform === 'win32';
 const run = (cmd, args, env = {}) => new Promise((resolve, reject) => {
-  const child = spawn(cmd, args, { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ...env } });
+  const child = spawn(cmd, args, { cwd: ROOT, stdio: 'inherit', shell, env: { ...process.env, ...env } });
   child.on('error', reject);
   child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(' ')} → exit ${code}`))));
 });
