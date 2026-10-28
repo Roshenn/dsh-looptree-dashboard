@@ -167,6 +167,10 @@
   .st{margin-left:auto;font-size:10px;padding:0 5px;border-radius:5px;line-height:16px;white-space:nowrap;
     color:var(--st-tone,var(--tx3));background:color-mix(in srgb,var(--st-tone,var(--tx3)) 13%,transparent);
     border:1px solid color-mix(in srgb,var(--st-tone,var(--tx3)) 24%,transparent)}
+  .tnode[data-frozen="1"]{opacity:.46;filter:grayscale(.35) saturate(.7);transition:opacity 160ms var(--ease-out)}
+  .tnode[data-frozen="1"]:hover{opacity:.72}
+  .frozenbad{font-size:9.5px;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);
+    border-radius:4px;padding:2px 5px;line-height:1;white-space:nowrap}
   .tnode-title{font-size:12.5px;line-height:1.42;color:var(--tx1);
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .tnode-meta{margin-top:3px;font-size:10.5px;color:var(--tx4);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -964,6 +968,24 @@ function staticRun(n){
   };
 }
 const runFor = (p, n) => runMap.get(runKey(p, n)) || staticRun(n);
+/** 上游（祖先）里正在跑会话的节点；有则本节点不允许再发起 */
+function activeAncestorOf(p, n){
+  if (!p || !p.root || !n) return null;
+  const isActive = (x) => {
+    const r = runMap.get(runKey(p, x));
+    return !!(r && (r.status === 'starting' || r.status === 'running'));
+  };
+  const walkPath = (node, trail) => {
+    if (node === n) return trail;
+    for (const child of node.children || []){
+      const hit = walkPath(child, [...trail, node]);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const trail = walkPath(p.root, []);
+  return trail && trail.length ? (trail.find(isActive) || null) : null;
+}
 const RUN_LABEL = { starting:'启动中', running:'运行中', done:'完成', failed:'失败', cancelled:'已取消', stale:'进程已不在' };
 const RUN_TONE = { starting:'var(--brand-2)', running:'var(--brand-2)', done:'var(--green)', failed:'var(--red)', cancelled:'var(--tx3)', stale:'var(--amber)' };
 
@@ -1425,6 +1447,7 @@ function nodeMarkup(n, p){
   const addKind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
   const bars = kidsExist ? `<span class="bars">${n.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>` : '';
   const issues = (n.issues||[]).map(i=>`<div class="issue">⚠ ${i}</div>`).join('');
+  const upstream = p ? activeAncestorOf(p, n) : null;
   const foot = [
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
@@ -1433,7 +1456,7 @@ function nodeMarkup(n, p){
       ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="${n.kind === 'goal' ? 'AI 拆构思 / 手动添加' : 'AI 拆目标 / 手动添加'}">+ ${KIND[addKind]}</button>`
       : `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>`) : '',
   ].filter(Boolean).join('');
-  return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}" style="--tone:${tone};--st-tone:${st.tone}">
+  return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
       <span class="kind">${KIND[n.kind]}</span>
       <span class="nid mono">${n.id}</span>
@@ -1445,6 +1468,7 @@ function nodeMarkup(n, p){
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
     ${lateBadge(n)}
     ${p ? runBadge(p, n) : ''}
+    ${upstream ? `<div class="tnode-meta"><span class="frozenbad">⏸ 上游生成中</span></div>` : ''}
     ${n.hiddenClosed ? `<button class="foldchip" data-fold="${n.id}" title="把 ${n.hiddenClosed} 个已关闭节点收在这里">▸ 已关闭 ${n.hiddenClosed}</button>` : ''}
     ${n.closedShown ? `<button class="foldchip on" data-fold="${n.id}" title="收起 ${n.closedShown} 个已关闭节点">▾ 收起已关闭 ${n.closedShown}</button>` : ''}
     ${issues}
@@ -1774,6 +1798,7 @@ function render(){
   const keepDetail = detailNode;   // 重渲染后把详情卡重新挂回原节点（窗口 resize / 切主题都会走这里）
   closeDetail();
   document.documentElement.dataset.theme = state.theme;
+  setTimeout(applyFrozenStates, 0);
   $('#tab-matrix').setAttribute('aria-pressed', state.view==='matrix');
   $('#tab-focus').setAttribute('aria-pressed', state.view==='focus');
   $('#matrix').hidden = state.view!=='matrix';
@@ -3260,6 +3285,31 @@ function askConfirm(title, bodyHtml, okLabel, onOk){
 }
 let askCb = null;
 
+/** 把「上游正在生成」的视觉状态刷到现有卡片上（不重建 DOM） */
+function applyFrozenStates(){
+  document.querySelectorAll('.tnode[data-nid]').forEach((el) => {
+    const p = findProjectByNode(el.dataset.nid);
+    const n = p && findNode(p.root, el.dataset.nid);
+    const up = p && n && activeAncestorOf(p, n);
+    if (up){
+      el.dataset.frozen = '1';
+      el.title = `上游「${up.title || up.id}」正在生成，暂时不能发起`;
+      if (!el.querySelector('.frozenbad')){
+        const badge = document.createElement('div');
+        badge.className = 'tnode-meta';
+        badge.innerHTML = '<span class="frozenbad">⏸ 上游生成中</span>';
+        const anchor = el.querySelector('.runbad')?.closest('.tnode-meta') || el.querySelector('.tnode-title');
+        if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(badge, anchor.nextSibling);
+        else el.appendChild(badge);
+      }
+    } else {
+      delete el.dataset.frozen;
+      el.removeAttribute('title');
+      el.querySelector('.frozenbad')?.closest('.tnode-meta')?.remove();
+    }
+  });
+}
+
 async function refreshRuns(){
   if (!RUN_CFG) return;
   try {
@@ -3269,6 +3319,7 @@ async function refreshRuns(){
     runMap.clear();
     (j.runs || []).forEach(r => runMap.set(r.key, r));
     paintRunBadges();
+    applyFrozenStates();
   } catch {}
 }
 
@@ -3577,7 +3628,17 @@ document.addEventListener('click', (e)=>{
   const viewSess = e.target.closest('[data-view-session]');
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const genBtn = e.target.closest('[data-gen]');
-  if (genBtn){ e.stopPropagation(); if (!genBtn.disabled) generateMissing(genBtn.dataset.proj, genBtn.dataset.nid, genBtn); return; }
+  if (genBtn){
+    e.stopPropagation();
+    if (!genBtn.disabled){
+      const p0 = PROJECTS.find(x => x.id === genBtn.dataset.proj);
+      const n0 = p0 && findNode(p0.root, genBtn.dataset.nid);
+      const up0 = p0 && n0 && activeAncestorOf(p0, n0);
+      if (up0){ toast(`上游「${up0.title || up0.id}」正在生成，先等它结束`); return; }
+      generateMissing(genBtn.dataset.proj, genBtn.dataset.nid, genBtn);
+    }
+    return;
+  }
   const delBtn = e.target.closest('[data-del]');
   if (delBtn){ return; }   // 删除只走长按（pointerdown），点一下不删
   const editVal = e.target.closest('[data-edit]');
@@ -3682,6 +3743,9 @@ document.addEventListener('click', (e)=>{
   const runBtn = e.target.closest('[data-prompt-run]');
   if (runBtn){
     const p0 = PROJECTS.find(x => x.id === runBtn.dataset.proj);
+    const n0 = p0 && findNode(p0.root, runBtn.dataset.nid);
+    const up0 = p0 && n0 && activeAncestorOf(p0, n0);
+    if (up0){ toast(`上游「${up0.title || up0.id}」正在生成，先等它结束`); return; }
     if (p0) openLaunch({
       nodeId: runBtn.dataset.nid,
       taskId: runBtn.dataset.promptRun,
