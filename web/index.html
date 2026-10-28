@@ -369,8 +369,21 @@
   .detail-row.editing{grid-template-columns:1fr}
   .detail-row.editing dt{margin-bottom:4px}
   .dfield.expand{width:100%;min-height:104px;resize:vertical;font-size:12px;line-height:1.6}
+  #fp-mask{position:fixed;inset:0;z-index:2147482000;background:transparent}
+  #fp-mask[hidden],#field-pop[hidden]{display:none}
+  #field-pop{position:fixed;inset:0;z-index:2147482001;display:flex;align-items:flex-start;justify-content:center;pointer-events:none}
+  .fp-box{pointer-events:auto;margin-top:8vh;width:min(720px,92vw);background:var(--l1);border:1px solid var(--b2);
+    border-radius:12px;box-shadow:0 18px 50px #0006;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .fp-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .fp-label{font-size:12px;color:var(--tx2);font-weight:500}
+  .fp-hint{font-size:10.5px;color:var(--tx4)}
+  #fp-input{min-height:min(46vh,420px);resize:vertical;font-size:12.5px;line-height:1.65}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
+  .res-box{border:1px solid var(--b2);border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:5px;max-height:180px;overflow:auto;background:color-mix(in srgb,var(--b2) 30%,transparent)}
+  .res-row{display:flex;gap:8px;font-size:11px;line-height:1.5}
+  .res-row span{flex:0 0 auto;color:var(--tx4);min-width:52px;font-size:10px;letter-spacing:.04em;text-transform:uppercase}
+  .res-row p{margin:0;color:var(--tx2);min-width:0;overflow-wrap:anywhere}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
   .sess-row{border-left:2px solid var(--b2);padding:2px 0 2px 8px;font-size:11.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
   .sess-row.user{border-color:var(--brand)}
@@ -537,6 +550,16 @@
   <div class="detail-card" role="dialog" aria-label="节点详情"></div>
 </div>
 
+<div id="fp-mask" hidden></div>
+<div id="field-pop" hidden>
+  <div class="fp-box">
+    <div class="fp-head">
+      <span class="fp-label" id="fp-label"></span>
+      <span class="fp-hint">失焦自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</span>
+    </div>
+    <textarea id="fp-input" class="dfield" spellcheck="false"></textarea>
+  </div>
+</div>
 <div class="modal" id="ask" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ask-title" style="width:min(520px,94vw)">
     <div class="modal-head"><span id="ask-title">确认</span>
@@ -1854,12 +1877,13 @@ function sessionMarkup(p, n){
     <div class="detail-k">会话<span class="psrc" style="color:${tone}">${st}${busy ? ' · ' + (secs >= 60 ? Math.floor(secs/60) + 'm' : secs + 's') : ''}</span></div>
     ${r ? `<div class="detail-row"><dt>会话</dt><dd class="mono">${r.sessionId || '—'}</dd></div>
       <div class="detail-row"><dt>目录</dt><dd class="mono">${r.cwd || '—'}</dd></div>
-      ${tail ? `<div class="detail-row"><dt>最后</dt><dd>${tail.brief}</dd></div>` : ''}
+      ${tail ? `<div class="detail-row"><dt>最后</dt><dd>${esc(tail.brief || tail.type || '—')}</dd></div>` : ''}
       ${r.error ? `<div class="detail-row"><dt>问题</dt><dd style="color:var(--red)">${esc(r.error)}</dd></div>` : ''}
-      ${r.result ? `<pre class="pgen" style="max-height:120px">${esc(r.result.slice(0, 1200))}</pre>` : (cardSess && cardSess.result ? `<pre class="pgen" style="max-height:120px">${esc(String(cardSess.result).slice(0, 1200))}</pre>` : '')}`
+      ${(r.result || (cardSess && cardSess.result)) ? resultPreview(r.result || cardSess.result) : ''}`
       : `<div class="detail-row"><dt>说明</dt><dd>${sessId ? '这个节点有历史会话记录，点「查看会话」看全文' : '还没有跑过会话；在下面每条 prompt 后面点「发起」即可'}</dd></div>`}
     <div class="detail-acts" style="margin-top:8px">${btn}
       ${sessId ? `<button class="tbtn" data-view-session="${sessId}">查看会话</button>` : ''}
+      ${sessId ? `<button class="tbtn" data-open-session="${sessId}" title="切到 DSH 里这个会话">在 DSH 打开</button>` : ''}
       ${p.file ? `<button class="tbtn" data-sess-list="1">最近会话</button>` : ''}
       ${r && r.result && n.kind === 'exec' ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
     </div>
@@ -2057,6 +2081,37 @@ async function listProjectSessions(){
   }
 }
 
+/** 会话结果预览：是 JSON 就按字段列出来，不是就截断成段落 */
+function resultPreview(text){
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const jsonText = fenced ? fenced[1] : ((raw.match(/\{[\s\S]*\}/) || [])[0] || '');
+  let parsed = null;
+  if (jsonText) { try { parsed = JSON.parse(jsonText); } catch { parsed = null; } }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)){
+    const rows = Object.entries(parsed).map(([k, v]) => {
+      const value = typeof v === 'string' ? v : JSON.stringify(v);
+      return `<div class="res-row"><span>${esc(k)}</span><p>${esc(String(value).slice(0, 400))}</p></div>`;
+    }).join('');
+    return `<div class="res-box">${rows}</div>`;
+  }
+  return `<div class="res-box"><div class="res-row"><span>输出</span><p>${esc(raw.slice(0, 800))}</p></div></div>`;
+}
+
+/** 请宿主切到这条会话（client 半监听 postMessage） */
+function openInDsh(sessionId){
+  if (!sessionId) return;
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'rotation-open-session', sessionId }, '*');
+      toast('已在 DSH 中切换到该会话');
+      return;
+    }
+  } catch { /* noop */ }
+  toast('独立打开时无法切换 DSH，请用「查看会话」看全文');
+}
+
 /** 查看会话全文：直接读 DSH 落盘的 session.v4.jsonl.zstd */
 async function viewSession(sessionId){
   askConfirm('会话 ' + String(sessionId).replace(/^session-/, '').slice(0, 12) + '…',
@@ -2130,43 +2185,58 @@ function startEdit(field, anchor){
   if (!row) return;
   const nid = row.dataset.nid, pid = row.dataset.proj;
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
-  const val = n0 && n0.raw ? (n0.raw[field] || '') : '';
-  const dd = row.querySelector('dd');
-  row.classList.add('editing');
-  dd.innerHTML = `<textarea class="dfield expand" rows="6" placeholder="${FIELD_LABEL[field] || field}…">${esc(val)}</textarea>
-    <div class="dedit-hint">失焦自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</div>`;
-  const input = dd.querySelector('.dfield');
-  input.focus();
-  input.setSelectionRange(val.length, val.length);   // 光标落在末尾，别覆盖已有文本
-  let done = false;
-  const revert = () => {
-    if (done) return;
-    done = true;
-    row.classList.remove('editing');
+  if (!p0 || !n0) return;
+  const value = String(n0.raw[field] || '');
+  openFieldEditor(FIELD_LABEL[field] || field, value).then(async (next) => {
+    if (next == null) return;                       // Esc 取消
+    const trimmed = next.trim();
+    if (trimmed === String(value).trim()) return;
+    if (field === 'title') { n0.title = trimmed; n0.raw.title = trimmed; }
+    else n0.raw[field] = trimmed;
     render();
-  };
-  const commit = async (v) => {
-    if (done) return;
-    done = true;
-    const next = String(v == null ? input.value : v).trim();
-    row.classList.remove('editing');
-    if (next === String(val || '').trim()) { render(); return; }
-    n0.raw[field] = next;
-    render();                                        // 先收起再落盘，避免长文本卡住交互
+    if (detailNode && findProjectByNode(detailNode)) openDetail(detailNode);
     const res = await persist(p0);
-    if (!res.ok){
-      toast('保存失败：' + res.error);
-    } else if (res.warnings && res.warnings.length){
-      toast('已保存（有警告：' + res.warnings[0] + '）');
-    }
-  };
-  input.addEventListener('blur', () => commit());
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape'){ e.preventDefault(); revert(); }
-    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); input.blur(); }
+    if (!res.ok) toast('保存失败：' + res.error);
+    else if (res.warnings && res.warnings.length) toast('已保存（有警告：' + res.warnings[0] + '）');
   });
 }
-let launchCtx = null;   // { p, n, tasks, selected }
+
+/** 大号字段编辑器：返回 Promise<新文本 | null>（失焦=保存并关闭，Esc=取消） */
+let fieldEditorResolve = null;
+function openFieldEditor(label, value){
+  const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input');
+  if (!pop || !input) return Promise.resolve(null);
+  $('#fp-label').textContent = label;
+  input.value = value;
+  pop.hidden = false;
+  mask.hidden = false;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      pop.hidden = true;
+      mask.hidden = true;
+      input.removeEventListener('blur', onBlur);
+      input.removeEventListener('keydown', onKey);
+      mask.removeEventListener('mousedown', onMask);
+      fieldEditorResolve = null;
+      resolve(result);
+    };
+    const onBlur = () => finish(input.value);                     // 点别处 → 保存并退出
+    const onKey = (event) => {
+      if (event.key === 'Escape'){ event.preventDefault(); event.stopPropagation(); finish(null); }
+      else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)){ event.preventDefault(); finish(input.value); }
+    };
+    const onMask = (event) => { event.preventDefault(); event.stopPropagation(); finish(input.value); };
+    fieldEditorResolve = finish;
+    input.addEventListener('blur', onBlur);
+    input.addEventListener('keydown', onKey);
+    mask.addEventListener('mousedown', onMask);                   // 用 mousedown：抢在 blur 前并且不冒泡到文档
+  });
+}let launchCtx = null;   // { p, n, tasks, selected }
 function openLaunch(opts){
   const id = (opts && opts.nodeId) || detailNode;
   if (!id) return;
@@ -2580,6 +2650,8 @@ $('#density').addEventListener('click', (e)=>{
 });
 
 document.addEventListener('click', (e)=>{
+  // 字段大编辑器开着时，点哪儿都只关编辑器（由它自己处理），不动详情卡
+  if (e.target.closest('#fp-mask') || e.target.closest('#field-pop')) return;
   // 点详情卡外面 → 关闭；点到别的节点则交给下面的节点逻辑切换
   const dEl = $('#detail');
   if (dEl && !dEl.hidden && !e.target.closest('.detail-card')){
@@ -2590,6 +2662,8 @@ document.addEventListener('click', (e)=>{
   if (e.target.closest('#detail-x')){ closeDetail(); return; }
   const sessList = e.target.closest('[data-sess-list]');
   if (sessList){ listProjectSessions(); return; }
+  const openSess = e.target.closest('[data-open-session]');
+  if (openSess){ openInDsh(openSess.dataset.openSession); return; }
   const viewSess = e.target.closest('[data-view-session]');
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const fillBtn = e.target.closest('[data-fill]');
