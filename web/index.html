@@ -358,6 +358,14 @@
     padding:1px 4px;margin:-1px -4px;border-radius:5px;transition:background-color 140ms var(--ease-out)}
   .editval:hover{background:var(--hover);color:var(--tx1)}
   .editval.empty{color:var(--tx4);border:1px dashed var(--b2);text-align:center;font-size:11px}
+  .editval{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .detail-row .fielddd{display:flex;gap:6px;align-items:flex-start}
+  .detail-row .fielddd .editval{flex:1;min-width:0}
+  .fillbtn{flex:0 0 auto;font-size:10.5px;height:20px;padding:0 6px;line-height:18px}
+  .fillbtn:disabled{opacity:.45;cursor:default}
+  .detail-row.editing{grid-template-columns:1fr}
+  .detail-row.editing dt{margin-bottom:4px}
+  .dfield.expand{width:100%;min-height:104px;resize:vertical;font-size:12px;line-height:1.6}
   .dfield{width:100%;font:inherit;font-size:11.5px;color:var(--tx1);background:var(--l3);
     border:1px solid var(--b3);border-radius:6px;padding:5px 7px;resize:vertical;min-height:30px}
   .dfield:focus{outline:2px solid var(--brand);outline-offset:1px}
@@ -1622,8 +1630,8 @@ function addChild(id){
 
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
   c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-const EDIT_FIELDS = { loop:['intent','acceptance'], goal:['acceptance'], idea:['approach'], exec:['verify','proof'] };
-const FIELD_LABEL = { intent:'意图', acceptance:'验收', approach:'方案', verify:'验证', proof:'证据' };
+const EDIT_FIELDS = { loop:['intent','constraints','acceptance'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
+const FIELD_LABEL = { intent:'意图·预期', constraints:'约束', acceptance:'验收', approach:'方案', verify:'验证', proof:'证据' };
 const STATUS_OPTS = ['plan','ready','doing','blocked','done'];
 
 /* ─────────── Prompt 模板 ─────────── */
@@ -1808,11 +1816,20 @@ function detailMarkup(p, n){
   const st = stateOf(n);
   const tone = nodeTone(n);
   const kids = n.children || [];
-  const editable = (EDIT_FIELDS[n.kind] || []).map(f =>
-    `<div class="detail-row editable" data-field="${f}" data-nid="${n.id}" data-proj="${p.id}">
+  const fields = EDIT_FIELDS[n.kind] || [];
+  const fillable = n.kind === 'loop' || n.kind === 'goal';
+  const missing = fields.filter(f => !String(r[f] || '').trim());
+  const editable = fields.map((f, i) => {
+    const showFill = fillable && i === 0;
+    const fillBtn = showFill
+      ? `<button class="tbtn fillbtn" data-fill="${n.id}" data-proj="${p.id}" ${missing.length ? '' : 'disabled'}
+           title="${missing.length ? '按「意图」自动补齐：' + missing.map(x => FIELD_LABEL[x] || x).join('、') : '没有缺失项'}">据此填充</button>`
+      : '';
+    return `<div class="detail-row editable" data-field="${f}" data-nid="${n.id}" data-proj="${p.id}">
        <dt>${FIELD_LABEL[f]}</dt>
-       <dd><button class="editval${r[f] ? '' : ' empty'}" data-edit="${f}">${r[f] ? esc(r[f]) : '点击填写'}</button></dd>
-     </div>`).join('');
+       <dd class="fielddd"><button class="editval${r[f] ? '' : ' empty'}" data-edit="${f}">${r[f] ? esc(r[f]) : '点击填写'}</button>${fillBtn}</dd>
+     </div>`;
+  }).join('');
   const timeRows = [];
   if (r.started_at) timeRows.push(['开始', fmtTs(r.started_at), true]);
   if (r.closed_at)  timeRows.push(['关闭', fmtTs(r.closed_at), true]);
@@ -1958,6 +1975,72 @@ function _openDetail(id){
   setTimeout(showIt, 48);
 }
 
+/** 「据此填充」：按意图让模型补齐缺失字段（验收 / 约束），回填后落盘 */
+const FILL_FIELDS = ['constraints', 'acceptance'];
+async function fillMissing(pid, nid, btn){
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return;
+  const missing = FILL_FIELDS.filter(f => !String(n0.raw[f] || '').trim());
+  if (!missing.length) return toast('没有缺失项');
+  if (!p0.file) return toast('该项目没有可写回的卡片文件');
+  const label = missing.map(f => FIELD_LABEL[f] || f).join('、');
+  const ctxLines = [
+    `节点类型：${KIND[n0.kind] || n0.kind}`,
+    `标题：${n0.title}`,
+    n0.raw.intent ? `意图·预期：${n0.raw.intent}` : '',
+    n0.raw.constraints ? `现有约束：${n0.raw.constraints}` : '',
+    n0.raw.acceptance ? `现有验收：${n0.raw.acceptance}` : '',
+  ].filter(Boolean).join('\n');
+  const prompt = [
+    '你在帮我补齐「闭环轮转」卡片里的字段。',
+    ctxLines,
+    '',
+    `请只补这些缺失字段：${label}。`,
+    '要求：验收要可判定（优先给可执行的检查步骤或命令）；约束写清楚边界与限制。',
+    '严格只输出一个 JSON 对象，键名用 acceptance / constraints，值为字符串，不要输出其它文字。',
+  ].join('\n');
+
+  const oldText = btn.textContent;
+  btn.disabled = true; btn.textContent = '填充中…';
+  try {
+    const res = await fetch(api('/run'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p0.file, nodeId: n0.id, prompt }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    const key = (j.run && j.run.key) || (p0.file + '::' + n0.id);
+    const deadline = Date.now() + 180000;
+    let run = null;
+    while (Date.now() < deadline){
+      await new Promise(r => setTimeout(r, 1500));
+      const runs = await fetch(api('/runs')).then(r => r.json()).catch(() => ({}));
+      run = (runs.runs || []).find(r => r.key === key);
+      if (run && ['done', 'failed', 'cancelled'].includes(run.status)) break;
+      run = null;
+    }
+    if (!run) throw new Error('等待超时（180s）');
+    if (run.status !== 'done') throw new Error(run.error || ('会话 ' + run.status));
+    const text = String(run.result || '');
+    const jsonText = (text.match(/\{[\s\S]*\}/) || [])[0];
+    if (!jsonText) throw new Error('模型没返回 JSON');
+    const patch = JSON.parse(jsonText);
+    const applied = [];
+    for (const f of FILL_FIELDS){
+      const v = patch[f] == null ? '' : String(patch[f]).trim();
+      if (v && !String(n0.raw[f] || '').trim()){ n0.raw[f] = v; applied.push(FIELD_LABEL[f] || f); }
+    }
+    if (!applied.length) throw new Error('没有可回填的内容');
+    const saved = await persist(p0);
+    render();
+    toast(saved.ok ? `已填充：${applied.join('、')}` : ('填充后保存失败：' + saved.error));
+  } catch (error) {
+    toast('据此填充失败：' + error.message);
+  } finally {
+    btn.disabled = false; btn.textContent = oldText;
+  }
+}
+
 function startEdit(field, anchor){
   const row = anchor.closest('.detail-row');
   if (!row) return;
@@ -1965,41 +2048,40 @@ function startEdit(field, anchor){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   const val = n0 && n0.raw ? (n0.raw[field] || '') : '';
   const dd = row.querySelector('dd');
-  const multiline = field === 'acceptance' || field === 'verify' || field === 'approach' || field === 'proof' || field === 'intent';
-  dd.innerHTML = `${multiline
-      ? `<textarea class="dfield" rows="${field === 'proof' ? 2 : 2}" placeholder="${FIELD_LABEL[field]}…">${esc(val)}</textarea>`
-      : `<input class="dfield" type="text" value="${esc(val)}" placeholder="${FIELD_LABEL[field]}…">`}
-    <div class="dedit">
-      <button class="tbtn primary-converge" data-save-edit="1">保存</button>
-      <button class="tbtn" data-cancel-edit="1">取消</button>
-      <span class="dedit-hint">⌘/Ctrl+Enter 保存 · Esc 取消</span>
-    </div>`;
+  row.classList.add('editing');
+  dd.innerHTML = `<textarea class="dfield expand" rows="6" placeholder="${FIELD_LABEL[field] || field}…">${esc(val)}</textarea>
+    <div class="dedit-hint">失焦自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</div>`;
   const input = dd.querySelector('.dfield');
   input.focus();
-  input.select && input.select();
-  const commit = () => {
-    const v = input.value.trim();
-    n0.raw[field === 'title' ? 'title' : field] = v;
-    if (field === 'title') n0.title = v;
-    persist(p0).then(res => {
-      if (!res.ok){
-        toast('保存失败：' + res.error);
-      } else if (res.warnings && res.warnings.length){
-        toast('已保存（有警告：' + res.warnings[0] + '）');
-      } else {
-        toast(`已保存「${FIELD_LABEL[field] || field}」`);
-      }
-      render();
-    });
+  input.setSelectionRange(val.length, val.length);   // 光标落在末尾，别覆盖已有文本
+  let done = false;
+  const revert = () => {
+    if (done) return;
+    done = true;
+    row.classList.remove('editing');
+    render();
   };
-  dd.querySelector('[data-save-edit]').addEventListener('click', commit);
-  dd.querySelector('[data-cancel-edit]').addEventListener('click', () => openDetail(nid));
+  const commit = async (v) => {
+    if (done) return;
+    done = true;
+    const next = String(v == null ? input.value : v).trim();
+    row.classList.remove('editing');
+    if (next === String(val || '').trim()) { render(); return; }
+    n0.raw[field] = next;
+    render();                                        // 先收起再落盘，避免长文本卡住交互
+    const res = await persist(p0);
+    if (!res.ok){
+      toast('保存失败：' + res.error);
+    } else if (res.warnings && res.warnings.length){
+      toast('已保存（有警告：' + res.warnings[0] + '）');
+    }
+  };
+  input.addEventListener('blur', () => commit());
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); openDetail(nid); }
+    if (e.key === 'Escape'){ e.preventDefault(); revert(); }
+    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); input.blur(); }
   });
 }
-
 let launchCtx = null;   // { p, n, tasks, selected }
 function openLaunch(opts){
   const id = (opts && opts.nodeId) || detailNode;
@@ -2232,7 +2314,7 @@ async function persist(p){
     const res = await fetch(api('/cards/') + encodeURIComponent(p.file), {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ card: p.card }),
+      body: JSON.stringify({ card: p.card, allowIncomplete: true }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status) + (j.errors ? '：' + j.errors[0] : ''));
@@ -2422,6 +2504,8 @@ document.addEventListener('click', (e)=>{
   }
   // 详情卡内部交互
   if (e.target.closest('#detail-x')){ closeDetail(); return; }
+  const fillBtn = e.target.closest('[data-fill]');
+  if (fillBtn){ fillMissing(fillBtn.dataset.proj, fillBtn.dataset.fill, fillBtn); return; }
   const editVal = e.target.closest('[data-edit]');
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');

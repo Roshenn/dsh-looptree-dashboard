@@ -1,45 +1,49 @@
 {
-  "schema": "rotation/v1",
-  "project": { "name": "新项目", "workspace": "/absolute/path/to/workspace" },
-  "updated": "2026-10-27T00:00:00+08:00",
-  "loop": {
-    "id": "new-loop",
-    "kind": "loop",
-    "title": "这个闭环完成意味着什么",
-    "intent": "一句话：做完之后用户/我能做到什么",
-    "acceptance": "可判定的整体验收（最好能落成一条命令）",
+ "schema": "rotation/v1",
+ "project": {
+  "name": "新项目",
+  "workspace": "/absolute/path/to/workspace"
+ },
+ "updated": "2026-10-27T00:00:00+08:00",
+ "loop": {
+  "id": "new-loop",
+  "kind": "loop",
+  "title": "这个闭环完成意味着什么",
+  "intent": "一句话：做完之后用户/我能做到什么",
+  "acceptance": "可判定的整体验收（最好能落成一条命令）",
+  "status": "plan",
+  "closed_at": null,
+  "children": [
+   {
+    "id": "new-g1",
+    "kind": "goal",
+    "title": "第一个目标",
+    "acceptance": "这个目标达成的判定方式",
     "status": "plan",
     "closed_at": null,
     "children": [
-      {
-        "id": "new-g1",
-        "kind": "goal",
-        "title": "第一个目标",
-        "acceptance": "这个目标达成的判定方式",
+     {
+      "id": "new-i1",
+      "kind": "idea",
+      "title": "实现这个目标的一个构思",
+      "approach": "方案要点；有备选就并列加一个 idea",
+      "status": "plan",
+      "closed_at": null,
+      "children": [
+       {
+        "id": "new-e1",
+        "kind": "exec",
+        "title": "一个可以直接执行的动作",
+        "verify": "怎么验，一条可运行命令优先",
         "status": "plan",
         "closed_at": null,
-        "children": [
-          {
-            "id": "new-i1",
-            "kind": "idea",
-            "title": "实现这个目标的一个构思",
-            "approach": "方案要点；有备选就并列加一个 idea",
-            "status": "plan",
-            "closed_at": null,
-            "children": [
-              {
-                "id": "new-e1",
-                "kind": "exec",
-                "title": "一个可以直接执行的动作",
-                "verify": "怎么验，一条可运行命令优先",
-                "status": "plan",
-                "closed_at": null,
-                "issues": []
-              }
-            ]
-          }
-        ]
-      }
+        "issues": []
+       }
+      ]
+     }
     ]
-  }
+   }
+  ],
+  "constraints": "边界与限制：不能改的东西、时间/成本/环境约束"
+ }
 }
