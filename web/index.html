@@ -1856,12 +1856,47 @@ function parseGoals(text){
   })).filter(g => g.title).slice(0, 3);
 }
 
+/** 读一条「AI 拆目标」草稿（host 侧落盘，面板切走/关掉也能捞回） */
+async function fetchSplitDraft(file, nodeId){
+  if (!API_BASE || !file) return null;
+  try {
+    const j = await fetch(api('/splits?file=') + encodeURIComponent(file)).then(r => r.json());
+    return (j.drafts || []).find(d => d.nodeId === nodeId) || null;
+  } catch { return null; }
+}
+
+async function dropSplitDraft(file, nodeId){
+  if (!API_BASE || !file) return;
+  try {
+    await fetch(api('/splits?file=') + encodeURIComponent(file) + '&nodeId=' + encodeURIComponent(nodeId), { method: 'DELETE' });
+  } catch { /* 清不掉就留着，下次还能看到 */ }
+}
+
+/** 面板打开时提示：上次有没确认的拆分结果 */
+async function notifyPendingSplits(){
+  if (!API_BASE) return;
+  try {
+    const j = await fetch(api('/splits')).then(r => r.json());
+    const n = (j.drafts || []).length;
+    if (n) toast(`有 ${n} 条 AI 拆解结果待确认：点「+ 目标」→「AI 拆出目标」查看`);
+  } catch { /* 忽略 */ }
+}
+
 /** 发起 AI 拆目标会话 → 轮询到结束 → 弹预览 */
-async function aiSplitGoals(pid, nid){
+async function aiSplitGoals(pid, nid, opts = {}){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
   if (!p || !n) return;
   if (!p.file) return toast('该项目没有可写回的卡片文件');
   if (!API_BASE) return toast('未连接服务，AI 拆目标不可用');
+  // 先看有没有上次没确认的草稿：有就直接恢复，不重复烧一次会话
+  if (!opts.skipDraft){
+    const draft = await fetchSplitDraft(p.file, n.id);
+    const goals = draft ? parseGoals(draft.result) : [];
+    if (goals.length){
+      toast('已恢复上次未确认的拆解结果');
+      return openGoalsPreview(pid, nid, goals, draft);
+    }
+  }
   let run = null;
   try {
     const res = await fetch(api('/run'), {
@@ -1898,7 +1933,10 @@ async function aiSplitGoals(pid, nid){
 }
 
 /** 预览：默认全选，标题/验收可改，确认后才写卡片 */
-function openGoalsPreview(pid, nid, goals){
+let lastSplitCtx = null;            // { pid, nid, file }：供「重新生成」用
+function openGoalsPreview(pid, nid, goals, draft = null){
+  const p0 = PROJECTS.find(x => x.id === pid);
+  lastSplitCtx = p0 ? { pid, nid, file: p0.file } : null;
   const rows = goals.map((g, i) => `
     <label class="gsel">
       <input type="checkbox" data-gpick="${i}" checked>
@@ -1907,7 +1945,11 @@ function openGoalsPreview(pid, nid, goals){
         <textarea class="gsel-acc" data-gacc="${i}" rows="2" spellcheck="false">${esc(g.acceptance)}</textarea>
       </span>
     </label>`).join('');
-  askConfirm('AI 拆出的目标', `${rows}<div class="mnote">默认全选；取消勾选的不写入。标题与验收都能直接改。</div>`, '写入选中的', () => {
+  const recovered = draft
+    ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
+         <button type="button" class="tbtn" id="split-regen" style="margin-left:2px">重新生成</button></div>`
+    : '';
+  askConfirm('AI 拆出的目标', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。标题与验收都能直接改。</div>`, '写入选中的', () => {
     const picked = [];
     goals.forEach((g, i) => {
       const box = document.querySelector(`#ask-body [data-gpick="${i}"]`);
@@ -1920,6 +1962,14 @@ function openGoalsPreview(pid, nid, goals){
     if (!picked.length) return toast('没有勾选任何目标');
     applyGoals(pid, nid, picked);
   });
+}
+
+/** 丢弃草稿并重新跑一次（只在恢复出来的预览里出现） */
+function regenSplit(){
+  const ctx = lastSplitCtx;
+  hideModal($('#ask'));
+  if (!ctx) return;
+  dropSplitDraft(ctx.file, ctx.nid).then(() => aiSplitGoals(ctx.pid, ctx.nid, { skipDraft: true }));
 }
 
 /** 把选中的目标写进闭环卡片 */
@@ -1943,6 +1993,7 @@ function applyGoals(pid, nid, goals){
   persist(p).then(res => {
     if (!res.ok) return toast('写入失败：' + res.error);
     toast(`已写入 ${goals.length} 个目标`);
+    dropSplitDraft(p.file, n.id);   // 已消费掉草稿，避免下次又弹出来
     reloadProjects();
   });
 }
@@ -3158,6 +3209,7 @@ document.addEventListener('click', (e)=>{
   if (reopenBtn){ e.stopPropagation(); reopenNode(reopenBtn.dataset.reopen); return; }
   const addMenuBtn = e.target.closest('[data-addmenu]');
   if (addMenuBtn){ e.stopPropagation(); openAddMenu(addMenuBtn); return; }
+  if (e.target.closest('#split-regen')){ e.stopPropagation(); regenSplit(); return; }
   const aim = e.target.closest('[data-aim]');
   if (aim){ e.stopPropagation(); chooseAddMenu(aim.dataset.aim); return; }
   if (!$('#addmenu').hidden && !e.target.closest('#addmenu')) closeAddMenu();
@@ -3235,6 +3287,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   if (!PROJECTS.some(p => p.id === state.focusId)) state.focusId = PROJECTS[0] ? PROJECTS[0].id : '';
   document.documentElement.dataset.theme = state.theme;
   render();
+  notifyPendingSplits();
   const src = $('#data-src');
   if (src) src.textContent = source === 'server'
     ? '数据源：项目 .dsh/rotation.json（可写回）'

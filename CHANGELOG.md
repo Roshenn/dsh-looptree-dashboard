@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.6.8 — AI 拆目标结果不再丢（切走 / 重开后可恢复）
+
+- 根因：预览结果只存在面板内存；切到别处或重开时 iframe 卸载，轮询循环终止，
+  会话在宿主侧跑完了却没人接住结果
+- host：`taskId=split-goals` 的会话结束后，结果落盘到
+  `~/.dsh/rotation/splits/<file>__<node>.json`；新增 `GET /api/splits?file=`、
+  `DELETE /api/splits?file=&nodeId=`
+- 面板：打开时提示「N 条 AI 拆解结果待确认」；点「+ 目标」→「AI 拆出目标」优先恢复草稿
+  （不再重复烧一次会话），预览里多一个「重新生成」；确认写入后自动清掉草稿
+- 验证：dev-host 上跑完后落盘/列出/删除 3 项通过；Playwright 恢复流程 7 项断言通过
+
 ## 0.6.7 — 修复嵌入 DSH 主区时的布局塌陷
 
 - 根因：工具栏末尾那条长说明（`#toolbar-hint`）是可压缩的 flex 项，在 DSH 主区 iframe
