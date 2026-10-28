@@ -53,18 +53,19 @@ node -v      # 需要 >= 20（package.json engines 已声明）
 
 ```powershell
 type $env:USERPROFILE\.dsh\profiles\desktop\package.json
-# 期望看到 "dsh-looptree-dashboard": "link:C:\\dev\\rotation-panel"
+# 期望看到 "dsh-looptree-dashboard": "link:../../dsh-looptree-dashboard"
+# （相对路径：Mac 与 Windows 解析结果一致，换机器不用改这一行）
 dir $env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-looptree-dashboard
 # 期望是目录联接/符号链接指回源码
 ```
 
-4. 重启 DSH，左栏应出现「闭环树」。
+4. 重启 DSH，左栏应出现「轮转闭环树」。
 
 ### 2.4 日常开发回路
 
 ```
 改 lib/*.mjs / lib/*.js   → 重启 DSH（host 模块在启动时加载）
-改 web/index.html、web/*  → 只刷新面板（切走再切回「闭环树」）
+改 web/index.html、web/*  → 只刷新面板（切走再切回「轮转闭环树」）
 改 lib/client.js          → 重启 DSH（client bundle 启动时加载）
 ```
 

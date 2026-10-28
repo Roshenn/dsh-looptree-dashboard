@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>闭环树 · Loop Tree</title>
+<title>轮转闭环树 · Loop Tree</title>
 <style>
   /* ── DSH design tokens (from @deepseek-ai/dsh-client-ui-theme, --dsw-*) ── */
   :root{
@@ -488,7 +488,7 @@
         </svg>
       </span>
       <div>
-        <h1>闭环树</h1>
+        <h1>轮转闭环树</h1>
         <p id="brand-sub">LOOP TREE · 树形收敛</p>
       </div>
     </div>
@@ -939,7 +939,7 @@ if (window.__ROTATION_VERSION__) {
   const v = 'v' + window.__ROTATION_VERSION__;
   const sub = document.getElementById('brand-sub');
   if (sub) sub.textContent = 'LOOP TREE · ' + v + ' · 树形收敛';
-  document.title = '闭环树 · ' + v;
+  document.title = '轮转闭环树 · ' + v;
 }
 
 const CARDS = Array.isArray(window.ROTATION_CARDS) ? window.ROTATION_CARDS : [];
@@ -2191,7 +2191,8 @@ async function reloadProjects(){
     PROJECTS = list.map(x => cardToProject(x.card, x.file));
     render();
     if (detailNode && findProjectByNode(detailNode)) openDetail(detailNode);
-  } catch { /* ignore */ }
+    return true;
+  } catch { return false; }
 }
 
 function startEdit(field, anchor){
@@ -2577,7 +2578,15 @@ function toast(msg){
 $('#tab-matrix').addEventListener('click', ()=>{ state.view='matrix'; render(); });
 $('#tab-focus').addEventListener('click', ()=>{ state.view='focus'; render(); });
 $('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
-$('#btn-refresh').addEventListener('click', ()=>{ state.stamp = new Date().toLocaleString('sv-SE').slice(0,16); render(); toast('已刷新（原型：数据仍是 mock）'); });
+// 刷新：真实重新拉一次 /api/cards + 服务/会话状态，再报数量（旧版只重绘内存，提示还写着 mock）
+$('#btn-refresh').addEventListener('click', async ()=>{
+  const ok = await reloadProjects();
+  if (ok) await refreshServices();
+  if (ok) refreshRuns();
+  state.stamp = new Date().toLocaleString('sv-SE').slice(0,16);
+  render();
+  toast(ok ? `已刷新 · ${PROJECTS.length} 个项目` : '刷新失败：连不上本地服务');
+});
 $('#export-json').addEventListener('click', () => exportCard());
 // 嵌在 DSH 主区 iframe 里时：不需要「返回」，并启用紧凑工具栏
 let EMBEDDED = false;
