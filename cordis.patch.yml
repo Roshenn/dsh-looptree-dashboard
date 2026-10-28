@@ -4,11 +4,11 @@
 # 会把下面这一行插入插件树，等于挂载本包的 host 半：
 #
 #   - insert:
-#       - id: rotation-dashboard
+#       - id: looptree-dashboard
 #         name: 'dsh-looptree-dashboard'
 #
 # host 半负责 /rotation/app（面板静态资源）与 /rotation/api（数据、会话、服务）；
-# client 半由 dsh.client 声明，浏览器侧注册右栏入口。
+# client 半由 dsh.client 声明，浏览器侧注册左栏「闭环树」入口。
 - insert:
-    - id: rotation-dashboard
+    - id: looptree-dashboard
       name: 'dsh-looptree-dashboard'
