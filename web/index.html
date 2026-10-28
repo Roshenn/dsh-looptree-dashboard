@@ -394,6 +394,9 @@
   .detail-row dd.mono{font-variant-numeric:tabular-nums;color:var(--tx3);font-size:11px}
   .detail-title{cursor:text;border-radius:5px;padding:1px 3px;margin-left:-3px;transition:background-color 140ms var(--ease-out)}
   .detail-title:hover{background:var(--hover)}
+  .detail-title .title-input{font:inherit;color:inherit;width:100%;background:color-mix(in srgb,#fff 55%,transparent);
+    border:1px solid color-mix(in srgb,var(--brand) 45%,transparent);border-radius:6px;padding:2px 6px;margin:-2px -6px;outline:none}
+  html[data-theme="dark"] .detail-title .title-input{background:color-mix(in srgb,#000 18%,transparent)}
   .editval{display:block;width:100%;text-align:left;font-size:11.5px;line-height:1.55;color:var(--tx2);
     padding:1px 4px;margin:-1px -4px;border-radius:5px;transition:background-color 140ms var(--ease-out)}
   .editval:hover{background:var(--hover);color:var(--tx1)}
@@ -2562,6 +2565,50 @@ async function reloadProjects(){
   } catch { return false; }
 }
 
+/** 标题很短，直接在原地改：点击变输入框，Enter/失焦保存，Esc 取消 */
+function startInlineTitle(titleEl){
+  if (!titleEl || titleEl.dataset.editing === '1') return;
+  const nid = titleEl.dataset.nid, pid = titleEl.dataset.proj;
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return;
+  const original = n0.title || '';
+  titleEl.dataset.editing = '1';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'title-input';
+  input.value = original;
+  input.spellcheck = false;
+  titleEl.textContent = '';
+  titleEl.appendChild(input);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+
+  let done = false;
+  const close = async (save) => {
+    if (done) return;
+    done = true;
+    delete titleEl.dataset.editing;
+    const next = save ? input.value.trim() : original;
+    if (!save || !next || next === original){
+      titleEl.textContent = original || '（未命名）';
+      return;
+    }
+    n0.title = next; n0.raw.title = next;
+    titleEl.textContent = next;
+    render();
+    if (detailNode && findProjectByNode(detailNode)) openDetail(detailNode);
+    const res = await persist(p0);
+    if (!res.ok) toast('保存失败：' + res.error);
+    else if (res.warnings && res.warnings.length) toast('已保存（有警告：' + res.warnings[0] + '）');
+  };
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter'){ event.preventDefault(); close(true); }
+    else if (event.key === 'Escape'){ event.preventDefault(); event.stopPropagation(); close(false); }
+  });
+  input.addEventListener('blur', () => close(true));
+  input.addEventListener('click', (event) => event.stopPropagation());
+}
+
 function startEdit(field, anchor){
   // 标题（h3.detail-title）不在 .detail-row 里，所以先看元素自身的 data-*
   const row = anchor.closest('.detail-row');
@@ -2602,31 +2649,49 @@ function stripOrdinalPrefix(text){
   return out;
 }
 
-/** 把长文本拆成「条目」：识别 1) A. 一、 - • 这类开头，续行并回上一段 */
+/** 把文本拆成「条目」：
+ *  - 有编号（1) A. 一、 - ）→ numbered 模式，按编号切，给序号
+ *  - 没有编号 → plain 模式，按空行切段；单段也照样是一条可拖拽的条目
+ */
 function parseItems(text){
-  const lines = String(text || '').split('\n');
-  const items = [];
-  let preamble = [];
-  let current = null;
-  for (const line of lines){
-    const m = line.match(ITEM_RE);
-    if (m){
-      if (current) items.push(current);
-      current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: stripOrdinalPrefix(m[4] || '') };
-    } else if (current){
-      current.content += (current.content ? '\n' : '') + line;
-    } else {
-      preamble.push(line);
+  const raw = String(text || '').replace(/\r/g, '');
+  const lines = raw.split('\n');
+  const hasMarkers = lines.some((line) => ITEM_RE.test(line));
+
+  if (hasMarkers){
+    const items = [];
+    const preamble = [];
+    let current = null;
+    for (const line of lines){
+      const m = line.match(ITEM_RE);
+      if (m){
+        if (current) items.push(current);
+        current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: stripOrdinalPrefix(m[4] || '') };
+      } else if (current){
+        current.content += (current.content ? '\n' : '') + line;
+      } else {
+        preamble.push(line);
+      }
     }
+    if (current) items.push(current);
+    return { mode: 'numbered', preamble: preamble.join('\n').trim(), items, separator: '\n' };
   }
-  if (current) items.push(current);
-  return { preamble: preamble.join('\n').trim(), items };
+
+  const trimmed = raw.trim();
+  const blocks = trimmed ? trimmed.split(/\n{2,}/).map((b) => b.replace(/\s+$/, '')).filter((b) => b.length) : [];
+  return {
+    mode: 'plain',
+    preamble: '',
+    items: blocks.length ? blocks.map((content) => ({ content })) : [{ content: '' }],
+    separator: /\n{2,}/.test(trimmed) ? '\n\n' : '\n',
+  };
 }
 
-/** 序列化：保留条目顺序，按数字序号重排（A./一、这类按原风格继续） */
-function serializeItems(preamble, items){
-  if (!items.length) return preamble;
-  const kinds = items.map(x => x.markerKind);
+/** 序列化：numbered 模式重排 1)2)3)；plain 模式用原分隔符拼回 */
+function serializeItems(parsed, items){
+  if (!items.length) return parsed.preamble;
+  if (parsed.mode === 'plain') return items.map((it) => String(it.content || '').trim()).filter(Boolean).join(parsed.separator);
+  const kinds = items.map((x) => x.markerKind);
   const kind = kinds[0] === 'alpha' ? 'alpha' : kinds[0] === 'han' ? 'han' : kinds[0] === 'dash' ? 'dash' : 'num';
   const body = items.map((it, i) => {
     const marker = kind === 'alpha' ? `${String.fromCharCode(65 + (i % 26))}.`
@@ -2634,8 +2699,8 @@ function serializeItems(preamble, items){
       : kind === 'dash' ? '- '
       : `${i + 1})`;
     return `${marker}${String(it.content || '').trim()}`;
-  }).join('\n');
-  return preamble ? `${preamble}\n${body}` : body;
+  }).join(parsed.separator);
+  return parsed.preamble ? `${parsed.preamble}${parsed.separator}${body}` : body;
 }
 
 function openFieldEditor(label, value, nodeLabel){
@@ -2645,14 +2710,12 @@ function openFieldEditor(label, value, nodeLabel){
   $('#fp-node').textContent = nodeLabel || '';
 
   const parsed = parseItems(value);
-  const structured = parsed.items.length >= 2;
   let items = parsed.items.map((x) => ({ ...x }));
-  const preamble = parsed.preamble;
-  let plainValue = value;
+  const numbered = parsed.mode === 'numbered';
 
   const count = $('#fp-count');
   const MAXLEN = 300;
-  const serialized = () => (structured ? serializeItems(preamble, items) : plainValue);
+  const serialized = () => serializeItems(parsed, items);
   const syncCount = () => {
     if (!count) return;
     const n = serialized().length;
@@ -2673,7 +2736,7 @@ function openFieldEditor(label, value, nodeLabel){
       <div class="fp-item" data-hue="${i % 6}" data-i="${i}" draggable="false">
         <div class="fp-item-head" draggable="true" data-grip="${i}" title="拖拽调整顺序">
           <span class="fp-grip">⠿</span>
-          <span class="fp-idx">${i + 1}</span>
+          ${numbered ? `<span class="fp-idx">${i + 1}</span>` : ''}
         </div>
         <textarea class="fp-item-body" data-body="${i}" rows="2" spellcheck="false">${esc(it.content || '')}</textarea>
       </div>`).join('');
@@ -2722,24 +2785,18 @@ function openFieldEditor(label, value, nodeLabel){
     });
   }
 
-  if (structured){
-    input.hidden = true;
-    if (listEl) listEl.hidden = false;
-    renderItems();
-  } else {
-    input.hidden = false;
-    if (listEl) listEl.hidden = true;
-    input.value = value;
-  }
+  input.hidden = true;
+  if (listEl) listEl.hidden = false;
+  renderItems();
   syncCount();
   pop.hidden = false;
   mask.hidden = false;
-  if (structured && listEl){
+  if (listEl){
     const bodies = listEl.querySelectorAll('.fp-item-body');
     bodies.forEach(autosize);
     requestAnimationFrame(() => bodies.forEach(autosize));
   }
-  (structured ? (listEl?.querySelector('.fp-item-body') || input) : input).focus();
+  (listEl?.querySelector('.fp-item-body') || input).focus();
 
   return new Promise((resolve) => {
     let settled = false;
@@ -2765,8 +2822,8 @@ function openFieldEditor(label, value, nodeLabel){
       suppressDocTimer = setTimeout(() => { suppressDocClick = false; }, 600);
       resolve(result);
     };
-    const current = () => (structured ? serializeItems(preamble, items) : input.value);
-    const onInput = () => { plainValue = input.value; syncCount(); };
+    const current = () => serializeItems(parsed, items);
+    const onInput = () => syncCount();
     const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(current()); };
     const onCancelBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(null); };
     $('#fp-save')?.addEventListener('click', onSaveBtn);
@@ -2774,7 +2831,7 @@ function openFieldEditor(label, value, nodeLabel){
     $('#fp-close')?.addEventListener('click', onCancelBtn);
     const onBlur = (event) => {
       // 结构化模式里在条目间切换焦点不算「点了外面」
-      if (structured && event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest('#field-pop')) return;
+      if (event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest('#field-pop')) return;
       finish(current());
     };
     const onKey = (event) => {
@@ -3233,7 +3290,7 @@ document.addEventListener('click', (e)=>{
   const editVal = e.target.closest('[data-edit]');
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');
-  if (titleEl){ startEdit('title', titleEl); return; }
+  if (titleEl){ startInlineTitle(titleEl); return; }
   if (e.target.closest('[data-pgen-reset]')){
     const wrap = $('#pgen-wrap');
     if (wrap && wrap.dataset.task){
