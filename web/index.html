@@ -75,6 +75,8 @@
   .chip[aria-pressed="true"]{color:var(--tx1);background:var(--brand-dim);border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
   .chip:active{transform:scale(.97)}
   .hint{font-size:11.5px;color:var(--tx4)}
+  /* 工具栏里的提示不许被挤成竖排：只允许单行截断，放不下出省略号 */
+  .toolbar .hint{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* ───────── matrix ───────── */
   .scroll{flex:1 1 auto;overflow:auto;scrollbar-color:var(--l4) transparent;scrollbar-width:thin}
@@ -299,6 +301,8 @@
   html[data-embed="1"] .toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:5px;padding-bottom:2px}
   html[data-embed="1"] .toolbar .chip{height:22px;padding:0 7px;font-size:11px;flex:0 0 auto}
   html[data-embed="1"] .brand-sub{display:none}
+  /* 嵌入时主区本就窄：这条长说明不参与布局，否则会把工具栏撑成 250px 高（竖排文字） */
+  html[data-embed="1"] #toolbar-hint{display:none}
   .detail-row dt{white-space:nowrap}
 
   /* ───────── 空状态 ───────── */
