@@ -167,6 +167,8 @@
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .tnode-meta{margin-top:3px;font-size:10.5px;color:var(--tx4);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .tnode-meta.one{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .tnode-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .tchip{font-size:9.5px;line-height:1;padding:3px 5px;border-radius:4px;color:var(--tx4);background:color-mix(in srgb,var(--b2) 55%,transparent);border:1px solid color-mix(in srgb,var(--b2) 70%,transparent);white-space:nowrap}
   .bars{display:inline-flex;gap:2px}
   .bars i{width:10px;height:3px;border-radius:2px;background:var(--b3)}
   .bars i.on{background:var(--green)}
@@ -732,6 +734,14 @@ const MOCK_PROJECTS = [
 ];
 
 /* ─────────── rotation/v1 → 面板结构 ─────────── */
+/** 识别编号条目数量（A. / 1) / - 这类） */
+function countItems(text){
+  const raw = String(text || '').trim();
+  if (!raw) return 0;
+  const hits = raw.match(/(?:^|\n)\s*(?:[A-Z][.、)]|\d+[.)]|[-•*])\s+/g);
+  return hits ? hits.length : 0;
+}
+
 /** 把长验收/约束压成卡片用的一句话摘要：优先取首句，识别编号条目给出条数 */
 function summarizeField(text, label){
   const raw = String(text || '').replace(/\r/g, '').trim();
@@ -755,6 +765,18 @@ function cardToProject(card, file){
     status: n.status || 'plan',
     closed: !!n.closed_at,
     metaFull: n.kind === 'exec' ? (n.verify || '') : (n.kind === 'loop' ? (n.intent || '') : (n.approach || n.acceptance || '')),
+    chips: (() => {
+      const kids = n.children || [];
+      const byKind = { goal: 0, idea: 0, exec: 0 };
+      kids.forEach((k) => { if (byKind[k.kind] !== undefined) byKind[k.kind] += 1; });
+      const out = [];
+      if (byKind.goal) out.push(`${byKind.goal} 目标`);
+      if (byKind.idea) out.push(`${byKind.idea} 构思`);
+      if (byKind.exec) out.push(`${byKind.exec} 执行`);
+      const accItems = countItems(n.acceptance);
+      if (accItems >= 3) out.push(`验收 ${accItems} 项`);
+      return out;
+    })(),
     meta: n.kind === 'exec'
       ? summarizeField(n.verify, '验证')
       : (n.kind === 'loop'
@@ -1225,6 +1247,7 @@ function nodeMarkup(n, p){
     </div>
     <div class="tnode-title" title="${n.title}">${n.title}</div>
     ${n.meta ? `<div class="tnode-meta one" title="${esc(n.metaFull || n.meta)}">${esc(n.meta)}</div>` : ''}
+    ${(n.chips && n.chips.length) ? `<div class="tnode-chips">${n.chips.map(c => `<span class="tchip">${esc(c)}</span>`).join('')}</div>` : ''}
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
     ${lateBadge(n)}
     ${p ? runBadge(p, n) : ''}
