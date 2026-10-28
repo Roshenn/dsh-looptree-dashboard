@@ -823,7 +823,7 @@ function cardToProject(card, file){
       if (accItems >= 3) out.push(`验收 ${accItems} 项`);
       if (n.kind === 'loop') {
         const steps = countSteps(n.scenario);
-        if (steps) out.push(`场景 ${steps} 步`);
+        if (steps) out.push(`流程 ${steps} 步`);
       }
       return out;
     })(),
@@ -1731,8 +1731,8 @@ const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
 // 「空标题」包括占位名：待命名闭环 / 未命名…
 const isBlankTitle = (t) => !String(t || '').trim() || /^(待命名|未命名)/.test(String(t).trim());
 const FILL_FIELDS = ['title', 'constraints', 'acceptance'];
-const EDIT_FIELDS = { loop:['intent','constraints','acceptance','scenario'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
-const FIELD_LABEL = { intent:'意图·预期', constraints:'约束', acceptance:'验收', scenario:'场景闭环验证', approach:'方案', verify:'验证', proof:'证据' };
+const EDIT_FIELDS = { loop:['scenario','intent','constraints','acceptance'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
+const FIELD_LABEL = { intent:'意图·预期', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', approach:'方案', verify:'验证', proof:'证据' };
 const STATUS_OPTS = ['plan','ready','doing','blocked','done'];
 
 /* ─────────── Prompt 模板 ─────────── */
