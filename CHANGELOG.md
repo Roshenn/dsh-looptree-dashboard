@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.6.0 — 改名「闭环树」
+
+- 插件显示名与包名统一：`闭环树` / `dsh-looptree-dashboard`（原名 `dsh-rotation-dashboard`）
+- 左栏图标换成**从左到右展开的树**（根在左、两根分叉到右侧子节点），与「树形收敛」一致
+- 面板标题、副标题、README / INSTALL / docs 全部同步新名字
+- 迁移：profile 里旧键 `dsh-rotation-dashboard` 需移除后再装新的（link 路径不变）
+
 ## 0.5.2 — 跨平台开发环境
 
 - `validate:samples`、`preflight` 改成纯 node 脚本，Windows 上无需 bash

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>闭环树 · Loop Rotation — 原型 v0.3</title>
+<title>闭环树 · Loop Tree</title>
 <style>
   /* ── DSH design tokens (from @deepseek-ai/dsh-client-ui-theme, --dsw-*) ── */
   :root{
@@ -370,15 +370,26 @@
   .detail-row.editing{grid-template-columns:1fr}
   .detail-row.editing dt{margin-bottom:4px}
   .dfield.expand{width:100%;min-height:104px;resize:vertical;font-size:12px;line-height:1.6}
-  #fp-mask{position:fixed;inset:0;z-index:2147482000;background:transparent}
+  #fp-mask{position:fixed;inset:0;z-index:2147482000;background:color-mix(in srgb,#000 22%,transparent)}
   #fp-mask[hidden],#field-pop[hidden]{display:none}
-  #field-pop{position:fixed;inset:0;z-index:2147482001;display:flex;align-items:flex-start;justify-content:center;pointer-events:none}
-  .fp-box{pointer-events:auto;margin-top:8vh;width:min(720px,92vw);background:var(--l1);border:1px solid var(--b2);
-    border-radius:12px;box-shadow:0 18px 50px #0006;padding:12px;display:flex;flex-direction:column;gap:8px}
-  .fp-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .fp-label{font-size:12px;color:var(--tx2);font-weight:500}
+  #field-pop{position:fixed;inset:0;z-index:2147482001;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .fp-box{pointer-events:auto;width:min(760px,92vw);max-height:86vh;background:var(--l1);border:1px solid var(--b2);
+    border-radius:14px;box-shadow:0 24px 64px #00000055,0 2px 8px #00000022;display:flex;flex-direction:column;overflow:hidden}
+  .fp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+    padding:14px 16px 10px;border-bottom:1px solid color-mix(in srgb,var(--b2) 65%,transparent)}
+  .fp-kicker{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx4);margin-bottom:3px}
+  .fp-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  #fp-label{font-size:14px;font-weight:600;color:var(--tx1)}
+  .fp-node{font-size:11px;color:var(--tx4);max-width:46ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fp-x{flex:0 0 auto;width:24px;height:24px;border-radius:6px;border:1px solid transparent;background:transparent;
+    color:var(--tx3);font-size:16px;line-height:1;cursor:pointer}
+  .fp-x:hover{background:var(--hover);color:var(--tx1)}
+  #fp-input{margin:12px 16px 0;min-height:min(48vh,440px);resize:vertical;font-size:12.5px;line-height:1.7;
+    background:color-mix(in srgb,var(--b2) 18%,transparent);border-color:color-mix(in srgb,var(--b2) 80%,transparent)}
+  #fp-input:focus{outline:none;border-color:color-mix(in srgb,var(--brand) 55%,transparent)}
+  .fp-foot{display:flex;align-items:center;gap:8px;padding:10px 16px 14px}
+  .fp-foot .grow{flex:1}
   .fp-hint{font-size:10.5px;color:var(--tx4)}
-  #fp-input{min-height:min(46vh,420px);resize:vertical;font-size:12.5px;line-height:1.65}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -549,12 +560,21 @@
 
 <div id="fp-mask" hidden></div>
 <div id="field-pop" hidden>
-  <div class="fp-box">
+  <div class="fp-box" role="dialog" aria-modal="false">
     <div class="fp-head">
-      <span class="fp-label" id="fp-label"></span>
-      <span class="fp-hint">失焦自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</span>
+      <div class="fp-titles">
+        <div class="fp-kicker">编辑字段</div>
+        <div class="fp-title"><span id="fp-label"></span><span class="fp-node" id="fp-node"></span></div>
+      </div>
+      <button class="fp-x" id="fp-close" type="button" aria-label="关闭">×</button>
     </div>
     <textarea id="fp-input" class="dfield" spellcheck="false"></textarea>
+    <div class="fp-foot">
+      <span class="fp-hint">点外面自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</span>
+      <span class="grow"></span>
+      <button class="tbtn" id="fp-cancel" type="button">取消</button>
+      <button class="tbtn primary" id="fp-save" type="button">完成</button>
+    </div>
   </div>
 </div>
 <div class="modal" id="ask" hidden>
@@ -2166,7 +2186,8 @@ function startEdit(field, anchor){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
   const value = String(n0.raw[field] || '');
-  openFieldEditor(FIELD_LABEL[field] || field, value).then(async (next) => {
+  const nodeLabel = `${KIND[n0.kind] || n0.kind} · ${n0.title || n0.id}`;
+  openFieldEditor(FIELD_LABEL[field] || field, value, nodeLabel).then(async (next) => {
     if (next == null) return;                       // Esc 取消
     const trimmed = next.trim();
     if (trimmed === String(value).trim()) return;
@@ -2182,10 +2203,11 @@ function startEdit(field, anchor){
 
 /** 大号字段编辑器：返回 Promise<新文本 | null>（失焦=保存并关闭，Esc=取消） */
 let fieldEditorResolve = null;
-function openFieldEditor(label, value){
+function openFieldEditor(label, value, nodeLabel){
   const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input');
   if (!pop || !input) return Promise.resolve(null);
   $('#fp-label').textContent = label;
+  $('#fp-node').textContent = nodeLabel || '';
   input.value = value;
   pop.hidden = false;
   mask.hidden = false;
@@ -2201,9 +2223,20 @@ function openFieldEditor(label, value){
       input.removeEventListener('blur', onBlur);
       input.removeEventListener('keydown', onKey);
       mask.removeEventListener('mousedown', onMask);
+      $('#fp-save')?.removeEventListener('click', onSaveBtn);
+      $('#fp-cancel')?.removeEventListener('click', onCancelBtn);
+      $('#fp-close')?.removeEventListener('click', onCancelBtn);
       fieldEditorResolve = null;
+      // 这一下点击只用于关编辑器，别再穿透去关详情卡
+      suppressDocClick = true;
+      setTimeout(() => { suppressDocClick = false; }, 0);
       resolve(result);
     };
+    const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(input.value); };
+    const onCancelBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(null); };
+    $('#fp-save')?.addEventListener('click', onSaveBtn);
+    $('#fp-cancel')?.addEventListener('click', onCancelBtn);
+    $('#fp-close')?.addEventListener('click', onCancelBtn);
     const onBlur = () => finish(input.value);                     // 点别处 → 保存并退出
     const onKey = (event) => {
       if (event.key === 'Escape'){ event.preventDefault(); event.stopPropagation(); finish(null); }
@@ -2628,7 +2661,10 @@ $('#density').addEventListener('click', (e)=>{
   render();
 });
 
+let suppressDocClick = false;
 document.addEventListener('click', (e)=>{
+  // 关闭字段编辑器的那一下点击，不继续去关详情卡
+  if (suppressDocClick){ suppressDocClick = false; return; }
   // 字段大编辑器开着时，点哪儿都只关编辑器（由它自己处理），不动详情卡
   if (e.target.closest('#fp-mask') || e.target.closest('#field-pop')) return;
   // 点详情卡外面 → 关闭；点到别的节点则交给下面的节点逻辑切换
