@@ -10,7 +10,7 @@
 | 层 | 是什么 | 在哪 |
 |---|---|---|
 | **插件源码（唯一真源）** | 一个 npm 包目录：`package.json` + `lib/`（host 半）+ `web/`（面板）+ `cordis.patch.yml` | 本机 `~/.dsh/reports/rotation-panel`（macOS） |
-| **远程仓库** | Git 远端，代码唯一备份 | `git@gitee.com:jrri/dsh-rotation-dashboard.git`（分支 `main`） |
+| **远程仓库** | Git 远端，代码唯一备份 | `git@gitee.com:jrri/dsh-looptree-dashboard.git`（分支 `main`） |
 | **运行环境** | DSH 桌面端 / dsh web 进程 + 它所在 profile 的 `node_modules` | 桌面端用 `~/.dsh/profiles/desktop`，测试用一次性 profile |
 
 关键事实：
@@ -20,7 +20,7 @@
   - `link:`（本地目录）→ 直接指到源码目录，**改完重启 DSH 即生效**，不用重装；
   - `file:`（.tgz）→ 是拷贝，改完必须 `remove` + `add` 重装。
 - 当前桌面端装的是 `link:`：`~/.dsh/profiles/desktop/package.json` →
-  `"dsh-rotation-dashboard": "link:/Users/julian/.dsh/reports/rotation-panel"`。
+  `"dsh-looptree-dashboard": "link:/Users/julian/.dsh/reports/rotation-panel"`。
 
 ---
 
@@ -39,7 +39,7 @@
 ```powershell
 mkdir C:\dev
 cd C:\dev
-git clone git@gitee.com:jrri/dsh-rotation-dashboard.git rotation-panel
+git clone git@gitee.com:jrri/dsh-looptree-dashboard.git rotation-panel
 cd rotation-panel
 node -v      # 需要 >= 20（package.json engines 已声明）
 ```
@@ -53,18 +53,18 @@ node -v      # 需要 >= 20（package.json engines 已声明）
 
 ```powershell
 type $env:USERPROFILE\.dsh\profiles\desktop\package.json
-# 期望看到 "dsh-rotation-dashboard": "link:C:\\dev\\rotation-panel"
-dir $env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-rotation-dashboard
+# 期望看到 "dsh-looptree-dashboard": "link:C:\\dev\\rotation-panel"
+dir $env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-looptree-dashboard
 # 期望是目录联接/符号链接指回源码
 ```
 
-4. 重启 DSH，左栏应出现「闭环轮转」。
+4. 重启 DSH，左栏应出现「闭环树」。
 
 ### 2.4 日常开发回路
 
 ```
 改 lib/*.mjs / lib/*.js   → 重启 DSH（host 模块在启动时加载）
-改 web/index.html、web/*  → 只刷新面板（切走再切回「闭环轮转」）
+改 web/index.html、web/*  → 只刷新面板（切走再切回「闭环树」）
 改 lib/client.js          → 重启 DSH（client bundle 启动时加载）
 ```
 
@@ -116,7 +116,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\profiles\rotationtest
 
 ```bash
 # 1) 拿代码
-git clone git@gitee.com:jrri/dsh-rotation-dashboard.git && cd rotation-panel
+git clone git@gitee.com:jrri/dsh-looptree-dashboard.git && cd rotation-panel
 
 # 2) 自检（不需要 DSH 在跑）
 npm run preflight
@@ -155,7 +155,7 @@ $EDITOR CHANGELOG.md                        # 写清「新增/修复/影响面�
 npm run preflight
 
 # 3) 打产物（包内只含 lib/ web/ cordis.patch.yml）
-npm pack                                    # → dsh-rotation-dashboard-x.y.z.tgz
+npm pack                                    # → dsh-looptree-dashboard-x.y.z.tgz
 
 # 4) 提交与推送
 git add -A && git commit -m "release: vX.Y.Z" && git push origin main

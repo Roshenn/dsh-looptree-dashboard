@@ -1,14 +1,14 @@
-# dsh-rotation-dashboard bundle patch
+# dsh-looptree-dashboard bundle patch
 #
 # 安装方式（市场 UI 或 `dsh plugin --profile web add ...`）后，profile 启动时
 # 会把下面这一行插入插件树，等于挂载本包的 host 半：
 #
 #   - insert:
 #       - id: rotation-dashboard
-#         name: 'dsh-rotation-dashboard'
+#         name: 'dsh-looptree-dashboard'
 #
 # host 半负责 /rotation/app（面板静态资源）与 /rotation/api（数据、会话、服务）；
 # client 半由 dsh.client 声明，浏览器侧注册右栏入口。
 - insert:
     - id: rotation-dashboard
-      name: 'dsh-rotation-dashboard'
+      name: 'dsh-looptree-dashboard'

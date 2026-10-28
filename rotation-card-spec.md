@@ -1,4 +1,4 @@
-# 闭环轮转卡 · 数据规范 v1（`rotation/v1`）
+# 闭环树卡 · 数据规范 v1（`rotation/v1`）
 
 > 一句话：**每个工作区一个 `.dsh/rotation.json`，里面是一棵 `loop → goal → idea → exec` 的树；
 > 关闭只能自下而上，`closed_at` 非空即代表「人确认过」。**

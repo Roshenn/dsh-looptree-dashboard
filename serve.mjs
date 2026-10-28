@@ -448,7 +448,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`闭环轮转面板: http://127.0.0.1:${PORT}/`);
+  console.log(`闭环树面板: http://127.0.0.1:${PORT}/`);
   console.log(`读写目录: ${DIR}`);
   console.log(`执行器: ${DSH_BIN} --profile headless --json（并发 ${MAX_CONCURRENT}，超时 ${Math.round(RUN_TIMEOUT_MS / 60000)} 分钟）`);
 });

@@ -1,6 +1,6 @@
-# 闭环轮转面板 · DSH 插件（v0.2.0，真机可用）
+# 闭环树面板 · DSH 插件（v0.2.0，真机可用）
 
-把「多项目闭环轮转」做成 DSH 插件：一个泳道视图里同时看多个项目的
+把「多项目闭环树」做成 DSH 插件：一个泳道视图里同时看多个项目的
 `闭环 → 目标 → 构思 → 执行`，每个节点带可复制的结构化 prompt、可发起的会话、
 可一键拉起的项目服务。
 
@@ -88,9 +88,9 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 
 | 验证 | 结果 |
 |---|---|
-| 插件装进 profile | `node_modules/dsh-rotation-dashboard` ✓，bundles 尾项写入 ✓ |
+| 插件装进 profile | `node_modules/dsh-looptree-dashboard` ✓，bundles 尾项写入 ✓ |
 | host 半挂载 | `/rotation/api/health` 200、`/rotation/app/` 200、`/rotation/api/cards` 200 ✓ |
-| client 半加载 | boot 清单里有 `{"id":"dsh-rotation-dashboard","url":"plugins/??dsh-rotation-dashboard/client.js…"}` ✓ |
+| client 半加载 | boot 清单里有 `{"id":"dsh-looptree-dashboard","url":"plugins/??dsh-looptree-dashboard/client.js…"}` ✓ |
 | 中文项目名 | `真机项目` → id `project-y85w`，注册 + 建卡 ✓ |
 | 卡片写回 | PUT 改标题 200，磁盘 `.dsh/rotation.json` 同步 ✓ |
 | 清理 | 测试项目已移除，真实注册表回到 `[]` ✓ |
@@ -99,7 +99,7 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 
 | 问题 | 现象 | 修法 |
 |---|---|---|
-| client bundle 的 `id` 用了 `dsh-external/<pkg>` | `loaded without registering "dsh-rotation-dashboard"`，整个 web boot 失败 | `id` 必须等于包名；并补 `exports.inject = ['slots']` |
+| client bundle 的 `id` 用了 `dsh-external/<pkg>` | `loaded without registering "dsh-looptree-dashboard"`，整个 web boot 失败 | `id` 必须等于包名；并补 `exports.inject = ['slots']` |
 | host 未声明 `agents` 服务 | `/api/run` 500：`cannot get property "agents" without inject` | `inject = ['webServer','agents','agentDefaultModel']` |
 | `turn/end` 只记 `reason.kind` | 卡片只显示「turn 结束原因：error」 | 透传 `reason.error.message`，现在显示真实 401 文本 |
 
@@ -142,7 +142,7 @@ POST /rotation/api/run → status running
 - 通过面板自己的接口注册项目：`200 {id:"project-z48d", …}`，刷新后项目出现在泳道里
 - 控制台零错误
 
-**入口（0.2.2，已实测）**：左栏「闭环轮转」——`sidebar.panellist` 注册条目，点击在主区用 iframe
+**入口（0.2.2，已实测）**：左栏「闭环树」——`sidebar.panellist` 注册条目，点击在主区用 iframe
 打开面板（`main` 槽，key=`rotation`）。右下角浮标已移除，不再有第二个入口。（与框架无关的 DOM 注入，
 位置在应用自带圆形按钮下方，不遮挡），点一下就在新标签打开面板。真机验证：
 按钮存在 → 点击 → popup 的 URL 是 `/rotation/app/`、标题正确、页面零报错。
@@ -171,7 +171,7 @@ POST /rotation/api/run → status running
 - `npm run mock:client`：用假浏览器环境验证 client 半契约（9 项断言）
 
 ---
-# 闭环轮转面板（原型 v0.6 · 可读写 rotation/v1）
+# 闭环树面板（原型 v0.6 · 可读写 rotation/v1）
 
 > 一个工作区一张闭环卡：`闭环 → 目标 → 构思 → 执行`，自下而上确认关闭，全部关闭后闭环收敛归档。
 

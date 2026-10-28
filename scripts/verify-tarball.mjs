@@ -6,7 +6,7 @@
  *   node scripts/verify-tarball.mjs path/to/pkg.tgz
  *
  * 做的事：
- *   1) 把 tgz 解到临时目录，模拟 node_modules/dsh-rotation-dashboard
+ *   1) 把 tgz 解到临时目录，模拟 node_modules/dsh-looptree-dashboard
  *   2) 从解出来的 package.json 读 main / exports / dsh 清单
  *   3) 动态 import host 半，用假 ctx 挂路由，跑 health / panel / registry 三个请求
  *   4) 用假 window 加载 client 半，断言 __ModuleLoader__ 契约与插槽注册
@@ -35,12 +35,12 @@ const work = await mkdtemp(join(tmpdir(), 'rotation-pkg-'));
 const unpack = join(work, 'unpack');
 await mkdir(unpack, { recursive: true });
 execFileSync('tar', ['-xzf', tgz, '-C', unpack]);
-const pkgDir = join(work, 'node_modules', 'dsh-rotation-dashboard');
+const pkgDir = join(work, 'node_modules', 'dsh-looptree-dashboard');
 await mkdir(dirname(pkgDir), { recursive: true });
 await cp(join(unpack, 'package'), pkgDir, { recursive: true });
 
 const pkg = JSON.parse(await readFile(join(pkgDir, 'package.json'), 'utf8'));
-check('包名正确', pkg.name === 'dsh-rotation-dashboard', pkg.name);
+check('包名正确', pkg.name === 'dsh-looptree-dashboard', pkg.name);
 check('main 指向 lib/index.js', pkg.main === 'lib/index.js', pkg.main);
 check('dsh.bundle.patch 存在', Boolean(pkg.dsh?.bundle?.patch), pkg.dsh?.bundle?.patch);
 
