@@ -1,6 +1,6 @@
 {
   "name": "dsh-looptree-dashboard",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "轮转闭环树面板：多项目「闭环 → 目标 → 构思 → 执行」泳道视图，含节点会话与项目服务拉起",
   "type": "module",
   "main": "lib/index.js",
