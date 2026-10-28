@@ -1830,7 +1830,7 @@ function buildSplitPrompt(p, n){
     '请给出 3 条候选目标，供人挑选（可能只采纳其中 1 条）。',
     '硬性限制：',
     '- 标题 8–16 字的名词短语，说清「做到什么」，不要写口号，不要写手段。',
-    '- 验收写清怎么判定通过（命令 / 文件 / 断言 / 可见结果），能落成命令就落成命令，单条 ≤200 字。',
+    '- 验收写清怎么判定通过（命令 / 文件 / 断言 / 可见结果），能落成命令就落成命令，单条 ≤300 字。',
     '- 3 条必须互相独立，不要互相包含，也不要把已有目标重复一遍。',
     '严格只输出一个 JSON 对象：{"goals":[{"title":"...","acceptance":"..."}]}，只含这 3 条，不要输出其它文字。',
   ].filter(Boolean).join('\n');
@@ -2438,7 +2438,7 @@ function openFieldEditor(label, value, nodeLabel){
   $('#fp-node').textContent = nodeLabel || '';
   input.value = value;
   const count = $('#fp-count');
-  const MAXLEN = 200;
+  const MAXLEN = 300;
   const syncCount = () => {
     if (!count) return;
     const n = input.value.length;
