@@ -209,6 +209,36 @@
   .tbtn.primary-converge{background:color-mix(in srgb,var(--green) 18%,transparent);border-color:color-mix(in srgb,var(--green) 40%,transparent);color:var(--green)}
   .tbtn.ghost{background:transparent;border-style:dashed;color:var(--tx4)}
   .tbtn.ghost:hover{color:var(--tx2)}
+
+  /* ───────── 「+ 目标」二级菜单 ───────── */
+  .addmenu{position:fixed;z-index:48;min-width:190px;padding:5px;border-radius:10px;
+    background:var(--l2);border:1px solid var(--b2);box-shadow:var(--shadow-pop);
+    opacity:0;transform:translateY(-4px) scale(.97);transform-origin:top right;
+    transition:opacity 130ms var(--ease-out),transform 160ms var(--ease-out)}
+  .addmenu[data-flip="1"]{transform:translateY(4px) scale(.97);transform-origin:bottom right}
+  .addmenu[data-show="true"]{opacity:1;transform:none}
+  .addmenu button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 9px;border-radius:7px;
+    color:var(--tx2);font-size:12px;text-align:left;
+    transition:background-color 130ms var(--ease-out),color 130ms var(--ease-out),transform 130ms var(--ease-out)}
+  .addmenu button:hover{background:var(--hover);color:var(--tx1)}
+  .addmenu button:active{transform:scale(.98)}
+  .addmenu .am-sub{margin-left:auto;color:var(--tx4);font-size:10.5px;white-space:nowrap}
+  .addmenu .am-sep{height:1px;margin:4px 7px;background:var(--b1)}
+  .addmenu .am-ai{color:var(--brand-2)}
+  .addmenu .am-ai:hover{background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-2)}
+  .addmenu .am-ai .am-sub{color:color-mix(in srgb,var(--brand) 60%,var(--tx4))}
+  @media (prefers-reduced-motion: reduce){ .addmenu{transition:none} }
+  /* AI 拆目标的预览行（ask 弹窗内） */
+  .gsel{display:flex;gap:8px;padding:8px 6px}
+  .gsel + .gsel{border-top:1px solid var(--b1)}
+  .gsel input[type="checkbox"]{margin-top:4px;accent-color:var(--brand)}
+  .gsel-main{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+  .gsel-title{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--b2);background:var(--l1);
+    color:var(--tx1);font:inherit;font-size:12.5px}
+  .gsel-title:focus{outline:2px solid var(--brand);outline-offset:0}
+  .gsel-acc{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--b1);background:var(--l1);
+    color:var(--tx3);font:inherit;font-size:11.5px;resize:vertical;min-height:34px}
+  .gsel-acc:focus{outline:2px solid var(--brand);outline-offset:0}
   .tfootline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
     margin:7px -9px 0 -11px;padding:5px 9px 6px 11px;
     border-top:1px solid var(--b1);background:color-mix(in srgb,var(--bg-base) 34%,transparent);border-radius:0 0 8px 8px}
@@ -620,6 +650,8 @@
     </div>
   </div>
 </div>
+
+<div class="addmenu" id="addmenu" hidden role="menu" aria-label="添加子节点"></div>
 
 <div class="toast" id="toast" role="status"><span class="dot"></span><span id="toast-text"></span></div>
 
@@ -1292,7 +1324,9 @@ function nodeMarkup(n, p){
     hasKids ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    addKind ? `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>` : '',
+    addKind ? (n.kind === 'loop'
+      ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="AI 拆目标 / 手动添加">+ ${KIND[addKind]}</button>`
+      : `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>`) : '',
   ].filter(Boolean).join('');
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-kind="${n.kind}" style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
@@ -1729,6 +1763,184 @@ function addChild(id){
   toast(`已为「${n.title}」新增${KIND[kind]}`);
   render();
   persist(p);
+}
+
+/* ─────────── 「+ 目标」二级菜单 + AI 拆目标 ─────────── */
+const SPLIT_TASK = 'split-goals';
+let addMenuCtx = null;              // { pid, nid, btn }
+
+function openAddMenu(btn){
+  const id = btn.dataset.addmenu;
+  const p = findProjectByNode(id), n = p && findNode(p.root, id);
+  if (!p || !n) return;
+  const menu = $('#addmenu');
+  menu.innerHTML = `
+    <button type="button" class="am-ai" data-aim="ai" role="menuitem">
+      <span>AI 拆出目标</span><span class="am-sub">生成 3 条，挑完再写</span>
+    </button>
+    <div class="am-sep"></div>
+    <button type="button" data-aim="manual" role="menuitem"><span>手动添加目标</span></button>`;
+  addMenuCtx = { pid: p.id, nid: n.id, btn };
+  btn.setAttribute('aria-expanded', 'true');
+  menu.hidden = false;
+  // 贴按钮定位：默认在下方右对齐；下方放不下就翻到上方
+  const r = btn.getBoundingClientRect();
+  const mw = menu.offsetWidth || 200, mh = menu.offsetHeight || 74;
+  const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+  const below = r.bottom + 6;
+  const flip = below + mh > window.innerHeight - 8;
+  menu.style.left = left + 'px';
+  menu.style.top = (flip ? Math.max(8, r.top - mh - 6) : below) + 'px';
+  menu.dataset.flip = flip ? '1' : '0';
+  requestAnimationFrame(() => { menu.dataset.show = 'true'; });
+}
+
+function closeAddMenu(){
+  const menu = $('#addmenu');
+  if (!menu || menu.hidden) return;
+  if (addMenuCtx && addMenuCtx.btn) addMenuCtx.btn.setAttribute('aria-expanded', 'false');
+  addMenuCtx = null;
+  menu.dataset.show = 'false';
+  setTimeout(() => { if (menu.dataset.show !== 'true') menu.hidden = true; }, 150);
+}
+
+function chooseAddMenu(which){
+  const ctx = addMenuCtx;
+  closeAddMenu();
+  if (!ctx) return;
+  if (which === 'manual') return addChild(ctx.nid);
+  if (which === 'ai') return aiSplitGoals(ctx.pid, ctx.nid);
+}
+
+/** 给模型的拆目标 prompt：只给真实上下文，要求 JSON、3 条候选 */
+function buildSplitPrompt(p, n){
+  const r = n.raw || {};
+  const kids = (n.children || []).map(k => `- ${k.title}`).join('\n') || '（暂无）';
+  const ws = (p.card && p.card.project && p.card.project.workspace) || '';
+  return [
+    `你在给「${p.name}」这个项目的闭环拆目标。${ws ? '项目目录：' + ws : ''}`,
+    '先按需读项目里的文件（README、脚本、配置、最近的提交与产物）再作答；不确定就去查，不要凭空编。',
+    '',
+    `闭环目标：${r.intent || '（还没写，按项目现状判断要做到什么）'}`,
+    r.scenario ? `已定的落地场景流程（约束与验收的唯一依据，必须逐条对上）：\n${r.scenario}` : '',
+    r.constraints ? `已知约束：${r.constraints}` : '',
+    r.acceptance ? `已有验收：${r.acceptance}` : '',
+    `已有的目标：\n${kids}`,
+    '',
+    '请给出 3 条候选目标，供人挑选（可能只采纳其中 1 条）。',
+    '硬性限制：',
+    '- 标题 8–16 字的名词短语，说清「做到什么」，不要写口号，不要写手段。',
+    '- 验收写清怎么判定通过（命令 / 文件 / 断言 / 可见结果），能落成命令就落成命令，单条 ≤200 字。',
+    '- 3 条必须互相独立，不要互相包含，也不要把已有目标重复一遍。',
+    '严格只输出一个 JSON 对象：{"goals":[{"title":"...","acceptance":"..."}]}，只含这 3 条，不要输出其它文字。',
+  ].filter(Boolean).join('\n');
+}
+
+/** 从模型输出里抠出 goals 数组（容忍 ```json 围栏与多余文字） */
+function parseGoals(text){
+  const raw = String(text || '');
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const cand = fenced ? fenced[1] : (raw.match(/\{[\s\S]*\}/) || [])[0];
+  let data = null;
+  try { data = cand ? JSON.parse(cand) : null; } catch { data = null; }
+  if (!data){ try { data = JSON.parse(raw); } catch { return []; } }
+  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.goals) ? data.goals : null);
+  if (!arr) return [];
+  return arr.map(g => ({
+    title: String((g && (g.title || g.name)) || '').trim(),
+    acceptance: String((g && (g.acceptance || g.verify)) || '').trim(),
+  })).filter(g => g.title).slice(0, 3);
+}
+
+/** 发起 AI 拆目标会话 → 轮询到结束 → 弹预览 */
+async function aiSplitGoals(pid, nid){
+  const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
+  if (!p || !n) return;
+  if (!p.file) return toast('该项目没有可写回的卡片文件');
+  if (!API_BASE) return toast('未连接服务，AI 拆目标不可用');
+  let run = null;
+  try {
+    const res = await fetch(api('/run'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt: buildSplitPrompt(p, n), taskId: SPLIT_TASK }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    run = j.run;
+  } catch (error) {
+    return toast('发起失败：' + error.message);
+  }
+  const key = (run && run.key) || (p.file + '::' + n.id);
+  toast('已发起 AI 拆目标（约 10–30 秒），结果先给你挑');
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline){
+    await new Promise(r => setTimeout(r, 1800));
+    let runs = [];
+    try { runs = (await fetch(api('/runs')).then(r => r.json())).runs || []; } catch { continue; }
+    runs.forEach(r => runMap.set(r.key, r));
+    paintRunBadges();
+    const hit = runs.find(r => r.key === key);
+    if (!hit) continue;
+    if (hit.status === 'done'){
+      const goals = parseGoals(hit.result);
+      if (!goals.length) return toast('AI 没返回可用的目标，可再点一次或手动添加');
+      return openGoalsPreview(pid, nid, goals);
+    }
+    if (hit.status === 'failed' || hit.status === 'cancelled'){
+      return toast('AI 拆目标失败：' + (hit.error || hit.status));
+    }
+  }
+  toast('AI 拆目标超时（3 分钟）：可在节点「会话」里看进展');
+}
+
+/** 预览：默认全选，标题/验收可改，确认后才写卡片 */
+function openGoalsPreview(pid, nid, goals){
+  const rows = goals.map((g, i) => `
+    <label class="gsel">
+      <input type="checkbox" data-gpick="${i}" checked>
+      <span class="gsel-main">
+        <input class="gsel-title" data-gtitle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
+        <textarea class="gsel-acc" data-gacc="${i}" rows="2" spellcheck="false">${esc(g.acceptance)}</textarea>
+      </span>
+    </label>`).join('');
+  askConfirm('AI 拆出的目标', `${rows}<div class="mnote">默认全选；取消勾选的不写入。标题与验收都能直接改。</div>`, '写入选中的', () => {
+    const picked = [];
+    goals.forEach((g, i) => {
+      const box = document.querySelector(`#ask-body [data-gpick="${i}"]`);
+      if (!box || !box.checked) return;
+      const titleEl = document.querySelector(`#ask-body [data-gtitle="${i}"]`);
+      const accEl = document.querySelector(`#ask-body [data-gacc="${i}"]`);
+      const title = titleEl ? titleEl.value.trim() : '';
+      if (title) picked.push({ title, acceptance: accEl ? accEl.value.trim() : '' });
+    });
+    if (!picked.length) return toast('没有勾选任何目标');
+    applyGoals(pid, nid, picked);
+  });
+}
+
+/** 把选中的目标写进闭环卡片 */
+function applyGoals(pid, nid, goals){
+  const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
+  if (!p || !n) return;
+  n.children = n.children || [];
+  n.raw.children = n.raw.children || [];
+  const stamp = Date.now().toString(36);
+  goals.forEach((g, i) => {
+    const rawChild = {
+      id: `${n.id}-g${stamp}${i}`, kind: 'goal', title: g.title,
+      acceptance: g.acceptance || '（待补）验收方式',
+      status: 'plan', closed_at: null, issues: [],
+    };
+    n.children.push({ id: rawChild.id, kind: 'goal', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
+    n.raw.children.push(rawChild);
+  });
+  if (n.closed) n.closed = false;
+  render();
+  persist(p).then(res => {
+    if (!res.ok) return toast('写入失败：' + res.error);
+    toast(`已写入 ${goals.length} 个目标`);
+    reloadProjects();
+  });
 }
 
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
@@ -2421,6 +2633,7 @@ $('#modal-ok').addEventListener('click', () => { const id = pendingClose; closeC
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeConfirm(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (!$('#addmenu').hidden) { closeAddMenu(); return; }
   if (!$('#ask').hidden) hideModal($('#ask'));
   else if (!$('#launch').hidden) closeLaunch();
   else if (!$('#modal').hidden) closeConfirm();
@@ -2939,6 +3152,11 @@ document.addEventListener('click', (e)=>{
   if (closeBtn){ e.stopPropagation(); closeNode(closeBtn.dataset.close); return; }
   const reopenBtn = e.target.closest('[data-reopen]');
   if (reopenBtn){ e.stopPropagation(); reopenNode(reopenBtn.dataset.reopen); return; }
+  const addMenuBtn = e.target.closest('[data-addmenu]');
+  if (addMenuBtn){ e.stopPropagation(); openAddMenu(addMenuBtn); return; }
+  const aim = e.target.closest('[data-aim]');
+  if (aim){ e.stopPropagation(); chooseAddMenu(aim.dataset.aim); return; }
+  if (!$('#addmenu').hidden && !e.target.closest('#addmenu')) closeAddMenu();
   const addBtn = e.target.closest('[data-add]');
   if (addBtn){ e.stopPropagation(); addChild(addBtn.dataset.add); return; }
   const exp = e.target.closest('[data-export]');
@@ -2963,6 +3181,7 @@ document.addEventListener('click', (e)=>{
   }
 });
 window.addEventListener('resize', ()=>render());
+window.addEventListener('scroll', ()=>closeAddMenu(), true);
 
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
