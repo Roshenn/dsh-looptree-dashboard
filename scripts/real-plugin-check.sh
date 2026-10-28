@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE="${PROFILE:-rotationtest}"
 PORT="${PORT:-64600}"
 PROFILES="$HOME/.dsh/profiles"
-TGZ="$ROOT/dsh-looptree-dashboard-0.6.2.tgz"
+TGZ="$ROOT/dsh-looptree-dashboard-0.6.3.tgz"
 
 case "${1:-}" in
   install)
