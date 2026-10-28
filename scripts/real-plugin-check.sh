@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE="${PROFILE:-rotationtest}"
 PORT="${PORT:-64600}"
 PROFILES="$HOME/.dsh/profiles"
-TGZ="$ROOT/dsh-rotation-dashboard-0.5.0.tgz"
+TGZ="$ROOT/dsh-rotation-dashboard-0.5.1.tgz"
 
 case "${1:-}" in
   install)
