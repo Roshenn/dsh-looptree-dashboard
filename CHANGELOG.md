@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.5.2 — 跨平台开发环境
+
+- `validate:samples`、`preflight` 改成纯 node 脚本，Windows 上无需 bash
+- 会话全文解压失败时给出安装 `zstd` 的明确提示（macOS/Windows/Linux 各自的命令）
+- 新增 `docs/dev-setup.md`：本地/远程环境分层、Windows 开发 SOP、平台差异清单、
+  从零重建流程、发布流程与检查清单
+
 ## 0.5.1 — 据此填充移到 host，关面板也不丢
 
 - 「据此填充」从面板内轮询改为 **host 侧执行**：`POST /api/fill` 起会话，

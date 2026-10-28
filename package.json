@@ -1,6 +1,6 @@
 {
   "name": "dsh-rotation-dashboard",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "闭环轮转面板：多项目「闭环 → 目标 → 构思 → 执行」泳道视图，含节点会话与项目服务拉起",
   "type": "module",
   "main": "lib/index.js",
@@ -37,13 +37,13 @@
     "dev": "node scripts/dev-host.mjs",
     "serve": "node serve.mjs",
     "build:cards": "node scripts/build-cards.mjs",
-    "validate:samples": "for f in samples/*.rotation.json; do node validate-rotation.mjs \"$f\" --quiet || exit 1; done",
+    "validate:samples": "node scripts/validate-samples.mjs",
     "migrate": "node scripts/migrate-samples.mjs",
     "check": "node scripts/check-install.mjs",
     "mock:session": "node scripts/dev-session-mock.mjs",
     "mock:client": "node scripts/dev-client-mock.mjs",
     "lint:plugin": "node scripts/lint-plugin.mjs",
-    "preflight": "npm run lint:plugin && npm run mock:client && ROTATION_HOME=\"$(mktemp -d)\" MOCK_WS=\"$(mktemp -d)\" PORT=$((4100 + RANDOM % 800)) node scripts/dev-session-mock.mjs && npm run validate:samples && npm run verify:tarball",
+    "preflight": "node scripts/preflight.mjs",
     "verify:tarball": "node scripts/verify-tarball.mjs"
   }
 }
