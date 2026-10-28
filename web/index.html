@@ -782,6 +782,12 @@ function countItems(text){
   return hits ? hits.length : 0;
 }
 
+/** 场景闭环验证的步骤数：数「1) 2) 3)」这类编号 */
+function countSteps(text){
+  if (!text) return 0;
+  return (String(text).match(/^\s*\d+\s*[)）.、]/gm) || []).length;
+}
+
 /** 把长验收/约束压成卡片用的一句话摘要：优先取首句，识别编号条目给出条数 */
 function summarizeField(text, label){
   const raw = String(text || '').replace(/\r/g, '').trim();
@@ -815,6 +821,10 @@ function cardToProject(card, file){
       if (byKind.exec) out.push(`${byKind.exec} 执行`);
       const accItems = countItems(n.acceptance);
       if (accItems >= 3) out.push(`验收 ${accItems} 项`);
+      if (n.kind === 'loop') {
+        const steps = countSteps(n.scenario);
+        if (steps) out.push(`场景 ${steps} 步`);
+      }
       return out;
     })(),
     meta: n.kind === 'exec'
@@ -1721,8 +1731,8 @@ const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
 // 「空标题」包括占位名：待命名闭环 / 未命名…
 const isBlankTitle = (t) => !String(t || '').trim() || /^(待命名|未命名)/.test(String(t).trim());
 const FILL_FIELDS = ['title', 'constraints', 'acceptance'];
-const EDIT_FIELDS = { loop:['intent','constraints','acceptance'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
-const FIELD_LABEL = { intent:'意图·预期', constraints:'约束', acceptance:'验收', approach:'方案', verify:'验证', proof:'证据' };
+const EDIT_FIELDS = { loop:['intent','constraints','acceptance','scenario'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
+const FIELD_LABEL = { intent:'意图·预期', constraints:'约束', acceptance:'验收', scenario:'场景闭环验证', approach:'方案', verify:'验证', proof:'证据' };
 const STATUS_OPTS = ['plan','ready','doing','blocked','done'];
 
 /* ─────────── Prompt 模板 ─────────── */
