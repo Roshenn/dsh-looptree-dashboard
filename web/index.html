@@ -172,6 +172,13 @@
   .tnode-meta{margin-top:3px;font-size:10.5px;color:var(--tx4);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .tnode-meta.one{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .tnode-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .tnode-del{position:relative;overflow:hidden;isolation:isolate;flex:0 0 auto;width:16px;height:16px;border-radius:50%;
+    border:1px solid transparent;background:transparent;color:var(--tx4);font-size:11px;line-height:14px;padding:0;
+    cursor:pointer;opacity:0;transition:opacity 120ms var(--ease-out),background-color 120ms var(--ease-out)}
+  .tnode:hover .tnode-del,.tnode:focus-within .tnode-del{opacity:1}
+  .tnode-del:hover{color:color-mix(in srgb,var(--red) 85%,var(--tx1));background:color-mix(in srgb,var(--red) 14%,transparent)}
+  .tnode-del .holdfill{position:absolute;inset:0;width:0;background:color-mix(in srgb,var(--red) 38%,transparent);z-index:-1}
+  .tnode-del[data-arming="1"] .holdfill{transition:width 60ms linear}
   .tbtn.hold{position:relative;overflow:hidden;isolation:isolate;user-select:none;touch-action:none}
   .tbtn.hold .holdfill{position:absolute;inset:0;width:0;background:color-mix(in srgb,var(--red) 42%,transparent);
     z-index:-1;transition:width 0ms linear}
@@ -1425,15 +1432,17 @@ function nodeMarkup(n, p){
     addKind ? ((n.kind === 'loop' || n.kind === 'goal')
       ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="${n.kind === 'goal' ? 'AI 拆构思 / 手动添加' : 'AI 拆目标 / 手动添加'}">+ ${KIND[addKind]}</button>`
       : `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>`) : '',
-    (!kidsExist && n.kind !== 'loop')
-      ? `<button class="tbtn danger hold" data-del="${n.id}" title="长按 0.8 秒删除"><span class="holdfill"></span><span class="holdlabel">长按删除</span></button>`
-      : '',
   ].filter(Boolean).join('');
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}" style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
       <span class="kind">${KIND[n.kind]}</span>
       <span class="nid mono">${n.id}</span>
       <span class="st">${st.label}</span>
+      ${(!kidsExist && n.kind !== 'loop')
+        ? `<button class="tnode-del hold" data-del="${n.id}" title="长按 0.8 秒删除" aria-label="长按删除">
+             <span class="holdfill"></span><span class="holdlabel">×</span>
+           </button>`
+        : ''}
     </div>
     <div class="tnode-title" title="${n.title}">${n.title}</div>
     ${n.meta ? `<div class="tnode-meta one" title="${esc(n.metaFull || n.meta)}">${esc(n.meta)}</div>` : ''}
