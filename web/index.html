@@ -2588,6 +2588,18 @@ function startEdit(field, anchor){
 let fieldEditorResolve = null;
 const ITEM_RE = /^\s*(?:(\d+)[.、)]\s*|([A-Za-z])[.、)]\s*|([一二三四五六七八九十]+)[、.]\s*|[-•*]\s+)(.*)$/;
 
+/** 去掉正文里自带的前缀序号（步骤3: / 第2步 / ③ / (4)），避免和左栏编号打架 */
+const ORDINAL_PREFIX_RE = /^\s*(?:步骤\s*[0-9一二三四五六七八九十]+|第\s*[0-9一二三四五六七八九十]+\s*步?|[①-⑳]|[（(]?[0-9]{1,2}[)）.、:：])\s*[:：.、,，\-—]?\s*/;
+function stripOrdinalPrefix(text){
+  let out = String(text || '');
+  for (let i = 0; i < 3; i += 1){
+    const next = out.replace(ORDINAL_PREFIX_RE, '');
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 /** 把长文本拆成「条目」：识别 1) A. 一、 - • 这类开头，续行并回上一段 */
 function parseItems(text){
   const lines = String(text || '').split('\n');
@@ -2598,7 +2610,7 @@ function parseItems(text){
     const m = line.match(ITEM_RE);
     if (m){
       if (current) items.push(current);
-      current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: m[4] || '' };
+      current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: stripOrdinalPrefix(m[4] || '') };
     } else if (current){
       current.content += (current.content ? '\n' : '') + line;
     } else {
