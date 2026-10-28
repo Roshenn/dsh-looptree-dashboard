@@ -172,6 +172,13 @@
   .tnode-meta{margin-top:3px;font-size:10.5px;color:var(--tx4);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .tnode-meta.one{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .tnode-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .tbtn.hold{position:relative;overflow:hidden;isolation:isolate;user-select:none;touch-action:none}
+  .tbtn.hold .holdfill{position:absolute;inset:0;width:0;background:color-mix(in srgb,var(--red) 42%,transparent);
+    z-index:-1;transition:width 0ms linear}
+  .tbtn.hold[data-arming="1"] .holdfill{transition:width 60ms linear}
+  .tbtn.hold .holdlabel{position:relative}
+  .tbtn.danger{color:color-mix(in srgb,var(--red) 82%,var(--tx1));border-color:color-mix(in srgb,var(--red) 35%,var(--b2))}
+  .tbtn.danger:hover{background:color-mix(in srgb,var(--red) 12%,transparent)}
   .tchip{font-size:9.5px;line-height:1;padding:3px 5px;border-radius:4px;color:var(--tx4);background:color-mix(in srgb,var(--b2) 55%,transparent);border:1px solid color-mix(in srgb,var(--b2) 70%,transparent);white-space:nowrap}
   .bars{display:inline-flex;gap:2px}
   .bars i{width:10px;height:3px;border-radius:2px;background:var(--b3)}
@@ -1418,6 +1425,9 @@ function nodeMarkup(n, p){
     addKind ? (n.kind === 'loop'
       ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="AI 拆目标 / 手动添加">+ ${KIND[addKind]}</button>`
       : `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>`) : '',
+    (!kidsExist && n.kind !== 'loop')
+      ? `<button class="tbtn danger hold" data-del="${n.id}" title="长按 0.8 秒删除"><span class="holdfill"></span><span class="holdlabel">长按删除</span></button>`
+      : '',
   ].filter(Boolean).join('');
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}" style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
@@ -2403,14 +2413,19 @@ function closeDetail(){
   setTimeout(() => { if (d.dataset.show === 'false') d.hidden = true; }, 150);
   detailNode = null;
 }
-function openDetail(id, skipEnsure){
+function openDetail(id, skipEnsure, origin){
   if (!skipEnsure) ensureVisible(id);
-  return _openDetail(id);
+  return _openDetail(id, origin);
 }
-function _openDetail(id){
+function _openDetail(id, origin){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
-  const anchor = document.querySelector(`.tnode[data-nid="${id}"]`);
+  // 聚焦视图和矩阵视图可能同时存在同名节点，只取「真的可见」的那个做锚点
+  const candidates = [...document.querySelectorAll(`.tnode[data-nid="${id}"]`)];
+  const anchor = candidates.find((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+  }) || candidates[0];
   if (!anchor) return;
   const d = $('#detail'), card = d.querySelector('.detail-card');
   card.innerHTML = detailMarkup(p, n);
@@ -2421,6 +2436,31 @@ function _openDetail(id){
   // 同步测量 + 定位（不依赖 RAF），再用 RAF 触发入场动画，另加定时兜底
   const ar = anchor.getBoundingClientRect();
   const W = card.offsetWidth, H = card.offsetHeight;
+  const rectVisible = ar.width > 0 && ar.height > 0 && ar.bottom > 0 && ar.top < innerHeight && ar.right > 0 && ar.left < innerWidth;
+  if (!rectVisible && origin){
+    // 锚点在可视区外（例如聚焦视图里的隐藏矩阵节点）：贴着点击位置放
+    const left2 = Math.min(Math.max(12, origin.x + 12), innerWidth - W - 12);
+    const top2 = Math.min(Math.max(12, origin.y - 8), innerHeight - H - 12);
+    card.style.left = left2 + 'px';
+    card.style.top = top2 + 'px';
+    card.style.transformOrigin = '0 26px';
+    restorePgen(p, n);
+    const showIt2 = () => {
+      if (detailNode !== id) return;
+      d.dataset.show = 'true';
+      card.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+      setTimeout(() => {
+        if (detailNode !== id) return;
+        card.style.transition = 'none';
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1)';
+      }, 220);
+    };
+    requestAnimationFrame(showIt2);
+    setTimeout(showIt2, 260);
+    return;
+  }
   let left = ar.right + 10;
   if (left + W > innerWidth - 12) left = ar.left - W - 10;
   if (left < 12) left = Math.max(12, Math.min(innerWidth - W - 12, ar.left));
@@ -3264,6 +3304,95 @@ $('#density').addEventListener('click', (e)=>{
   render();
 });
 
+/* ─── 长按删除：按住 0.8s 蓄力，颜色从左往右填满才删；中途松手回退 ─── */
+const HOLD_MS = 800;
+let holdState = null;
+function cancelHold(el){
+  if (!holdState) return;
+  const { button, raf, started } = holdState;
+  cancelAnimationFrame(raf);
+  holdState = null;
+  if (button){ button.removeAttribute('data-arming'); button.style.setProperty('--hold', '0'); }
+  const fill = button && button.querySelector('.holdfill');
+  if (fill){ fill.style.transition = 'width 120ms ease-out'; fill.style.width = '0'; }
+  if (el) el.dataset.idle = '1';
+}
+function startHold(button, onDone){
+  if (holdState) return;
+  const fill = button.querySelector('.holdfill');
+  const t0 = performance.now();
+  button.setAttribute('data-arming', '1');
+  if (fill) fill.style.transition = 'width 60ms linear';
+  const step = (now) => {
+    if (!holdState) return;
+    const p = Math.min(1, (now - t0) / HOLD_MS);
+    if (fill) fill.style.width = `${(p * 100).toFixed(1)}%`;
+    if (p >= 1){
+      holdState = null;
+      button.removeAttribute('data-arming');
+      if (fill){ fill.style.transition = 'width 120ms ease-out'; fill.style.width = '0'; }
+      onDone();
+      return;
+    }
+    holdState.raf = requestAnimationFrame(step);
+  };
+  holdState = { button, raf: requestAnimationFrame(step) };
+}
+document.addEventListener('pointerdown', (event) => {
+  const btn = event.target.closest('[data-del]');
+  if (!btn || btn.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const id = btn.dataset.del;
+  const p0 = findProjectByNode(id);
+  startHold(btn, () => deleteNode(p0, id));
+}, true);
+['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => {
+  document.addEventListener(type, (event) => {
+    if (!holdState) return;
+    if (type === 'pointerup' || !event.target.closest('[data-del]')) cancelHold();
+  }, true);
+});
+document.addEventListener('pointerout', (event) => {
+  if (holdState && event.target.closest && event.target.closest('[data-del]') && !event.relatedTarget) cancelHold();
+}, true);
+// 焦点离开/窗口失焦时也要回退
+window.addEventListener('blur', () => cancelHold());
+
+/** 从卡片里删掉一个叶子节点并落盘 */
+async function deleteNode(p0, id){
+  if (!p0) return;
+  const node = findNode(p0.root, id);
+  if (!node) return;
+  if ((node.children || []).length) return toast('还有子节点，不能删除');
+  if (node.kind === 'loop') return toast('闭环根节点不能删除');
+  const rawNode = node.raw;
+  const parent = findParentRaw(p0.card && p0.card.loop, id);
+  if (!parent) return toast('找不到父节点');
+  const idx = (parent.children || []).findIndex((c) => c.id === id);
+  if (idx < 0) return;
+  parent.children.splice(idx, 1);
+  if (parent.children.length === 0) delete parent.children;
+  try {
+    const res = await persist(p0);
+    if (!res.ok) throw new Error(res.error);
+    toast(`已删除「${rawNode.title || id}」`);
+  } catch (error) {
+    toast('删除失败：' + error.message);
+  }
+  if (detailNode === id) closeDetail();
+  await reloadProjects();
+}
+
+function findParentRaw(root, id){
+  let found = null;
+  walk(root, (n) => {
+    if (found) return;
+    if ((n.children || []).some((c) => c.id === id)) found = n;
+  });
+  return found;
+}
+
 let suppressDocClick = false;
 let suppressDocTimer = null;
 document.addEventListener('click', (e)=>{
@@ -3287,6 +3416,8 @@ document.addEventListener('click', (e)=>{
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const genBtn = e.target.closest('[data-gen]');
   if (genBtn){ e.stopPropagation(); if (!genBtn.disabled) generateMissing(genBtn.dataset.proj, genBtn.dataset.nid, genBtn); return; }
+  const delBtn = e.target.closest('[data-del]');
+  if (delBtn){ return; }   // 删除只走长按（pointerdown），点一下不删
   const editVal = e.target.closest('[data-edit]');
   if (editVal){ startEdit(editVal.dataset.edit, editVal); return; }
   const titleEl = e.target.closest('.detail-title');
@@ -3520,7 +3651,10 @@ document.addEventListener('click', (e)=>{
     state.focusId = arch.dataset.arch; state.view='focus'; render(); return;
   }
   const nodeEl = e.target.closest('.tnode');
-  if (nodeEl && !e.target.closest('button')){ openDetail(nodeEl.dataset.nid); return; }
+  if (nodeEl && !e.target.closest('button')){
+    openDetail(nodeEl.dataset.nid, undefined, { x: e.clientX, y: e.clientY });
+    return;
+  }
   const act = e.target.closest('[data-act]');
   if (act){
     const p = PROJECTS.find(x=>x.id===act.dataset.id);
