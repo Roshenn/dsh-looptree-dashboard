@@ -1009,9 +1009,15 @@ function anyBlocked(n){ let h=false; walk(n, x=>{ if(hasIssues(x) && !x.closed) 
 function blockCount(n){ let c=0; walk(n, x=>{ if(hasIssues(x) && !x.closed) c++; }); return c; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
 const INFO_FIELDS = ['intent','scenario','constraints','acceptance','approach','verify','proof'];
+// 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
+const PLACEHOLDER_RE = /^[（(]待补[）)]/;
+function isFilled(v){
+  const s = String(v || '').trim();
+  return Boolean(s) && !PLACEHOLDER_RE.test(s);
+}
 function hasInfo(n){
   const r = n.raw || {};
-  return INFO_FIELDS.some(f => String(r[f] || '').trim());
+  return INFO_FIELDS.some(f => isFilled(r[f]));
 }
 /* 四种状态，全部由结构派生（不再手改）：
    未开始 = 只有标题；规划中 = 有内容但没子节点；进行中 = 有子节点未全闭环；已闭环 = 子节点全闭环（或叶子被完成） */
