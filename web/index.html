@@ -431,6 +431,32 @@
   .fp-foot{display:flex;align-items:center;gap:8px;padding:10px 16px 14px}
   .fp-foot .grow{flex:1}
   .fp-hint{font-size:10.5px;color:var(--tx4)}
+  #fp-items{margin:12px 16px 0;display:flex;flex-direction:column;gap:8px;max-height:min(52vh,480px);overflow:auto;padding-right:2px}
+  .fp-item{border-radius:10px;border:1px solid color-mix(in srgb,var(--b2) 60%,transparent);overflow:hidden;
+    background:var(--p-bg);transition:box-shadow 120ms var(--ease-out),transform 120ms var(--ease-out)}
+  .fp-item[data-drag="1"]{opacity:.45}
+  .fp-item[data-over="1"]{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 45%,transparent)}
+  .fp-item-head{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:grab;user-select:none;
+    border-bottom:1px solid color-mix(in srgb,var(--b2) 55%,transparent)}
+  .fp-item-head:active{cursor:grabbing}
+  .fp-grip{color:var(--tx4);font-size:12px;letter-spacing:-1px}
+  .fp-idx{font-size:11px;font-weight:600;color:var(--tx2);font-variant-numeric:tabular-nums;min-width:18px}
+  .fp-item-note{font-size:10.5px;color:var(--tx4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fp-item-body{width:100%;border:0;background:transparent;color:var(--tx1);font-family:inherit;
+    font-size:12.5px;line-height:1.65;padding:8px 10px;resize:vertical;min-height:52px;outline:none;display:block}
+  .fp-item-body:focus{background:color-mix(in srgb,#fff 26%,transparent)}
+  html[data-theme="light"] .fp-item[data-hue="0"]{--p-bg:#eef4ff}
+  html[data-theme="light"] .fp-item[data-hue="1"]{--p-bg:#eefaf2}
+  html[data-theme="light"] .fp-item[data-hue="2"]{--p-bg:#fff7e8}
+  html[data-theme="light"] .fp-item[data-hue="3"]{--p-bg:#f6efff}
+  html[data-theme="light"] .fp-item[data-hue="4"]{--p-bg:#eafaf8}
+  html[data-theme="light"] .fp-item[data-hue="5"]{--p-bg:#fdeef3}
+  html[data-theme="dark"] .fp-item[data-hue="0"]{--p-bg:#1b2330}
+  html[data-theme="dark"] .fp-item[data-hue="1"]{--p-bg:#16241d}
+  html[data-theme="dark"] .fp-item[data-hue="2"]{--p-bg:#2a2418}
+  html[data-theme="dark"] .fp-item[data-hue="3"]{--p-bg:#241d2e}
+  html[data-theme="dark"] .fp-item[data-hue="4"]{--p-bg:#152628}
+  html[data-theme="dark"] .fp-item[data-hue="5"]{--p-bg:#2b1c22}
   .fp-count{margin-left:auto;font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums;white-space:nowrap}
   .fp-count[data-over="1"]{color:var(--red)}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
@@ -612,6 +638,7 @@
       <button class="fp-x" id="fp-close" type="button" aria-label="关闭">×</button>
     </div>
     <textarea id="fp-input" class="dfield" spellcheck="false"></textarea>
+    <div id="fp-items" hidden></div>
     <div class="fp-foot">
       <span class="fp-hint">点外面自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</span>
       <span class="fp-count" id="fp-count"></span>
@@ -2557,34 +2584,151 @@ function startEdit(field, anchor){
 
 /** 大号字段编辑器：返回 Promise<新文本 | null>（失焦=保存并关闭，Esc=取消） */
 let fieldEditorResolve = null;
+const ITEM_RE = /^\s*(?:(\d+)[.、)]\s*|([A-Za-z])[.、)]\s*|([一二三四五六七八九十]+)[、.]\s*|[-•*]\s+)(.*)$/;
+
+/** 把长文本拆成「条目」：识别 1) A. 一、 - • 这类开头，续行并回上一段 */
+function parseItems(text){
+  const lines = String(text || '').split('\n');
+  const items = [];
+  let preamble = [];
+  let current = null;
+  for (const line of lines){
+    const m = line.match(ITEM_RE);
+    if (m){
+      if (current) items.push(current);
+      current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: m[4] || '' };
+    } else if (current){
+      current.content += (current.content ? '\n' : '') + line;
+    } else {
+      preamble.push(line);
+    }
+  }
+  if (current) items.push(current);
+  return { preamble: preamble.join('\n').trim(), items };
+}
+
+/** 序列化：保留条目顺序，按数字序号重排（A./一、这类按原风格继续） */
+function serializeItems(preamble, items){
+  if (!items.length) return preamble;
+  const kinds = items.map(x => x.markerKind);
+  const kind = kinds[0] === 'alpha' ? 'alpha' : kinds[0] === 'han' ? 'han' : kinds[0] === 'dash' ? 'dash' : 'num';
+  const body = items.map((it, i) => {
+    const marker = kind === 'alpha' ? `${String.fromCharCode(65 + (i % 26))}.`
+      : kind === 'han' ? `${'一二三四五六七八九十'[i] || (i + 1)}、`
+      : kind === 'dash' ? '- '
+      : `${i + 1})`;
+    return `${marker}${String(it.content || '').trim()}`;
+  }).join('\n');
+  return preamble ? `${preamble}\n${body}` : body;
+}
+
 function openFieldEditor(label, value, nodeLabel){
-  const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input');
+  const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input'), listEl = $('#fp-items');
   if (!pop || !input) return Promise.resolve(null);
   $('#fp-label').textContent = label;
   $('#fp-node').textContent = nodeLabel || '';
-  input.value = value;
+
+  const parsed = parseItems(value);
+  const structured = parsed.items.length >= 2;
+  let items = parsed.items.map((x) => ({ ...x }));
+  const preamble = parsed.preamble;
+  let plainValue = value;
+
   const count = $('#fp-count');
   const MAXLEN = 300;
+  const serialized = () => (structured ? serializeItems(preamble, items) : plainValue);
   const syncCount = () => {
     if (!count) return;
-    const n = input.value.length;
+    const n = serialized().length;
     count.textContent = `${n} / ${MAXLEN} 字`;
     count.dataset.over = n > MAXLEN ? '1' : '0';
   };
+
+  /** 渲染条目列表（结构化模式） */
+  function renderItems(){
+    if (!listEl) return;
+    listEl.innerHTML = items.map((it, i) => `
+      <div class="fp-item" data-hue="${i % 6}" data-i="${i}" draggable="false">
+        <div class="fp-item-head" draggable="true" data-grip="${i}">
+          <span class="fp-grip">⠿</span>
+          <span class="fp-idx">${i + 1}</span>
+          <span class="fp-item-note">${esc((it.content || '').split('\n')[0].slice(0, 28))}</span>
+        </div>
+        <textarea class="fp-item-body" data-body="${i}" rows="2" spellcheck="false">${esc(it.content || '')}</textarea>
+      </div>`).join('');
+    listEl.querySelectorAll('[data-body]').forEach((el) => {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px';
+      el.addEventListener('input', () => {
+        const idx = Number(el.dataset.body);
+        if (items[idx]) items[idx].content = el.value;
+        const note = el.closest('.fp-item')?.querySelector('.fp-item-note');
+        if (note) note.textContent = el.value.split('\n')[0].slice(0, 28);
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px';
+        syncCount();
+      });
+    });
+    listEl.querySelectorAll('.fp-item-head').forEach((head) => {
+      head.addEventListener('dragstart', (event) => {
+        dragFrom = Number(head.dataset.grip);
+        event.dataTransfer.effectAllowed = 'move';
+        try { event.dataTransfer.setData('text/plain', String(dragFrom)); } catch { /* noop */ }
+        head.closest('.fp-item')?.setAttribute('data-drag', '1');
+      });
+      head.addEventListener('dragend', () => {
+        dragFrom = null;
+        listEl.querySelectorAll('.fp-item').forEach((node) => node.removeAttribute('data-drag'));
+        listEl.querySelectorAll('.fp-item').forEach((node) => node.removeAttribute('data-over'));
+      });
+    });
+    listEl.querySelectorAll('.fp-item').forEach((row) => {
+      row.addEventListener('dragover', (event) => {
+        if (dragFrom == null) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        listEl.querySelectorAll('.fp-item').forEach((node) => node.removeAttribute('data-over'));
+        row.setAttribute('data-over', '1');
+      });
+      row.addEventListener('dragleave', () => row.removeAttribute('data-over'));
+      row.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const to = Number(row.dataset.i);
+        if (dragFrom == null || dragFrom === to) return;
+        const [moved] = items.splice(dragFrom, 1);
+        items.splice(to, 0, moved);
+        dragFrom = null;
+        renderItems();
+        syncCount();
+      });
+    });
+  }
+
+  if (structured){
+    input.hidden = true;
+    if (listEl) listEl.hidden = false;
+    renderItems();
+  } else {
+    input.hidden = false;
+    if (listEl) listEl.hidden = true;
+    input.value = value;
+  }
   syncCount();
-  input.addEventListener('input', syncCount);
   pop.hidden = false;
   mask.hidden = false;
-  input.focus();
-  input.setSelectionRange(input.value.length, input.value.length);
+  (structured ? (listEl?.querySelector('.fp-item-body') || input) : input).focus();
+
   return new Promise((resolve) => {
     let settled = false;
+    let dragFrom = null;
     const finish = (result) => {
       if (settled) return;
       settled = true;
       pop.hidden = true;
       mask.hidden = true;
-      input.removeEventListener('input', syncCount);
+      if (listEl) listEl.innerHTML = '';
+      input.hidden = false;
+      input.removeEventListener('input', onInput);
       input.removeEventListener('blur', onBlur);
       input.removeEventListener('keydown', onKey);
       mask.removeEventListener('mousedown', onMask);
@@ -2592,32 +2736,39 @@ function openFieldEditor(label, value, nodeLabel){
       $('#fp-cancel')?.removeEventListener('click', onCancelBtn);
       $('#fp-close')?.removeEventListener('click', onCancelBtn);
       fieldEditorResolve = null;
-      // 这一下点击只用于关编辑器，别再穿透去关详情卡。
-      // click 通常晚于 mousedown：用 0ms 定时器会在中间就把标记清掉，
-      // 所以改成「消费即清除 + 600ms 兜底」。
+      // 这一下点击只用于关编辑器，别再穿透去关详情卡（600ms 兜底，消费即清）
       suppressDocClick = true;
       clearTimeout(suppressDocTimer);
       suppressDocTimer = setTimeout(() => { suppressDocClick = false; }, 600);
       resolve(result);
     };
-    const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(input.value); };
+    const current = () => (structured ? serializeItems(preamble, items) : input.value);
+    const onInput = () => { plainValue = input.value; syncCount(); };
+    const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(current()); };
     const onCancelBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(null); };
     $('#fp-save')?.addEventListener('click', onSaveBtn);
     $('#fp-cancel')?.addEventListener('click', onCancelBtn);
     $('#fp-close')?.addEventListener('click', onCancelBtn);
-    const onBlur = () => finish(input.value);                     // 点别处 → 保存并退出
+    const onBlur = (event) => {
+      // 结构化模式里在条目间切换焦点不算「点了外面」
+      if (structured && event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest('#field-pop')) return;
+      finish(current());
+    };
     const onKey = (event) => {
       if (event.key === 'Escape'){ event.preventDefault(); event.stopPropagation(); finish(null); }
-      else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)){ event.preventDefault(); finish(input.value); }
+      else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)){ event.preventDefault(); finish(current()); }
     };
-    const onMask = (event) => { event.preventDefault(); event.stopPropagation(); finish(input.value); };
+    const onMask = (event) => { event.preventDefault(); event.stopPropagation(); finish(current()); };
     fieldEditorResolve = finish;
+    input.addEventListener('input', onInput);
     input.addEventListener('blur', onBlur);
     input.addEventListener('keydown', onKey);
-    mask.addEventListener('mousedown', onMask);                   // 抢在 blur 前并且不冒泡到文档
-    mask.addEventListener('pointerdown', onMask, { once: true });  // touch/pen 也走同一条路径
+    mask.addEventListener('mousedown', onMask);
+    mask.addEventListener('pointerdown', onMask, { once: true });
   });
-}let launchCtx = null;   // { p, n, tasks, selected }
+}
+
+let launchCtx = null;   // { p, n, tasks, selected }
 function openLaunch(opts){
   const id = (opts && opts.nodeId) || detailNode;
   if (!id) return;
