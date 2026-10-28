@@ -1762,7 +1762,8 @@ function addChild(id){
   const kind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : 'exec';
   const title = kind==='goal' ? '新目标（待命名）' : kind==='idea' ? '新构思（待命名）' : '新执行项（待命名）';
   n.children = n.children || [];
-  const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null, issues:[] };
+  const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null };
+  if (kind === 'exec') rawChild.issues = [];
   if (kind === 'goal') rawChild.acceptance = '（待补）验收方式';
   if (kind === 'exec') rawChild.verify = '（待补）验证命令';
   n.children.push({ id: rawChild.id, kind, title, status:'plan', closed:false, raw: rawChild, children:[] });
@@ -1985,10 +1986,11 @@ function applyGoals(pid, nid, goals){
   n.raw.children = n.raw.children || [];
   const stamp = Date.now().toString(36);
   goals.forEach((g, i) => {
+    // 只有 exec 才允许带 issues；空数组挂在 goal 上会被校验判错（0.6.9 之前写不进卡片的原因）
     const rawChild = {
       id: `${n.id}-g${stamp}${i}`, kind: 'goal', title: g.title,
       acceptance: g.acceptance || '（待补）验收方式',
-      status: 'plan', closed_at: null, issues: [],
+      status: 'plan', closed_at: null,
     };
     n.children.push({ id: rawChild.id, kind: 'goal', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
     n.raw.children.push(rawChild);
@@ -2802,7 +2804,11 @@ async function persist(p){
       body: JSON.stringify({ card: p.card, allowIncomplete: true }),
     });
     const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status) + (j.errors ? '：' + j.errors[0] : ''));
+    if (!res.ok) {
+      const list = Array.isArray(j.errors) ? j.errors : [];
+      const detail = list.length ? '：' + list.slice(0, 2).join('；') + (list.length > 2 ? ` 等 ${list.length} 项` : '') : '';
+      throw new Error((j.error || ('HTTP ' + res.status)) + detail);
+    }
     markSave(`已写入 ${p.file} · ${new Date().toLocaleTimeString('sv-SE')}`, 'ok');
     return { ok:true, warnings: j.warnings || [] };
   } catch (e) {
