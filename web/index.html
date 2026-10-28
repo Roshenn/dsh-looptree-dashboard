@@ -1422,8 +1422,8 @@ function nodeMarkup(n, p){
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    addKind ? (n.kind === 'loop'
-      ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="AI 拆目标 / 手动添加">+ ${KIND[addKind]}</button>`
+    addKind ? ((n.kind === 'loop' || n.kind === 'goal')
+      ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="${n.kind === 'goal' ? 'AI 拆构思 / 手动添加' : 'AI 拆目标 / 手动添加'}">+ ${KIND[addKind]}</button>`
       : `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>`) : '',
     (!kidsExist && n.kind !== 'loop')
       ? `<button class="tbtn danger hold" data-del="${n.id}" title="长按 0.8 秒删除"><span class="holdfill"></span><span class="holdlabel">长按删除</span></button>`
@@ -1877,12 +1877,13 @@ function openAddMenu(btn){
   const p = findProjectByNode(id), n = p && findNode(p.root, id);
   if (!p || !n) return;
   const menu = $('#addmenu');
+  const isGoal = n.kind === 'goal';
   menu.innerHTML = `
     <button type="button" class="am-ai" data-aim="ai" role="menuitem">
-      <span>AI 拆出目标</span><span class="am-sub">生成 3 条，挑完再写</span>
+      <span>${isGoal ? 'AI 拆出构思' : 'AI 拆出目标'}</span><span class="am-sub">生成 3 条，挑完再写</span>
     </button>
     <div class="am-sep"></div>
-    <button type="button" data-aim="manual" role="menuitem"><span>手动添加目标</span></button>`;
+    <button type="button" data-aim="manual" role="menuitem"><span>${isGoal ? '手动添加构思' : '手动添加目标'}</span></button>`;
   addMenuCtx = { pid: p.id, nid: n.id, btn };
   btn.setAttribute('aria-expanded', 'true');
   menu.hidden = false;
@@ -1912,7 +1913,160 @@ function chooseAddMenu(which){
   closeAddMenu();
   if (!ctx) return;
   if (which === 'manual') return addChild(ctx.nid);
-  if (which === 'ai') return aiSplitGoals(ctx.pid, ctx.nid);
+  if (which === 'ai'){
+    const p = PROJECTS.find(x => x.id === ctx.pid), n = p && findNode(p.root, ctx.nid);
+    return (n && n.kind === 'goal') ? aiSplitIdeas(ctx.pid, ctx.nid) : aiSplitGoals(ctx.pid, ctx.nid);
+  }
+}
+
+/** 给模型的拆构思 prompt：目标 + 约束 + 落地场景，要求 3 条候选构思 */
+function buildIdeaPrompt(p, n){
+  const r = n.raw || {};
+  const kids = (n.children || []).map(k => `- ${k.title}`).join('\n') || '（暂无）';
+  const ws = (p.card && p.card.project && p.card.project.workspace) || '';
+  const loop = (p.card && p.card.loop) || {};
+  return [
+    `你在给「${p.name}」这个项目的目标拆构思（实现路径）。${ws ? '项目目录：' + ws : ''}`,
+    '先按需读项目里的文件（README、脚本、配置、最近的提交与产物）再作答；不确定就去查，不要凭空编。',
+    '',
+    `目标：${n.title}`,
+    r.acceptance ? `目标验收：${r.acceptance}` : '',
+    r.constraints ? `目标约束：${r.constraints}` : '',
+    loop.intent ? `所属闭环目标：${loop.intent}` : '',
+    loop.scenario ? `已定的落地场景流程（约束与验收的唯一依据）：\n${loop.scenario}` : '',
+    `已有的构思 / 执行项：\n${kids}`,
+    '',
+    '请给出 3 条候选构思，供人挑选（可能只采纳其中 1 条）。',
+    '硬性限制：',
+    '- 标题 6–14 字的名词短语，说清「走哪条路」，不要写口号，也不要写成任务清单。',
+    '- 方案（approach）说清关键做法、与其它候选的差异、代价与适用条件，特别是对目标验收方式的影响；单条 ≤220 字。',
+    '- 3 条必须是**不同的实现路线**（不要同一条路的不同细节），不要重复已有构思。',
+    '严格只输出一个 JSON 对象：{"ideas":[{"title":"...","approach":"..."}]}，只含这 3 条，不要输出其它文字。',
+  ].filter(Boolean).join('\n');
+}
+
+/** 从模型输出里抠出 ideas 数组 */
+function parseIdeas(text){
+  const raw = String(text || '');
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const cand = fenced ? fenced[1] : (raw.match(/\{[\s\S]*\}/) || [])[0];
+  let data = null;
+  try { data = cand ? JSON.parse(cand) : null; } catch { data = null; }
+  if (!data){ try { data = JSON.parse(raw); } catch { return []; } }
+  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.ideas) ? data.ideas : null);
+  if (!arr) return [];
+  return arr.map(x => ({
+    title: String((x && (x.title || x.name)) || '').trim(),
+    approach: String((x && (x.approach || x.plan || x.detail)) || '').trim(),
+  })).filter(x => x.title).slice(0, 3);
+}
+
+/** 发起 AI 拆构思会话 → 轮询到结束 → 弹预览 */
+async function aiSplitIdeas(pid, nid, opts = {}){
+  const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
+  if (!p || !n) return;
+  if (!p.file) return toast('该项目没有可写回的卡片文件');
+  if (!API_BASE) return toast('未连接服务，AI 拆构思不可用');
+  if (!opts.skipDraft){
+    const draft = await fetchSplitDraft(p.file, n.id);
+    const ideas = draft ? parseIdeas(draft.result) : [];
+    if (ideas.length){
+      toast('已恢复上次未确认的构思');
+      return openIdeasPreview(pid, nid, ideas, draft);
+    }
+  }
+  let run = null;
+  try {
+    const res = await fetch(api('/run'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt: buildIdeaPrompt(p, n), taskId: 'split-ideas' }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    run = j.run;
+  } catch (error) { return toast('发起失败：' + error.message); }
+  const key = (run && run.key) || (p.file + '::' + n.id);
+  toast('已发起 AI 拆构思（约 10–30 秒），结果先给你挑');
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline){
+    await new Promise(r => setTimeout(r, 1800));
+    let runs = [];
+    try { runs = (await fetch(api('/runs')).then(r => r.json())).runs || []; } catch { continue; }
+    runs.forEach(r => runMap.set(r.key, r));
+    paintRunBadges();
+    const hit = runs.find(r => r.key === key);
+    if (!hit) continue;
+    if (hit.status === 'done'){
+      const ideas = parseIdeas(hit.result);
+      if (!ideas.length) return toast('AI 没返回可用的构思，可再点一次或手动添加');
+      return openIdeasPreview(pid, nid, ideas);
+    }
+    if (hit.status === 'failed' || hit.status === 'cancelled') return toast('AI 拆构思失败：' + (hit.error || hit.status));
+  }
+  toast('AI 拆构思超时（3 分钟）：可在节点「会话」里看进展');
+}
+
+/** 预览：默认全选，标题/方案可改，确认后才写卡片 */
+let lastIdeaCtx = null;
+function openIdeasPreview(pid, nid, ideas, draft = null){
+  const p0 = PROJECTS.find(x => x.id === pid);
+  lastIdeaCtx = p0 ? { pid, nid, file: p0.file } : null;
+  const rows = ideas.map((g, i) => `
+    <label class="gsel">
+      <input type="checkbox" data-ipick="${i}" checked>
+      <span class="gsel-main">
+        <input class="gsel-title" data-ititle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
+        <textarea class="gsel-acc" data-iapproach="${i}" rows="3" spellcheck="false">${esc(g.approach)}</textarea>
+      </span>
+    </label>`).join('');
+  const recovered = draft
+    ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
+         <button type="button" class="tbtn" id="idea-regen" style="margin-left:2px">重新生成</button></div>`
+    : '';
+  askConfirm('AI 拆出的构思', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。标题与方案都能直接改。</div>`, '写入选中的', () => {
+    const picked = [];
+    ideas.forEach((g, i) => {
+      const box = document.querySelector(`#ask-body [data-ipick="${i}"]`);
+      if (!box || !box.checked) return;
+      const titleEl = document.querySelector(`#ask-body [data-ititle="${i}"]`);
+      const apprEl = document.querySelector(`#ask-body [data-iapproach="${i}"]`);
+      const title = titleEl ? titleEl.value.trim() : '';
+      if (title) picked.push({ title, approach: apprEl ? apprEl.value.trim() : '' });
+    });
+    if (!picked.length) return toast('没有勾选任何构思');
+    applyIdeas(pid, nid, picked);
+  });
+  const regen = $('#idea-regen');
+  if (regen) regen.addEventListener('click', () => {
+    hideModal($('#ask'));
+    if (lastIdeaCtx) dropSplitDraft(lastIdeaCtx.file, lastIdeaCtx.nid).then(() => aiSplitIdeas(pid, nid, { skipDraft: true }));
+  });
+}
+
+/** 把选中的构思写进卡片 */
+function applyIdeas(pid, nid, ideas){
+  const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
+  if (!p || !n) return;
+  n.children = n.children || [];
+  n.raw.children = n.raw.children || [];
+  const stamp = Date.now().toString(36);
+  ideas.forEach((g, i) => {
+    const rawChild = {
+      id: `${n.id}-i${stamp}${i}`, kind: 'idea', title: g.title,
+      approach: g.approach || '（待补）方案要点',
+      status: 'plan', closed_at: null,
+    };
+    n.children.push({ id: rawChild.id, kind: 'idea', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
+    n.raw.children.push(rawChild);
+  });
+  reopenChain(p.root, n.id);
+  render();
+  persist(p).then(res => {
+    if (!res.ok) return toast('写入失败：' + res.error);
+    toast(`已写入 ${ideas.length} 个构思`);
+    dropSplitDraft(p.file, n.id);
+    reloadProjects();
+  });
 }
 
 /** 给模型的拆目标 prompt：只给真实上下文，要求 JSON、3 条候选 */
@@ -2339,7 +2493,6 @@ function detailMarkup(p, n){
     canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' ? '确认收敛' : '完成'}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
-    `<button class="tbtn" data-gofocus="${p.id}">聚焦项目</button>`,
   ].filter(Boolean).join('');
 
   return `<div class="detail-head">
