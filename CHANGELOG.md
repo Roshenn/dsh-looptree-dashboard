@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.5.0 — 会话直接进 DSH 侧栏
+
+- host 声明 `workspaceRegistry` 服务；会话创建后立刻
+  `workspaceRegistry.resolveByPath(cwd).attachSession(sessionId)`，
+  于是「轮转」发起的会话**从一开始就是 DSH 里的普通会话**（侧栏可见、可点开续聊），
+  不再是事后追加
+- 会话头未落盘时自动重试一次；失败只记警告，不影响本轮运行
+- 实测：`/api/run` 跑出的 session-253b00d9… 出现在 english-shadow 工作区的
+  `sessionIds` 首位，`/api/session` 能读到完整 4 条事件
+
 ## 0.4.1 — 会话全文可见 + 标题自动补
 
 - 会话区新增「查看会话」：host 直接读 DSH 落盘的
