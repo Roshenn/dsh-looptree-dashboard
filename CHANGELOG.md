@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 0.6.19 — 生成后能真正看到填充
+
+- 修「点生成，内容不填充」：会话状态变 done 时，host 的 onFinish 还在写卡片，
+  面板却已经 reload → 拿到的是旧卡片，之后再没有刷新
+- runner snapshot 增加 `fillApplied` / `fillError`；host 在 onFinish 里把回填结果挂到 run 上
+- 面板改为等到 `fillApplied`（或 `fillError`）出现才 reload 并提示：
+  成功「已生成并写入：约束」，失败「生成结果没写进卡片：…」
+- 版本 0.6.19
+- 实测：清空目标 constraints → 点「生成 1 项」→ 详情卡约束即刻出现内容，
+  toast「已生成并写入：约束」
+
+
 ## 0.6.18 — 位置并发：上游生成时冻结子节点
 
 - 并发不再只看数量，更看位置：某节点有会话在跑（starting/running）时，

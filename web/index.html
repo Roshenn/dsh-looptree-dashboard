@@ -2764,14 +2764,27 @@ async function generateMissing(pid, nid, btn){
     const key = (j.run && j.run.key) || (p0.file + '::' + n0.id);
     toast(`已发起生成（${(j.fields || need).map(f => FIELD_LABEL[f] || f).join('、')}），完成后自动写入`);
     const deadline = Date.now() + 180000;
+    let settled = false;
     while (Date.now() < deadline){
-      await new Promise(r => setTimeout(r, 1800));
+      await new Promise(r => setTimeout(r, 1500));
       const runs = await fetch(api('/runs')).then(r => r.json()).catch(() => ({}));
       const run = (runs.runs || []).find(x => x.key === key);
       if (!run) continue;
-      if (run.status === 'done'){ toast('已生成并写入缺失项'); await reloadProjects(); break; }
-      if (['failed', 'cancelled'].includes(run.status)){ toast('生成失败：' + (run.error || run.status)); break; }
+      if (['failed', 'cancelled'].includes(run.status)){
+        toast('生成失败：' + (run.error || run.status));
+        settled = true; break;
+      }
+      // 会话 done 之后 host 还要把 JSON 写进卡片：等到 fillApplied/fillError 才算真的完成
+      if (run.status === 'done'){
+        if (run.fillError){ toast('生成结果没写进卡片：' + run.fillError); settled = true; break; }
+        if (run.fillApplied && run.fillApplied.length){
+          await reloadProjects();
+          toast('已生成并写入：' + run.fillApplied.map(f => FIELD_LABEL[f] || f).join('、'));
+          settled = true; break;
+        }
+      }
     }
+    if (!settled) toast('等得太久了：会话可能仍在跑，稍后点刷新看看');
   } catch (error) {
     toast('生成失败：' + error.message);
   } finally {
