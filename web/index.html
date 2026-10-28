@@ -65,6 +65,8 @@
 
   /* ───────── toolbar ───────── */
   .toolbar{display:flex;align-items:center;gap:10px;padding:8px 16px;flex:0 0 auto;border-bottom:1px solid var(--b1);background:var(--l1)}
+  .toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+  .toolbar .chipbar,.toolbar .chip{flex:0 0 auto;white-space:nowrap}
   .chipbar{display:flex;gap:6px;align-items:center}
   .chip{height:26px;padding:0 10px;border-radius:7px;corner-shape:var(--corner);font-size:12px;color:var(--tx3);
     border:1px solid var(--b2);background:transparent;
@@ -352,8 +354,8 @@
   .detail-path button:hover{background:var(--hover);color:var(--tx1)}
   .detail-sec{margin-top:9px;padding-top:9px;border-top:1px solid var(--b1)}
   .detail-k{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tx4);margin-bottom:5px}
-  .detail-row{display:flex;gap:8px;font-size:11.5px;line-height:1.55;margin-bottom:4px}
-  .detail-row dt{flex:0 0 40px;color:var(--tx4)}
+  .detail-row{display:flex;gap:8px;font-size:11.5px;line-height:1.55;margin-bottom:4px;align-items:flex-start}
+  .detail-row dt{flex:0 0 74px;color:var(--tx4);white-space:nowrap;padding-top:1px}
   .detail-row dd{margin:0;color:var(--tx2);word-break:break-word}
   .detail-row dd.mono{font-variant-numeric:tabular-nums;color:var(--tx3);font-size:11px}
   .detail-title{cursor:text;border-radius:5px;padding:1px 3px;margin-left:-3px;transition:background-color 140ms var(--ease-out)}
@@ -390,6 +392,8 @@
   .fp-foot{display:flex;align-items:center;gap:8px;padding:10px 16px 14px}
   .fp-foot .grow{flex:1}
   .fp-hint{font-size:10.5px;color:var(--tx4)}
+  .fp-count{margin-left:auto;font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .fp-count[data-over="1"]{color:var(--red)}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -571,6 +575,7 @@
     <textarea id="fp-input" class="dfield" spellcheck="false"></textarea>
     <div class="fp-foot">
       <span class="fp-hint">点外面自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</span>
+      <span class="fp-count" id="fp-count"></span>
       <span class="grow"></span>
       <button class="tbtn" id="fp-cancel" type="button">取消</button>
       <button class="tbtn primary" id="fp-save" type="button">完成</button>
@@ -2219,6 +2224,16 @@ function openFieldEditor(label, value, nodeLabel){
   $('#fp-label').textContent = label;
   $('#fp-node').textContent = nodeLabel || '';
   input.value = value;
+  const count = $('#fp-count');
+  const MAXLEN = 200;
+  const syncCount = () => {
+    if (!count) return;
+    const n = input.value.length;
+    count.textContent = `${n} / ${MAXLEN} 字`;
+    count.dataset.over = n > MAXLEN ? '1' : '0';
+  };
+  syncCount();
+  input.addEventListener('input', syncCount);
   pop.hidden = false;
   mask.hidden = false;
   input.focus();
@@ -2230,6 +2245,7 @@ function openFieldEditor(label, value, nodeLabel){
       settled = true;
       pop.hidden = true;
       mask.hidden = true;
+      input.removeEventListener('input', syncCount);
       input.removeEventListener('blur', onBlur);
       input.removeEventListener('keydown', onKey);
       mask.removeEventListener('mousedown', onMask);
@@ -2237,9 +2253,12 @@ function openFieldEditor(label, value, nodeLabel){
       $('#fp-cancel')?.removeEventListener('click', onCancelBtn);
       $('#fp-close')?.removeEventListener('click', onCancelBtn);
       fieldEditorResolve = null;
-      // 这一下点击只用于关编辑器，别再穿透去关详情卡
+      // 这一下点击只用于关编辑器，别再穿透去关详情卡。
+      // click 通常晚于 mousedown：用 0ms 定时器会在中间就把标记清掉，
+      // 所以改成「消费即清除 + 600ms 兜底」。
       suppressDocClick = true;
-      setTimeout(() => { suppressDocClick = false; }, 0);
+      clearTimeout(suppressDocTimer);
+      suppressDocTimer = setTimeout(() => { suppressDocClick = false; }, 600);
       resolve(result);
     };
     const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(input.value); };
@@ -2256,7 +2275,8 @@ function openFieldEditor(label, value, nodeLabel){
     fieldEditorResolve = finish;
     input.addEventListener('blur', onBlur);
     input.addEventListener('keydown', onKey);
-    mask.addEventListener('mousedown', onMask);                   // 用 mousedown：抢在 blur 前并且不冒泡到文档
+    mask.addEventListener('mousedown', onMask);                   // 抢在 blur 前并且不冒泡到文档
+    mask.addEventListener('pointerdown', onMask, { once: true });  // touch/pen 也走同一条路径
   });
 }let launchCtx = null;   // { p, n, tasks, selected }
 function openLaunch(opts){
@@ -2672,9 +2692,10 @@ $('#density').addEventListener('click', (e)=>{
 });
 
 let suppressDocClick = false;
+let suppressDocTimer = null;
 document.addEventListener('click', (e)=>{
-  // 关闭字段编辑器的那一下点击，不继续去关详情卡
-  if (suppressDocClick){ suppressDocClick = false; return; }
+  // 关闭字段编辑器的那一下点击，不继续去关详情卡（一次点击只关一层）
+  if (suppressDocClick){ suppressDocClick = false; clearTimeout(suppressDocTimer); return; }
   // 字段大编辑器开着时，点哪儿都只关编辑器（由它自己处理），不动详情卡
   if (e.target.closest('#fp-mask') || e.target.closest('#field-pop')) return;
   // 点详情卡外面 → 关闭；点到别的节点则交给下面的节点逻辑切换
