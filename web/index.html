@@ -2093,7 +2093,7 @@ const isBlankTitle = (t) => {
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
 const EDIT_FIELDS = { loop:['intent','scenario','constraints','acceptance'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
-const FIELD_LABEL = { intent:'闭环目标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', approach:'方案', verify:'验证', proof:'证据' };
+const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', approach:'方案', verify:'验证', proof:'证据' };
 
 /* ─────────── Prompt 模板 ─────────── */
 const PROMPT_TASKS = {
@@ -2563,9 +2563,11 @@ async function reloadProjects(){
 }
 
 function startEdit(field, anchor){
+  // 标题（h3.detail-title）不在 .detail-row 里，所以先看元素自身的 data-*
   const row = anchor.closest('.detail-row');
-  if (!row) return;
-  const nid = row.dataset.nid, pid = row.dataset.proj;
+  const holder = (anchor.dataset && anchor.dataset.nid) ? anchor : row;
+  if (!holder) return;
+  const nid = holder.dataset.nid, pid = holder.dataset.proj;
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
   const value = String(n0.raw[field] || '');
