@@ -17,7 +17,7 @@
 ### B. CLI（仅在市场 UI 不可用时）
 
 ```bash
-cd ~/.dsh/reports/rotation-panel
+cd ~/.dsh/dsh-looptree-dashboard
 npm pack                                   # 生成 tgz
 pnpm store path                            # 记下这个路径
 grep storeDir ~/.dsh/profiles/web/node_modules/.modules.yaml   # 必须与上一行逐字一致

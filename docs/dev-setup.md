@@ -9,7 +9,7 @@
 
 | 层 | 是什么 | 在哪 |
 |---|---|---|
-| **插件源码（唯一真源）** | 一个 npm 包目录：`package.json` + `lib/`（host 半）+ `web/`（面板）+ `cordis.patch.yml` | 本机 `~/.dsh/reports/rotation-panel`（macOS） |
+| **插件源码（唯一真源）** | 一个 npm 包目录：`package.json` + `lib/`（host 半）+ `web/`（面板）+ `cordis.patch.yml` | 本机 `~/.dsh/dsh-looptree-dashboard`（macOS） |
 | **远程仓库** | Git 远端，代码唯一备份 | `git@gitee.com:jrri/dsh-looptree-dashboard.git`（分支 `main`） |
 | **运行环境** | DSH 桌面端 / dsh web 进程 + 它所在 profile 的 `node_modules` | 桌面端用 `~/.dsh/profiles/desktop`，测试用一次性 profile |
 
@@ -20,7 +20,7 @@
   - `link:`（本地目录）→ 直接指到源码目录，**改完重启 DSH 即生效**，不用重装；
   - `file:`（.tgz）→ 是拷贝，改完必须 `remove` + `add` 重装。
 - 当前桌面端装的是 `link:`：`~/.dsh/profiles/desktop/package.json` →
-  `"dsh-looptree-dashboard": "link:/Users/julian/.dsh/reports/rotation-panel"`。
+  `"dsh-looptree-dashboard": "link:/Users/julian/.dsh/dsh-looptree-dashboard"`。
 
 ---
 
