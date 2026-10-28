@@ -433,17 +433,19 @@
   .fp-hint{font-size:10.5px;color:var(--tx4)}
   #fp-items{margin:12px 16px 0;display:flex;flex-direction:column;gap:8px;max-height:min(52vh,480px);overflow:auto;padding-right:2px}
   .fp-item{border-radius:10px;border:1px solid color-mix(in srgb,var(--b2) 60%,transparent);overflow:hidden;
-    background:var(--p-bg);transition:box-shadow 120ms var(--ease-out),transform 120ms var(--ease-out)}
+    background:var(--p-bg);transition:box-shadow 120ms var(--ease-out),transform 120ms var(--ease-out);
+    display:grid;grid-template-columns:86px minmax(0,1fr);align-items:stretch}
   .fp-item[data-drag="1"]{opacity:.45}
   .fp-item[data-over="1"]{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 45%,transparent)}
-  .fp-item-head{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:grab;user-select:none;
-    border-bottom:1px solid color-mix(in srgb,var(--b2) 55%,transparent)}
+  .fp-item-head{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 6px;cursor:grab;
+    user-select:none;border-right:1px solid color-mix(in srgb,var(--b2) 55%,transparent);
+    background:color-mix(in srgb,#fff 24%,transparent)}
   .fp-item-head:active{cursor:grabbing}
   .fp-grip{color:var(--tx4);font-size:12px;letter-spacing:-1px}
   .fp-idx{font-size:11px;font-weight:600;color:var(--tx2);font-variant-numeric:tabular-nums;min-width:18px}
   .fp-item-note{font-size:10.5px;color:var(--tx4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .fp-item-body{width:100%;border:0;background:transparent;color:var(--tx1);font-family:inherit;
-    font-size:12.5px;line-height:1.65;padding:8px 10px;resize:vertical;min-height:52px;outline:none;display:block}
+    font-size:12.5px;line-height:1.65;padding:10px 12px;resize:vertical;min-height:56px;outline:none;display:block}
   .fp-item-body:focus{background:color-mix(in srgb,#fff 26%,transparent)}
   html[data-theme="light"] .fp-item[data-hue="0"]{--p-bg:#eef4ff}
   html[data-theme="light"] .fp-item[data-hue="1"]{--p-bg:#eefaf2}
@@ -2644,28 +2646,30 @@ function openFieldEditor(label, value, nodeLabel){
     count.dataset.over = n > MAXLEN ? '1' : '0';
   };
 
+  const autosize = (el) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(Math.max(el.scrollHeight + 2, 56), 280) + 'px';
+  };
+
   /** 渲染条目列表（结构化模式） */
   function renderItems(){
     if (!listEl) return;
     listEl.innerHTML = items.map((it, i) => `
       <div class="fp-item" data-hue="${i % 6}" data-i="${i}" draggable="false">
-        <div class="fp-item-head" draggable="true" data-grip="${i}">
+        <div class="fp-item-head" draggable="true" data-grip="${i}" title="拖拽调整顺序">
           <span class="fp-grip">⠿</span>
           <span class="fp-idx">${i + 1}</span>
-          <span class="fp-item-note">${esc((it.content || '').split('\n')[0].slice(0, 28))}</span>
         </div>
         <textarea class="fp-item-body" data-body="${i}" rows="2" spellcheck="false">${esc(it.content || '')}</textarea>
       </div>`).join('');
     listEl.querySelectorAll('[data-body]').forEach((el) => {
-      el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px';
       el.addEventListener('input', () => {
         const idx = Number(el.dataset.body);
         if (items[idx]) items[idx].content = el.value;
         const note = el.closest('.fp-item')?.querySelector('.fp-item-note');
         if (note) note.textContent = el.value.split('\n')[0].slice(0, 28);
-        el.style.height = 'auto';
-        el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px';
+        autosize(el);
         syncCount();
       });
     });
@@ -2716,6 +2720,11 @@ function openFieldEditor(label, value, nodeLabel){
   syncCount();
   pop.hidden = false;
   mask.hidden = false;
+  if (structured && listEl){
+    const bodies = listEl.querySelectorAll('.fp-item-body');
+    bodies.forEach(autosize);
+    requestAnimationFrame(() => bodies.forEach(autosize));
+  }
   (structured ? (listEl?.querySelector('.fp-item-body') || input) : input).focus();
 
   return new Promise((resolve) => {
