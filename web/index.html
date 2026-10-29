@@ -104,12 +104,19 @@
   .lane-menu:hover,.lane-menu[aria-expanded="true"]{color:var(--tx1);background:var(--hover);border-color:var(--b2)}
   .lane-tag{font-size:10.5px;color:var(--tx4);letter-spacing:.04em}
   .lane-prog{margin-top:2px;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--tx4)}
-  .lane-actions{display:flex;gap:5px;margin-top:4px}
+  .lane-actions{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
+  .lane-state{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;font-size:10px;line-height:1;
+    color:var(--tone);border:1px solid color-mix(in srgb,var(--tone) 38%,transparent);
+    background:color-mix(in srgb,var(--tone) 10%,transparent);white-space:nowrap}
+  .lane-state[data-state="review"]{border-style:dashed}
   .mini{display:inline-flex;align-items:center;gap:5px;height:23px;padding:0 8px;border-radius:6px;corner-shape:var(--corner);
     border:1px solid var(--b2);color:var(--tx3);font-size:11.5px;background:var(--l2);
     transition:color 160ms var(--ease-out),background-color 160ms var(--ease-out),transform 160ms var(--ease-out)}
   .mini:hover{color:var(--tx1);background:var(--l3)}
   .mini:active{transform:scale(.97)}
+  .mini.primary-converge{background:color-mix(in srgb,var(--green) 16%,transparent);
+    border-color:color-mix(in srgb,var(--green) 42%,transparent);color:var(--green)}
+  .mini.primary-converge:hover{background:color-mix(in srgb,var(--green) 24%,transparent);color:var(--green)}
 
   .canvas{position:relative;min-height:96px;padding:10px 0 14px}
   .canvas--collapsed{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:0;padding:11px 14px}
@@ -201,6 +208,14 @@
     background:transparent;color:var(--tx4);font-size:10px;transition:color 140ms var(--ease-out),border-color 140ms var(--ease-out)}
   .foldchip:hover{color:var(--tx2);border-color:var(--b3)}
   .foldchip.on{border-style:solid;color:var(--tx3)}
+  .foldchip:not(.on){border-color:color-mix(in srgb,var(--green) 30%,var(--b2));color:color-mix(in srgb,var(--green) 55%,var(--tx3))}
+  .foldchip[data-pulse="1"]{animation:foldPulse 900ms var(--ease-out)}
+  @keyframes foldPulse{
+    0%{transform:scale(1)}
+    35%{transform:scale(1.09);border-color:color-mix(in srgb,var(--green) 65%,transparent);color:var(--green)}
+    100%{transform:scale(1)}
+  }
+  @media (prefers-reduced-motion: reduce){ .foldchip[data-pulse="1"]{animation:none} }
   .runbad{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--tone);
     padding:1px 6px;border-radius:5px;background:color-mix(in srgb,var(--tone) 12%,transparent);
     border:1px solid color-mix(in srgb,var(--tone) 26%,transparent)}
@@ -290,26 +305,6 @@
     margin:7px -9px 0 -11px;padding:5px 9px 6px 11px;
     border-top:1px solid var(--b1);background:color-mix(in srgb,var(--bg-base) 34%,transparent);border-radius:0 0 8px 8px}
 
-  /* ───────── 已闭环区 ───────── */
-  .archive{grid-column:1/-1;border-top:1px solid var(--b2);background:var(--panel-3,var(--base));padding:0}
-  .archive-head{display:flex;align-items:center;gap:8px;padding:9px 16px;font-size:10.5px;letter-spacing:.08em;
-    text-transform:uppercase;color:var(--tx4);background:var(--base);border-bottom:1px solid var(--b1)}
-  .archive-head .n{color:var(--tx3);letter-spacing:0;text-transform:none}
-  .archive-head .grow{flex:1}
-  .archive-list{padding:6px 10px 12px;display:flex;flex-direction:column;gap:1px}
-  .archive-row{display:grid;grid-template-columns:22px 170px 1fr 150px 150px auto;align-items:center;gap:10px;
-    padding:9px 12px;border-radius:8px;corner-shape:var(--corner);border:1px solid transparent;text-align:left;
-    transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out)}
-  .archive-row:hover{background:var(--hover);border-color:var(--b1)}
-  .archive-row .check{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
-    background:color-mix(in srgb,var(--green) 16%,transparent);border:1px solid color-mix(in srgb,var(--green) 42%,transparent);
-    color:var(--green);font-size:10px}
-  .archive-row .nm{font-size:12.5px;color:var(--tx2)}
-  .archive-row .lp{font-size:12.5px;color:var(--tx1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .archive-row .mt{font-size:11px;color:var(--tx4);font-variant-numeric:tabular-nums}
-  .archive-row .acts{display:flex;gap:5px;justify-self:end}
-  .archive-empty{padding:10px 16px 14px;font-size:11.5px;color:var(--tx4)}
-
   /* ───────── 第一列统计块 ───────── */
   .lane-time{margin-top:auto;padding-top:10px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
   .lane-time .info-row{font-size:11px}
@@ -382,6 +377,7 @@
   .sumbox .v{margin-top:4px;font-size:12.5px;color:var(--tx1);line-height:1.45}
   .sumbox[data-tone="issue"]{border-color:color-mix(in srgb,var(--red) 34%,var(--b1))}
   .sumbox[data-tone="ok"]{border-color:color-mix(in srgb,var(--green) 34%,var(--b1))}
+  .sumbox[data-tone="review"]{border-color:color-mix(in srgb,var(--amber) 38%,var(--b1))}
   .focus-lane{border:1px solid var(--b1);border-radius:11px;corner-shape:var(--corner);overflow:hidden;background:var(--l1)}
   .focus-lane .lane{border:0;background:transparent;box-shadow:none}
   .focus-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:10px;margin-top:11px}
@@ -618,6 +614,24 @@
   .modal-foot{display:flex;justify-content:flex-end;gap:7px;padding:10px 14px 13px}
   .tbtn.ghostmodal{background:transparent}
 
+  /* ───────── 闭环历史（弹窗内） ───────── */
+  .hist-list{display:flex;flex-direction:column;gap:6px;max-height:58vh;overflow:auto}
+  .hist-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;corner-shape:var(--corner);
+    border:1px solid var(--b1);background:var(--l1);text-align:left;cursor:pointer;
+    transition:border-color 140ms var(--ease-out),background-color 140ms var(--ease-out)}
+  .hist-row:hover,.hist-row:focus-visible{border-color:var(--b3);background:var(--l2)}
+  .hist-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+  .hist-title{font-size:12.5px;color:var(--tx1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hist-meta{font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums}
+  .hist-empty{padding:18px 4px 14px;text-align:center;font-size:11.5px;color:var(--tx4);line-height:1.8}
+  .hist-head{display:flex;align-items:center;gap:8px}
+  .hist-head .grow{flex:1}
+  .hist-tree{max-height:56vh;overflow:auto;padding:2px 2px 6px}
+  .hist-node{display:flex;align-items:baseline;gap:6px;padding:2px 0}
+  .hist-node .hn-kind{font-size:9.5px;color:var(--tx4);border:1px solid var(--b1);border-radius:4px;padding:0 4px;flex:0 0 auto}
+  .hist-node .hn-title{color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hist-node .hn-st{margin-left:auto;font-size:10px;color:var(--tone);flex:0 0 auto}
+
   /* ───────── toast ───────── */
   .toast{position:fixed;left:50%;bottom:52px;transform:translate(-50%,10px);z-index:40;display:flex;align-items:center;gap:9px;
     padding:8px 13px;border-radius:9px;corner-shape:var(--corner);border:1px solid var(--b2);background:var(--l3);
@@ -654,6 +668,7 @@
     <div class="meta-strip mono">
       <span class="kpi"><span class="dot" style="background:var(--tx4)"></span><span>数据 <b id="stamp">–</b></span></span>
       <span class="kpi"><span class="dot doing"></span><span>执行中 <b id="k-doing">0</b></span></span>
+      <span class="kpi"><span class="dot" style="background:var(--amber)"></span><span>待确认 <b id="k-review">0</b></span></span>
       <span class="kpi"><span class="dot blocked"></span><span>阻塞 <b id="k-blocked">0</b></span></span>
       <span class="kpi"><span class="dot done"></span><span>已闭环 <b id="k-done">0</b></span></span>
       <button class="iconbtn" id="btn-theme" aria-label="切换主题">
@@ -685,7 +700,7 @@
     </div>
     <div class="grow"></div>
     <div id="focus-switch" class="chipbar" hidden></div>
-    <span class="hint" id="toolbar-hint">闭环 → 目标 → 构思 → 执行；叶子完成后逐级「确认关闭」，全关闭则闭环收敛</span>
+    <span class="hint" id="toolbar-hint">闭环 → 目标 → 构思 → 执行；构思记录全闭环自动收口，目标 / 闭环点「确认收敛」才闭环</span>
   </div>
 
   <main class="scroll" id="stage">
@@ -772,6 +787,19 @@
     <div class="modal-foot">
       <button class="tbtn" id="modal-cancel">取消</button>
       <button class="tbtn primary" id="modal-ok">确认关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="history" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="history-title" style="width:min(760px,94vw)">
+    <div class="modal-head">
+      <span id="history-title">闭环历史</span>
+      <button class="modal-x" id="history-x" aria-label="关闭历史">✕</button>
+    </div>
+    <div class="modal-body" id="history-body"></div>
+    <div class="modal-foot">
+      <button class="tbtn" id="history-close">关闭</button>
     </div>
   </div>
 </div>
@@ -1008,9 +1036,9 @@ function cardToProject(card, file){
     };
   };
   const root = conv(card.loop);
-  autoCloseTree(root);   // 旧数据里「子节点全闭环但父节点没关」的，进入面板时先按结构补正
+  autoCloseTree(root);   // 旧数据里「构思记录全闭环但没关」的，进入面板时先按结构补正（只补构思）
   if (card.loop.closed_at) root.convergedAt = new Date(card.loop.closed_at).toLocaleString('sv-SE').slice(0,16);
-  return {
+  const proj = {
     id: 'card-' + root.id,
     name: (card.project && card.project.name) || '未命名闭环',
     tag: tail || '未绑定工作区',
@@ -1019,6 +1047,76 @@ function cardToProject(card, file){
     card,
     root,
   };
+  // 旧卡片没有历史：已闭环的当前闭环先补一条（内存里补，下次写盘落下来）
+  if (root.closed) ensureClosedLoopHistory(proj);
+  return proj;
+}
+
+/* ─────────── 闭环历史（card.closed_loops，随项目 git） ─────────── */
+const CLOSED_LOOPS_MAX = 10;
+const HISTORY_SOFT_BYTES = 400 * 1000;
+
+function countExecItems(root){
+  let n = 0;
+  walk(root, (x) => { if (x.kind === 'exec' && !(x.raw && x.raw.action)) n += 1; });
+  return n;
+}
+/** 历史快照只保留回看需要的字段：结构完整，不背 session / 计划全文 */
+function compactLoopSnapshot(node){
+  if (!node || typeof node !== 'object') return null;
+  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','acceptance','verify','proof','action','lessons'];
+  const out = {};
+  KEEP.forEach((k) => { if (node[k] != null) out[k] = node[k]; });
+  if (Array.isArray(node.issues) && node.issues.length){
+    out.issues = node.issues.map((i) => ({ text: String((i && (i.text || i)) || ''), at: i && i.at, resolved_at: i && i.resolved_at }))
+      .filter((i) => i.text);
+  }
+  const kids = node.children || [];
+  if (kids.length) out.children = kids.map(compactLoopSnapshot).filter(Boolean);
+  return out;
+}
+function closedLoopsOf(p){
+  const list = p && p.card && p.card.closed_loops;
+  return Array.isArray(list) ? list.filter((x) => x && x.id) : [];
+}
+/** 把当前闭环快照推进历史（同 id 去重、最多 10 条、总体积超限丢最旧） */
+function pushClosedLoop(p, root, at){
+  const card = p && p.card;
+  if (!card || !root) return null;
+  const raw = root.raw || {};
+  const entry = {
+    id: raw.id || root.id,
+    title: raw.title || root.title || '未命名闭环',
+    closed_at: raw.closed_at || at || new Date().toISOString(),
+    archived_at: new Date().toISOString(),
+    goals: (raw.children || []).filter((k) => k && k.kind === 'goal').length,
+    execs: countExecItems(root),
+    snapshot: compactLoopSnapshot(raw),
+  };
+  const list = closedLoopsOf(p).filter((x) => x.id !== entry.id);
+  list.unshift(entry);
+  while (list.length > CLOSED_LOOPS_MAX) list.pop();
+  while (list.length > 1 && JSON.stringify(list).length > HISTORY_SOFT_BYTES) list.pop();
+  card.closed_loops = list;
+  return entry;
+}
+function ensureClosedLoopHistory(p){
+  const root = p && p.root;
+  if (!root || !root.closed) return false;
+  const id = (root.raw && root.raw.id) || root.id;
+  if (closedLoopsOf(p).some((x) => x.id === id)) return false;
+  pushClosedLoop(p, root, root.raw && root.raw.closed_at);
+  return true;
+}
+function removeClosedLoop(p, id){
+  if (!p || !p.card || !Array.isArray(p.card.closed_loops)) return;
+  p.card.closed_loops = p.card.closed_loops.filter((x) => x && x.id !== id);
+  if (!p.card.closed_loops.length) delete p.card.closed_loops;
+}
+/** 当前闭环对应的历史条目（给「重开」去重用） */
+function currentLoopHistoryId(p){
+  const raw = p && p.root && p.root.raw;
+  return (raw && raw.id) || (p && p.root && p.root.id) || '';
 }
 let RUN_CFG = null;                 // { token, maxConcurrent, timeoutMs }
 const runMap = new Map();           // `${file}::${nodeId}` -> run
@@ -1184,13 +1282,14 @@ function hasInfo(n){
   const r = n.raw || {};
   return INFO_FIELDS.some(f => isFilled(r[f]));
 }
-/* 四种状态，全部由结构派生（不再手改）：
+/* 五种状态，全部由结构派生（不再手改）：
    未开始 = 只有标题；规划中 = 有内容但还没执行；进行中 = 有工作子节点/执行记录未全闭环；
-   已闭环 = 子节点全闭环（或叶子被完成） */
+   待确认收敛 = 目标/闭环的子项已全闭环，等人工点「确认收敛」；已闭环 = 人工确认过（或构思记录全闭环自动收口） */
 const STATE_DEF = {
   todo:   { label:'未开始', tone:'var(--tx4)' },
   plan:   { label:'规划中', tone:'var(--tx3)' },
   doing:  { label:'进行中', tone:'var(--brand-2)' },
+  review: { label:'待确认收敛', tone:'var(--amber)' },
   closed: { label:'已闭环', tone:'var(--green)' },
 };
 /** 构思的「记录全闭环」判据：计划 / 执行 / 反馈都关闭，且至少有一次执行（只出计划不算完成） */
@@ -1200,10 +1299,17 @@ function ideaRecordsDone(n){
   if (!kids.length || !kids.every(k => k.closed)) return false;
   return kids.some(k => recordActionOf(k) === 'exec') && kids.some(k => recordActionOf(k) === 'reflect');
 }
-function deriveState(n){
+function deriveState(node){
+  const n = (node && node.src) || node;   // 折叠克隆会丢掉已闭环子节点，状态必须按原节点算
+  if (!n) return 'todo';
   if (n.closed) return 'closed';
   const wk = workKids(n);
-  if (wk.length) return wk.every(k => k.closed) ? 'closed' : 'doing';
+  if (wk.length){
+    const allClosed = wk.every(k => k.closed);
+    // 目标 / 闭环不再自动闭环：子项全闭环后停在「待确认收敛」，等人工确认
+    if (n.kind === 'loop' || n.kind === 'goal') return allClosed ? 'review' : 'doing';
+    return allClosed ? 'closed' : 'doing';
+  }
   // 构思的子节点全是会话记录：有计划但没执行 = 规划中，执行过 = 进行中，记录全闭环 = 已闭环
   if (n.kind === 'idea'){
     if (ideaRecordsDone(n)) return 'closed';
@@ -1224,25 +1330,21 @@ function nodeTone(n){
   const s = stateOf(n);
   if (hasIssues(n) && !n.closed) return 'var(--red)';
   if (s.key === 'closed') return 'var(--tx4)';
+  if (s.key === 'review') return 'var(--amber)';
   return KIND_TONE[n.kind];
 }
-/** 自底向上把「子节点全闭环」的祖先自动闭环（返回是否发生变化） */
+/**
+ * 自动闭环**只作用于构思**（记录全闭环 / 旧数据的工作子节点全闭环）。
+ * 目标与闭环必须由人点「确认收敛」，不再自动收口——否则分支会凭空消失。
+ */
 function autoCloseTree(root){
-  let changed = true;
-  while (changed){
-    changed = false;
-    walk(root, (x)=>{
-      // 有真实子节点、且所有子节点（含未完结的记录）都闭环，才自动闭环；
-      // 构思只有会话记录时，按「记录全闭环（含一次执行）」这一条同样自动闭环
-      const kids = x.children || [];
-      if (!x.closed && kids.length && kids.every(k => k.closed)
-        && (workKids(x).length > 0 || ideaRecordsDone(x))){
-        x.closed = true;
-        if (x.raw) x.raw.closed_at = new Date().toISOString();
-        changed = true;
-      }
-    });
-  }
+  walk(root, (x)=>{
+    const kids = x.children || [];
+    if (x.closed || x.kind !== 'idea' || !kids.length || !kids.every(k => k.closed)) return;
+    if (!(workKids(x).length > 0 || ideaRecordsDone(x))) return;
+    x.closed = true;
+    if (x.raw) x.raw.closed_at = new Date().toISOString();
+  });
 }
 /** 把节点及其所有祖先重新打开（加子节点/重开后状态回到进行中） */
 function reopenChain(root, id){
@@ -1254,14 +1356,19 @@ function reopenChain(root, id){
   })(root, []);
   chain.forEach(x => { if (x.closed){ x.closed = false; if (x.raw) x.raw.closed_at = null; } });
 }
-/** 落盘前把派生状态写回 schema 的 status（plan / doing / done） */
+/** 落盘前把派生状态写回 schema 的 status（plan / doing / done）：review 不算 done */
 function syncRawStatus(root){
   walk(root, (n)=>{
     if (!n.raw) return;
     if (isRecord(n)) return;   // 记录的 status 由会话语义维护，不按树结构覆盖
     if (n.closed){ n.raw.status = 'done'; return; }
     const wk = workKids(n);
-    if (wk.length){ n.raw.status = wk.every(k => k.closed) ? 'done' : 'doing'; return; }
+    if (wk.length){
+      // 目标/闭环：子项全闭环只是「待确认收敛」，status 不能写 done（closed_at 才是关闭）
+      if (n.kind === 'loop' || n.kind === 'goal'){ n.raw.status = 'doing'; return; }
+      n.raw.status = wk.every(k => k.closed) ? 'done' : 'doing';
+      return;
+    }
     // 构思：记录里有执行就算 doing，只出计划/还没动作算 plan
     if (n.kind === 'idea'){
       n.raw.status = (n.children || []).some(k => recordActionOf(k) === 'exec') ? 'doing' : 'plan';
@@ -1270,7 +1377,8 @@ function syncRawStatus(root){
     n.raw.status = 'plan';
   });
 }
-function progressOf(n){
+function progressOf(node){
+  const n = (node && node.src) || node;   // 同 deriveState：按原节点算，折叠克隆会少 kids
   const kids = workKids(n);
   const closed = kids.filter(k=>k.closed).length;
   const lv = leaves(n);
@@ -1333,7 +1441,7 @@ function projectStats(p){
   const all = [];
   walk(p.root, n => { if (!isRecord(n)) all.push(n); });
   const kind = { loop:0, goal:0, idea:0, exec:0 };
-  const stat = { doing:0, plan:0, todo:0, blocked:0, closed:0 };
+  const stat = { doing:0, review:0, plan:0, todo:0, blocked:0, closed:0 };
   let issues = 0, noVerify = 0, noProof = 0, folded = 0;
   const closedAt = [];
   all.forEach(n => {
@@ -1341,6 +1449,7 @@ function projectStats(p){
     const state = deriveState(n);
     if (n.closed) stat.closed++;
     else if (hasIssues(n)) stat.blocked++;
+    else if (state === 'review') stat.review++;
     else if (state === 'doing') stat.doing++;
     else if (state === 'plan') stat.plan++;
     else stat.todo++;
@@ -1480,7 +1589,7 @@ function laneStats(p){
       <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>闭环 / 目标<b>${s0.kind.loop} / ${s0.kind.goal}</b></div>
       <div class="info-row"><span class="d" style="--tone:var(--amber)"></span>构思 / 执行<b>${s0.kind.idea} / ${s0.kind.exec}</b></div>
       <div class="info-row"><span class="d" style="--tone:var(--tx4)"></span>合计<b>${nodes}</b></div>
-      <div class="info-row" style="font-size:11px">进行中 ${s0.stat.doing} · 规划中 ${s0.stat.plan} · 未开始 ${s0.stat.todo} · 阻塞 ${s0.stat.blocked} · 已闭环 ${s0.stat.closed}</div>
+      <div class="info-row" style="font-size:11px">进行中 ${s0.stat.doing} · 待确认 ${s0.stat.review} · 规划中 ${s0.stat.plan} · 未开始 ${s0.stat.todo} · 阻塞 ${s0.stat.blocked} · 已闭环 ${s0.stat.closed}</div>
     </div>
   </div>`;
 }
@@ -1488,7 +1597,7 @@ function laneStats(p){
 function laneTime(p){
   const s0 = projectStats(p);
   const etaTxt = s0.remain === 0 && s0.execs.length
-    ? '执行项已全部完成，待逐级确认关闭'
+    ? '执行项已全部完成，等待人工「确认收敛」'
     : s0.etaDays == null
       ? (s0.closedNodes < 2 ? '样本不足：需 ≥2 个已关闭节点' : '关闭集中在 1 小时内，暂不估算')
       : `约 ${fmtDays(s0.etaDays)} 后收敛 <em>置信 ${s0.conf}</em>`;
@@ -1512,7 +1621,7 @@ function infoMarkup(p){
   const execPct = s0.execs.length ? Math.round(s0.execDone / s0.execs.length * 100) : 0;
   const risk = s0.stat.blocked + s0.issues + s0.noVerify + s0.noProof;
   const etaTxt = s0.remain === 0 && s0.execs.length
-    ? '执行项已全部完成，待逐级确认关闭'
+    ? '执行项已全部完成，等待人工「确认收敛」'
     : s0.etaDays == null
       ? (s0.closedNodes < 2 ? '样本不足：需 ≥2 个已关闭节点' : '关闭集中在 1 小时内，暂不估算')
       : `约 ${fmtDays(s0.etaDays)} 后收敛 <em>置信 ${s0.conf}</em>`;
@@ -1523,7 +1632,7 @@ function infoMarkup(p){
     : `<div class="info-empty">执行记录完成后自动提炼</div>`;
   const guideHtml = guide.length
     ? guide.slice(0,2).map(g => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:11.5px">${g.text}</span></div>`).join('')
-    : `<div class="info-empty">无待办，可考虑收敛或归档</div>`;
+    : `<div class="info-empty">无待办 · 子项都已闭环时，点「确认收敛」收口</div>`;
   return `<div class="info">
     ${laneStats(p)}
 
@@ -1611,10 +1720,11 @@ function nodeMarkup(n, p){
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
   const isIdea = n.kind === 'idea';
-  // 只有叶子能手动「完成」；构思的记录还有未闭环的也不给关（父节点关闭+子节点未关会被校验拒绝）
+  const isContainer = n.kind === 'loop' || n.kind === 'goal';
+  // 目标/闭环：子项全闭环后由人「确认收敛」；构思：记录还有未闭环的也不给关（否则校验 422）
   const recordOpen = isIdea && (n.children || []).some(k => !k.closed);
-  const canClose = !n.closed && !kidsExist && !recordOpen;
-  const closeLabel = n.kind==='loop' ? '确认收敛' : '完成';
+  const canClose = !n.closed && (kidsExist ? (isContainer && kids.every(k => k.closed)) : !recordOpen);
+  const closeLabel = isContainer ? '确认收敛' : '完成';
   const addKind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
   // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
   // 构思卡不再抽候选：改为「生成计划 / 执行计划」，目标卡与闭环卡保持候选池
@@ -1659,8 +1769,8 @@ function nodeMarkup(n, p){
     ${lateBadge(n)}
     ${p ? runBadge(p, n) : ''}
     ${upstream ? `<div class="tnode-meta"><span class="frozenbad">⏸ 上游生成中</span></div>` : ''}
-    ${n.hiddenClosed ? `<button class="foldchip" data-fold="${n.id}" title="把 ${n.hiddenClosed} 个已关闭节点收在这里">▸ 已关闭 ${n.hiddenClosed}</button>` : ''}
-    ${n.closedShown ? `<button class="foldchip on" data-fold="${n.id}" title="收起 ${n.closedShown} 个已关闭节点">▾ 收起已关闭 ${n.closedShown}</button>` : ''}
+    ${n.hiddenClosed ? `<button class="foldchip" data-fold="${n.id}" title="把 ${n.hiddenClosed} 个已闭环节点收在这里，点开可看">▸ 已闭环 ${n.hiddenClosed}</button>` : ''}
+    ${n.closedShown ? `<button class="foldchip on" data-fold="${n.id}" title="收起 ${n.closedShown} 个已闭环节点">▾ 收起已闭环 ${n.closedShown}</button>` : ''}
     ${issues}
     ${recordErrorLine(n)}
     ${foldedMarkup(n)}
@@ -1676,14 +1786,14 @@ function visibleRoot(root){
     let hidden = 0, shown = 0;
     for (const k of (n.children || [])){
       // 执行记录就是「执行验证反馈记录」列的内容：已完成的也常驻显示，不参与「已关闭 n」折叠；
-      // 其余节点保持原来的折叠行为（默认收起已关闭，点 chip 展开）
+      // 其余节点保持原来的折叠行为（默认收起已闭环，点 chip 展开）
       if (k.closed && !isRecord(k)){
         if (!foldedClosed.has(n.id)){ hidden++; continue; }
         shown++;
       }
       kids.push(clone(k));
     }
-    return Object.assign({}, n, { children: kids, hiddenClosed: hidden, closedShown: shown });
+    return Object.assign({}, n, { children: kids, hiddenClosed: hidden, closedShown: shown, src: n.src || n });
   };
   return clone(root);
 }
@@ -1820,12 +1930,22 @@ function focusCols(canvas){
 /* ─────────── 泳道 ─────────── */
 function laneMarkup(p){
   const pr = progressOf(p.root);
-  return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${p.root.closed}">
+  const rootState = stateOf(p.root);
+  const closed = !!p.root.closed;
+  const canConverge = !closed && rootState.key === 'review';
+  const dotCls = closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
+  const stateChip = `<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>`;
+  const headerActs = closed
+    ? `<button class="mini" data-act="history" data-id="${esc(p.id)}">闭环历史</button>
+       <button class="mini" data-act="new-loop" data-id="${esc(p.id)}">开新闭环</button>`
+    : (canConverge ? `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认收敛</button>` : '');
+  return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}">
     <div class="lane-head">
-      <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}
-        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 移除项目">⋯</button>` : ''}</div>
+      <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}${stateChip}
+        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 闭环历史 / 开新闭环 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
-      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
+      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标${closed ? ' · 已闭环' : (canConverge ? ' · 待确认收敛' : '关闭')}</div>
+      ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
       ${laneServices(p)}
       ${laneTime(p)}
     </div>
@@ -1840,42 +1960,14 @@ function visibleProjects(){
   return PROJECTS;
 }
 
-function archiveMarkup(list){
-  if (!list.length) return `<div class="archive">
-    <div class="archive-head"><span class="k">已闭环</span><span class="n mono">0</span><span class="grow"></span>
-      <span style="text-transform:none;letter-spacing:0">闭环全部目标关闭后自动收进这里</span></div></div>`;
-  return `<div class="archive">
-    <div class="archive-head"><span class="k">已闭环</span><span class="n mono">${list.length}</span><span class="grow"></span>
-      <span style="text-transform:none;letter-spacing:0">点「查看」在聚焦视图回看，或「重开」把它拉回主泳道</span></div>
-    <div class="archive-list">
-      ${list.map(p=>{
-        const pr = progressOf(p.root);
-        return `<button class="archive-row" data-arch="${p.id}">
-          <span class="check">✓</span>
-          <span class="nm">${p.name}</span>
-          <span class="lp">${p.root.title}</span>
-          <span class="mt">${pr.kids}/${pr.kids} 目标 · ${pr.totalLeaves} 执行项</span>
-          <span class="mt">收敛于 ${p.root.convergedAt || '—'}</span>
-          <span class="acts">
-            <span class="tbtn" data-act="focus" data-id="${p.id}">查看</span>
-            <span class="tbtn" data-reopen="${p.root.id}">重开</span>
-          </span>
-        </button>`;
-      }).join('')}
-    </div></div>`;
-}
-
 function renderMatrix(){
   const m = $('#matrix');
-  const active = visibleProjects().filter(p=>!p.root.closed);
-  const archived = PROJECTS.filter(p=>p.root.closed && (state.filter==='all' || state.filter==='open' ? true : false));
-  const showArchive = state.filter!=='open';
+  const active = visibleProjects();   // 已闭环项目留在主泳道，不再自动移走
   m.innerHTML = `<div class="stage-head corner">项目 / 阶段</div>` +
     STAGES.map((st,i)=>`<div class="stage-head" data-depth="${i}" style="--c:${st.color}">
       <span class="swatch"></span><span class="label">${st.label}</span><span class="en">${st.en}</span></div>`).join('') +
     `<div class="stage-head" data-depth="info"><span class="swatch" style="--c:var(--tx4)"></span><span class="label">信息 · 操作</span><span class="en">Info</span></div>` +
-    active.map(laneMarkup).join('') +
-    (showArchive ? archiveMarkup(archived) : '');
+    active.map(laneMarkup).join('');
 
   const lanes = [...m.querySelectorAll('.lane')];
   lanes.forEach(lane => {
@@ -1909,6 +2001,10 @@ function nextAction(p){
     if (hasIssues(n) && !n.closed)
       out.push({ text:`解阻断：${n.title}`, hint:(nodeIssues(n)[0] && nodeIssues(n)[0].text) || '有未处置问题，后续无法采集证据' });
   });
+  // 有「待确认收敛」的节点时，它就是当前最该做的一步
+  const review = [];
+  walk(p.root, (n)=>{ if (!n.closed && deriveState(n)==='review') review.push(n); });
+  if (review.length) out.push({ text:`确认收敛：${review[0].title}`, hint:'子项已全部闭环，等你点「确认收敛」后才算闭环' });
   if (!out.length){
     const doing = [], plan = [], todo = [];
     walk(p.root, (n)=>{
@@ -1931,21 +2027,29 @@ function renderFocus(){
   const wrap = $('#focus');
   const p = PROJECTS.find(x=>x.id===state.focusId) || PROJECTS[0];
   const pr = progressOf(p.root), st = stateOf(p.root), acts = nextAction(p);
+  const rootState = stateOf(p.root);
+  const canConverge = !p.root.closed && rootState.key === 'review';
+  const dotCls = p.root.closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
   wrap.innerHTML = `
     <div class="focus-summary">
       <div class="sumbox"><div class="k">当前闭环</div><div class="v">${p.root.title}</div></div>
-      <div class="sumbox"><div class="k">收敛进度</div><div class="v">${pr.closed}/${pr.kids} 目标关闭 · ${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div></div>
-      <div class="sumbox" data-tone="${st.key==='closed'?'ok':(hasBlocked(p)?'issue':'')}"><div class="k">闭环状态</div><div class="v">${st.label}</div></div>
+      <div class="sumbox"><div class="k">收敛进度</div><div class="v">${pr.closed}/${pr.kids} 目标闭环 · ${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div></div>
+      <div class="sumbox" data-tone="${st.key==='closed'?'ok':(st.key==='review'?'review':(hasBlocked(p)?'issue':''))}"><div class="k">闭环状态</div><div class="v">${st.label}</div></div>
       <div class="sumbox" data-tone="${hasBlocked(p)?'issue':''}"><div class="k">阻断项</div><div class="v">${hasBlocked(p)?'存在阻塞，需先处置':'无'}</div></div>
     </div>
 
     <div class="focus-lane">
       <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}">
         <div class="lane-head">
-          <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}
-        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 移除项目">⋯</button>` : ''}</div>
+          <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>
+        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 闭环历史 / 开新闭环 / 移除项目">⋯</button>` : ''}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
+          ${(p.root.closed || canConverge) ? `<div class="lane-actions">
+            ${p.root.closed
+              ? `<button class="mini" data-act="history" data-id="${esc(p.id)}">闭环历史</button><button class="mini" data-act="new-loop" data-id="${esc(p.id)}">开新闭环</button>`
+              : `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认收敛</button>`}
+          </div>` : ''}
           ${laneServices(p)}
           ${laneTime(p)}
         </div>
@@ -1959,7 +2063,7 @@ function renderFocus(){
         <div class="pane-head"><span class="k">下一步（自下而上关闭）</span><span class="n mono">${acts.length} 项</span></div>
         <ol class="steplist">
           ${acts.length ? acts.map((a,i)=>`<li><span class="idx mono">${i+1}</span><div><b>${a.text}</b><p>${a.hint}</p></div></li>`).join('')
-            : `<li><span class="idx mono">✓</span><div><b>闭环已收口，无待办</b><p>可归档，或开新闭环。</p></div></li>`}
+            : `<li><span class="idx mono">✓</span><div><b>${p.root.closed ? '闭环已闭环，无待办' : '子项已全闭环，等待确认收敛'}</b><p>${p.root.closed ? '可在泳道头查看闭环历史，或开新闭环。' : '点泳道头的「确认收敛」后才会写入 closed_at。'}</p></div></li>`}
         </ol>
       </section>
       <section class="pane">
@@ -2002,7 +2106,7 @@ function render(){
   const src = $('#data-src');
   if (src) src.textContent = USING_REAL ? `数据源：${CARDS.length} 张 rotation/v1 卡` : '数据源：内置 mock';
   $('#toolbar-hint').textContent = state.view==='matrix'
-    ? '闭环 → 目标 → 构思 → 执行；叶子完成后逐级「确认关闭」，全关闭则闭环收敛'
+    ? '闭环 → 目标 → 构思 → 执行；构思记录全闭环自动收口，目标 / 闭环点「确认收敛」才闭环'
     : '聚焦单项目：从执行项开始，一层层确认关闭，直到闭环收敛';
   focusSwitch();
   const emptyEl = $('#empty'), matrixEl = $('#matrix'), focusEl = $('#focus');
@@ -2020,17 +2124,22 @@ function render(){
 }
 
 function updateKpis(){
-  let doing=0, blocked=0, closedLoops=0;
+  let doing=0, review=0, blocked=0, closedLoops=0;
   PROJECTS.forEach(p=>{
     if (p.root.closed) closedLoops++;
-    walk(p.root, n=>{ if(n.closed) return; if(hasIssues(n)) blocked++; if(deriveState(n)==='doing') doing++; });
+    walk(p.root, n=>{ if(n.closed) return; if(hasIssues(n)) blocked++; const s = deriveState(n); if (s==='doing') doing++; else if (s==='review') review++; });
   });
   $('#k-doing').textContent = doing;
+  $('#k-review').textContent = review;
   $('#k-blocked').textContent = blocked;
   $('#k-done').textContent = closedLoops;
-  const next = PROJECTS.find(hasBlocked) || PROJECTS.find(p=>!p.root.closed) || PROJECTS[0];
+  const hasReview = (p) => { let hit = false; walk(p.root, n => { if (!hit && !n.closed && deriveState(n) === 'review') hit = true; }); return hit; };
+  const next = PROJECTS.find(hasBlocked) || PROJECTS.find(hasReview) || PROJECTS.find(p=>!p.root.closed) || PROJECTS[0];
   $('#next-project').textContent = next ? next.name : '—';
-  $('#next-reason').textContent = !next ? '还没有项目，先添加一个' : (hasBlocked(next) ? '有阻断未处置，先看它' : (next.root.closed ? '已闭环' : '闭环仍在推进'));
+  $('#next-reason').textContent = !next ? '还没有项目，先添加一个'
+    : (hasBlocked(next) ? '有阻断未处置，先看它'
+      : (next.root.closed ? '已闭环 · 可去闭环历史回看'
+        : (hasReview(next) ? '子项已全闭环，待确认收敛' : '闭环仍在推进')));
 }
 
 /* ─────────── 关闭 / 重开 / 加节点 ─────────── */
@@ -2040,35 +2149,63 @@ function findProjectByNode(id){
 }
 let pendingClose = null;
 function closeNode(id){ openConfirm(id); }
+/** 关闭后让「已闭环 N」chip 闪一下，告诉用户东西去哪了（reduced-motion 下无动画） */
+let foldPulseTimer = null;
+function pulseFoldChip(parentId){
+  if (!parentId) return;
+  requestAnimationFrame(() => {
+    const chip = document.querySelector(`[data-fold="${parentId}"]`);
+    if (!chip) return;
+    chip.dataset.pulse = '1';
+    clearTimeout(foldPulseTimer);
+    foldPulseTimer = setTimeout(() => { delete chip.dataset.pulse; }, 900);
+  });
+}
 function doClose(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
+  if (!n) return;
+  const parent = findParent(p.root, id);
+  const now = new Date().toISOString();
   n.closed = true;
   if (n.raw){
-    n.raw.closed_at = new Date().toISOString();
+    n.raw.closed_at = now;
     if (n.raw.kind === 'exec' && !n.raw.proof) n.raw.proof = '（面板关闭，未附证据）';
   }
-  autoCloseTree(p.root);   // 子节点全闭环 → 祖先自动闭环
-  if (p.root.closed){
-    p.root.convergedAt = p.root.convergedAt || state.stamp;
-    collapsed.delete(p.id);
-    toast(`「${n.title}」已完成 · 子项全闭环，整条闭环已自动收口`);
+  // 只补构思（记录全闭环自动收口）；目标/闭环不再级联，由人确认
+  autoCloseTree(p.root);
+  if (n.kind === 'loop'){
+    p.root.convergedAt = now.slice(0, 16).replace('T', ' ');
+    pushClosedLoop(p, n, now);          // 收进项目闭环历史
+    toast(`「${n.title}」已收敛 · 项目留在泳道，可从 ⋯ 查看闭环历史或开新闭环`);
+  } else if (n.kind === 'goal'){
+    toast(`「${n.title}」已闭环 · 已折叠进闭环卡片的「已闭环 N」，点它可展开`);
   } else {
-    toast(`「${n.title}」已完成；上级会在它的子项全闭环后自动闭环`);
+    toast(`「${n.title}」已完成 · 已折叠进上级的「已闭环 N」`);
   }
   render();
+  pulseFoldChip(parent && parent.id);
   persist(p);
 }
 function reopenNode(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
-  if (n) { n.closed = false; if (n.raw) n.raw.closed_at = null; if (n.kind==='loop') delete n.convergedAt; }
+  if (!n) return;
+  const wasRootClosed = p.root.closed;
+  n.closed = false;
+  if (n.raw) n.raw.closed_at = null;
+  if (n.kind === 'loop') delete n.convergedAt;
   let changed = true;
   while (changed){
     changed = false;
     walk(p.root, (x)=>{ if (x.closed && (x.children||[]).some(c=>!c.closed)){ x.closed = false; if (x.raw) x.raw.closed_at = null; changed = true; } });
   }
-  toast('已重开，上级回到未关闭状态');
+  // 闭环被重开：把它的历史条目拿掉，避免再次收敛时出现两条
+  if (wasRootClosed && !p.root.closed){
+    removeClosedLoop(p, currentLoopHistoryId(p));
+    delete p.root.convergedAt;
+  }
+  toast(wasRootClosed && !p.root.closed ? '已重开闭环 · 对应历史条目已移除' : '已重开，上级回到未关闭状态');
   render();
   persist(p);
 }
@@ -2076,6 +2213,7 @@ let seq = 0;
 function addChild(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
+  const wasRootClosed = !!p.root.closed;
   const kind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : 'exec';
   if (kind === 'idea' && ideaLocked(n)) return toast(ideaLockTip(n));
   const title = kind==='goal' ? '新目标（待命名）' : kind==='idea' ? '新构思（待命名）' : '新执行项（待命名）';
@@ -2088,6 +2226,10 @@ function addChild(id){
   n.raw.children = n.raw.children || [];
   n.raw.children.push(rawChild);
   reopenChain(p.root, n.id);   // 给已闭环的节点加子节点 → 它和祖先都回到进行中
+  if (wasRootClosed && !p.root.closed){
+    removeClosedLoop(p, currentLoopHistoryId(p));   // 重新开工的闭环不再是历史
+    delete p.root.convergedAt;
+  }
   toast(`已为「${n.title}」新增${KIND[kind]}`);
   render();
   persist(p);
@@ -2159,10 +2301,23 @@ function openProjMenu(btn){
   const menu = $('#prjmenu');
   const busy = collecting.get(p.file);
   const running = busy && busy.status === 'running';
+  const histCount = closedLoopsOf(p).length;
+  const closedLoop = !!p.root.closed;
   menu.innerHTML = `
     <button type="button" class="am-ai${running ? ' is-locked' : ''}" data-prj-act="collect" role="menuitem"${running ? ' aria-disabled="true"' : ''}>
       <span>服务信息收集</span><span class="am-sub">${running ? '收集中…' : 'AI 读项目后填 services'}</span>
     </button>
+    <div class="am-sep"></div>
+    <button type="button" data-prj-act="history" role="menuitem">
+      <span>闭环历史</span><span class="am-sub">${histCount ? histCount + ' 条' : '暂无'}</span>
+    </button>
+    ${closedLoop ? `
+    <button type="button" data-prj-act="new-loop" role="menuitem">
+      <span>开新闭环</span><span class="am-sub">旧闭环存入历史</span>
+    </button>
+    <button type="button" data-prj-act="reopen-loop" role="menuitem">
+      <span>重开闭环</span><span class="am-sub">回到进行中</span>
+    </button>` : ''}
     <div class="am-sep"></div>
     <button type="button" class="am-danger" data-prj-act="remove" role="menuitem">
       <span>移除项目</span><span class="am-sub">只取消登记</span>
@@ -2172,7 +2327,7 @@ function openProjMenu(btn){
   menu.hidden = false;
   // 贴按钮定位：默认下方右对齐；下方放不下就翻到上方（与「+ 目标」菜单同一套）
   const r = btn.getBoundingClientRect();
-  const mw = menu.offsetWidth || 200, mh = menu.offsetHeight || 82;
+  const mw = menu.offsetWidth || 220, mh = menu.offsetHeight || 120;
   const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
   const below = r.bottom + 6;
   const flip = below + mh > window.innerHeight - 8;
@@ -2198,6 +2353,9 @@ function chooseProjMenu(act){
   const p = PROJECTS.find(x => x.id === ctx.pid);
   if (!p) return;
   if (act === 'collect') collectServices(p);
+  else if (act === 'history') openProjectHistory(p);
+  else if (act === 'new-loop') newLoopConfirm(p);
+  else if (act === 'reopen-loop') reopenNode(p.root.id);
   else if (act === 'remove') removeProjectConfirm(p);
 }
 
@@ -2214,6 +2372,111 @@ function removeProjectConfirm(p){
         toast('已移除，正在重新载入');
         setTimeout(() => location.reload(), 500);
       } catch (error) { toast('移除失败：' + error.message); }
+    });
+}
+
+/* ─────────── 闭环历史（只读回看） ─────────── */
+const HISTORY_KIND = { loop:'闭环', goal:'目标', idea:'构思', exec:'执行' };
+let historyCtx = null;   // { pid, list, view }
+function fmtHistTime(iso){
+  try { return new Date(iso).toLocaleString('sv-SE').slice(0, 16); } catch { return iso || '—'; }
+}
+function historyStateOf(node){
+  if (!node) return { label:'', tone:'var(--tx4)' };
+  if (node.closed_at) return { label:'已闭环', tone:'var(--green)' };
+  return { label:'未闭环', tone:'var(--tx3)' };
+}
+function historyTreeHtml(node, depth){
+  if (!node) return '';
+  const st = historyStateOf(node);
+  const rows = [`<div class="hist-node" data-depth="${depth}" style="padding-left:${depth * 14}px">
+    <span class="hn-kind">${HISTORY_KIND[node.kind] || node.kind || '节点'}</span>
+    <span class="hn-title" title="${esc(node.title || '')}">${esc(node.title || node.id || '')}</span>
+    <span class="hn-st" style="--tone:${st.tone}">${st.label}</span>
+  </div>`];
+  (node.children || []).forEach((k) => rows.push(historyTreeHtml(k, depth + 1)));
+  return rows.join('');
+}
+function openProjectHistory(p){
+  if (!p || !p.card){ return; }
+  const list = closedLoopsOf(p).slice().sort((a, b) => String(b.closed_at).localeCompare(String(a.closed_at)));
+  historyCtx = { pid: p.id, list, view: null };
+  $('#history-title').textContent = `闭环历史 · ${p.name}`;
+  $('#history-body').innerHTML = list.length
+    ? `<div class="hist-list">${list.map((e, i) => `
+        <div class="hist-row" role="button" tabindex="0" data-hist-view="${i}" aria-label="查看闭环历史 ${esc(e.title || e.id)}">
+          <div class="hist-main">
+            <span class="hist-title">${esc(e.title || e.id)}</span>
+            <span class="hist-meta">收敛于 ${esc(fmtHistTime(e.closed_at))} · ${e.goals || 0} 目标 · ${e.execs || 0} 执行项</span>
+          </div>
+          <span class="tbtn">查看</span>
+        </div>`).join('')}</div>
+       <div class="mnote">历史随项目卡片（<code>.dsh/rotation.json</code> 的 <code>closed_loops</code>）一起走 git，最多保留 10 条。</div>`
+    : `<div class="hist-empty">还没有已闭环的闭环。<br>闭环全部目标后，在泳道头点「确认收敛」就会收进这里。</div>`;
+  showModal($('#history'));
+}
+function openHistorySnapshot(entry){
+  if (!entry) return;
+  if (historyCtx) historyCtx.view = entry;
+  const snap = entry.snapshot || {};
+  $('#history-body').innerHTML = `
+    <div class="hist-head">
+      <button class="tbtn" data-hist-back="1">← 返回列表</button>
+      <span class="grow"></span>
+      <span class="hist-meta">收敛于 ${esc(fmtHistTime(entry.closed_at))}</span>
+    </div>
+    <div class="mnote" style="margin-bottom:4px">${esc(snap.intent || '（没有记录闭环目标）')}</div>
+    <div class="hist-tree">${historyTreeHtml(snap, 0)}</div>`;
+}
+function closeHistory(){ hideModal($('#history')); historyCtx = null; }
+
+/* ─────────── 开新闭环 / 重开 ─────────── */
+function hasActiveRunFor(p){
+  if (!p || !p.file) return false;
+  for (const r of runMap.values()){
+    if (r && r.file === p.file && (r.status === 'starting' || r.status === 'running')) return true;
+  }
+  return false;
+}
+function newLoopId(p){
+  const base = String(p.file || p.id || 'loop')
+    .replace(/\.rotation\.json$/i, '')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'loop';
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:TZ]/g, '');
+  const rand = Math.random().toString(36).slice(2, 5);
+  return `${base}-loop-${stamp}-${rand}`;
+}
+function newLoopConfirm(p){
+  if (!p || !p.root || !p.root.closed) return toast('当前闭环还没收敛，先确认收敛再开新闭环');
+  if (!p.file) return toast('该项目没有可写回的卡片文件');
+  if (hasActiveRunFor(p)) return toast('还有会话在跑，等它结束再开新闭环');
+  ensureClosedLoopHistory(p);   // 老卡片先补历史，避免替换后旧闭环丢失
+  askConfirm('开新闭环',
+    `<div class="detail-row"><dt>当前闭环</dt><dd>${esc(p.root.title)}</dd></div>
+     <div class="detail-row"><dt>历史</dt><dd>旧闭环会存入「闭环历史」（现有 ${closedLoopsOf(p).length} 条）</dd></div>
+     <div class="mnote">新闭环从空目标开始；旧闭环仍可在「闭环历史」里只读回看。也可以先「重开」当前闭环继续做，再决定是否开新的。</div>`,
+    '开新闭环', () => {
+      const loop = {
+        id: newLoopId(p),
+        kind: 'loop',
+        title: '新闭环（待命名）',
+        intent: '',
+        acceptance: '（待补）验收方式',
+        status: 'plan',
+        closed_at: null,
+        children: [],
+      };
+      p.card.loop = loop;
+      const rebuilt = cardToProject(p.card, p.file);
+      const idx = PROJECTS.findIndex((x) => x.id === p.id);
+      if (idx >= 0) PROJECTS[idx] = rebuilt;
+      state.focusId = rebuilt.id;
+      collapsed.delete(p.id);
+      render();
+      persist(rebuilt);
+      toast('已开新闭环 · 旧闭环存入闭环历史');
     });
 }
 
@@ -3027,7 +3290,13 @@ function detailMarkup(p, n){
         }).join('')}
       </div></div>`
     : '';
-  const canClose = !n.closed && !workKids(n).length;   // 父节点由子节点自动闭环，叶子才手动完成
+  // 目标/闭环：子项全闭环后由人确认收敛；叶子/构思：可直接完成（记录未全闭环时不给关）
+  const detailKids = workKids(n);
+  const detailContainer = n.kind === 'loop' || n.kind === 'goal';
+  const detailRecordOpen = n.kind === 'idea' && (n.children || []).some(k => !k.closed);
+  const canClose = !n.closed && (detailKids.length
+    ? (detailContainer && detailKids.every(k => k.closed))
+    : !detailRecordOpen);
   const isIdea = n.kind === 'idea';
   const childKind = { loop: 'goal', goal: 'idea', idea: 'exec' }[n.kind];
   const poolCount = (!isIdea && childKind) ? candidateCount(p, n) : 0;
@@ -3049,7 +3318,7 @@ function detailMarkup(p, n){
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
   const acts = [
-    canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' ? '确认收敛' : '完成'}</button>` : '',
+    canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' || n.kind === 'goal' ? '确认收敛' : '完成'}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     ideaActs, candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
@@ -4249,18 +4518,23 @@ function openConfirm(id){
   const pr = progressOf(n), parent = findParent(p.root, id);
   pendingClose = id;
   const isLoop = n.kind === 'loop';
-  $('#modal-title').textContent = `${isLoop ? '确认收敛' : '确认关闭'}「${n.title}」？`;
+  const isGoal = n.kind === 'goal';
+  $('#modal-title').textContent = `${(isLoop || isGoal) ? '确认收敛' : '确认关闭'}「${n.title}」？`;
   const rows = [`<div class="mrow"><span>类型</span><b>${KIND[n.kind]} · ${n.id}</b></div>`];
-  if ((n.children||[]).length) rows.push(`<div class="mrow"><span>子项</span><b>${pr.closed}/${pr.kids} 已关闭</b></div>`);
+  if ((n.children||[]).length) rows.push(`<div class="mrow"><span>子项</span><b>${pr.closed}/${pr.kids} 已闭环</b></div>`);
   if (parent) rows.push(`<div class="mrow"><span>上级</span><b>${KIND[parent.kind]} · ${parent.title}</b></div>`);
   if (n.kind === 'exec' && n.meta) {
     const label = n.meta.startsWith('验证') ? '验证' : '证据';
     rows.push(`<div class="mrow warn"><span>${label}</span><b>${n.meta.replace(/^验证：/, '')}</b></div>`);
   }
   if ((n.issues||[]).length) rows.push(`<div class="mrow warn"><span>未处置</span><b>${n.issues.length} 条问题反馈</b></div>`);
-  rows.push(`<div class="mnote">${isLoop ? '闭环后整条泳道移入底部「已闭环」区，可随时重开。' : '叶子完成后，上级在子项全闭环时会自动闭环；关错了可点「重开」恢复。'}</div>`);
+  rows.push(`<div class="mnote">${isLoop
+    ? '确认后闭环进入「已闭环」，项目仍留在主泳道；可从项目菜单查看「闭环历史」、开新闭环或重开。'
+    : isGoal
+      ? '子项全部闭环后才能收敛。确认后目标折叠进闭环卡片的「已闭环 N」里，不会消失；可随时展开或去闭环历史回看。'
+      : '构思记录全闭环会自动闭环；目标 / 闭环要人确认，不会自动关。关错了可点「重开」恢复。'}</div>`);
   $('#modal-body').innerHTML = rows.join('');
-  $('#modal-ok').textContent = isLoop ? '确认收敛' : '确认关闭';
+  $('#modal-ok').textContent = (isLoop || isGoal) ? '确认收敛' : '确认关闭';
   const m = $('#modal');
   showModal(m);
   $('#modal-ok').focus();
@@ -4285,11 +4559,23 @@ $('#modal-x').addEventListener('click', closeConfirm);
 $('#modal-cancel').addEventListener('click', closeConfirm);
 $('#modal-ok').addEventListener('click', () => { const id = pendingClose; closeConfirm(); if (id) doClose(id); });
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeConfirm(); });
+$('#history-x').addEventListener('click', closeHistory);
+$('#history-close').addEventListener('click', closeHistory);
+$('#history').addEventListener('click', (e) => { if (e.target.id === 'history') closeHistory(); });
+$('#history').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const row = e.target.closest('[data-hist-view]');
+  if (!row || !historyCtx) return;
+  e.preventDefault();
+  const entry = historyCtx.list[Number(row.dataset.histView)];
+  if (entry) openHistorySnapshot(entry);
+});
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('#addmenu').hidden) { closeAddMenu(); return; }
   if (!$('#prjmenu').hidden) { closeProjMenu(); return; }
-  if (!$('#ask').hidden) hideModal($('#ask'));
+  if (!$('#history').hidden) closeHistory();
+  else if (!$('#ask').hidden) hideModal($('#ask'));
   else if (!$('#launch').hidden) closeLaunch();
   else if (!$('#modal').hidden) closeConfirm();
   else closeDetail();
@@ -4996,9 +5282,17 @@ document.addEventListener('click', (e)=>{
   if (exp){ const p0 = PROJECTS.find(x=>x.id===exp.dataset.export); if (p0) exportCard(p0); return; }
   const sess = e.target.closest('[data-sess]');
   if (sess){ toast(`已请求切回会话 ${sess.dataset.sess}（原型未接宿主）`); return; }
-  const arch = e.target.closest('[data-arch]');
-  if (arch && !e.target.closest('[data-act]') && !e.target.closest('[data-reopen]')){
-    state.focusId = arch.dataset.arch; state.view='focus'; render(); return;
+  const histView = e.target.closest('[data-hist-view]');
+  if (histView && historyCtx){
+    const entry = historyCtx.list[Number(histView.dataset.histView)];
+    if (entry) openHistorySnapshot(entry);
+    return;
+  }
+  const histBack = e.target.closest('[data-hist-back]');
+  if (histBack && historyCtx){
+    const p0 = PROJECTS.find(x => x.id === historyCtx.pid);
+    if (p0) openProjectHistory(p0);
+    return;
   }
   const nodeEl = e.target.closest('.tnode');
   if (nodeEl && !e.target.closest('button')){
@@ -5008,11 +5302,14 @@ document.addEventListener('click', (e)=>{
   const act = e.target.closest('[data-act]');
   if (act){
     const p = PROJECTS.find(x=>x.id===act.dataset.id);
+    if (!p) return;
     if (act.dataset.act==='focus'){ state.focusId = p.id; state.view='focus'; render(); }
     else if (act.dataset.act==='toggle'){
       if (collapsed.has(p.id)) collapsed.delete(p.id); else collapsed.add(p.id);
       render();
     }
+    else if (act.dataset.act==='history') openProjectHistory(p);
+    else if (act.dataset.act==='new-loop') newLoopConfirm(p);
     else toast(`已请求打开 ${p.name} 的最近会话 ${p.session}（原型未接宿主）`);
   }
 });

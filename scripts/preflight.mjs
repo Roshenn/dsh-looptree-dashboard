@@ -35,6 +35,8 @@ try {
   await run('node', ['scripts/idea-lock-mock.mjs'], { PORT: String(Number(port) + 2) });
   console.log('── mock:action ──');
   await run(npm, ['run', 'mock:action'], { PORT: String(Number(port) + 1) });
+  console.log('── mock:closure ──');
+  await run(npm, ['run', 'mock:closure']);
   console.log('── mock:prompt ──');
   await run(npm, ['run', 'mock:prompt']);
   console.log('── mock:registry ──');

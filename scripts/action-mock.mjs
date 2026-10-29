@@ -360,6 +360,25 @@ try {
   check('记录节点 session 不被普通会话覆盖', (planRec2b?.session?.id || '') === planRecSession,
     `${planRecSession || 'none'} vs ${planRec2b?.session?.id || 'none'}`);
   check('记录节点保持动作会话的结论', planRec2b?.status === 'done' && !!planRec2b?.closed_at, planRec2b?.status || '?');
+
+  // ── 7. host 不级联：目标 / 闭环必须由面板手动「确认收敛」 ──
+  // 把同级构思补成已关闭，让目标满足「子项全闭环」，再跑一次动作确认 host 不会顺手关目标
+  const cascadeSeed = await readCard(project);
+  const goalSeed = cascadeSeed.loop.children[0];
+  const sibling = (goalSeed.children || []).find((k) => k.id === 'am-i2');
+  sibling.closed_at = new Date().toISOString();
+  sibling.status = 'done';
+  await writeCard(project, cascadeSeed, { lenient: true });
+  const cascadeRes = await api('/action/plan', { file: project.file, nodeId: 'am-i1', prompt: '# 再跑一次\n\n## 目标\n验证 host 不级联' });
+  check('级联验证：动作可再次发起', cascadeRes.status === 200, JSON.stringify(cascadeRes.body?.error || ''));
+  await waitRunKey(cascadeRes.body?.run?.key);
+  const cascadeAfter = await readCard(project);
+  const cascadeIdea = findNode(cascadeAfter.loop, 'am-i1');
+  check('级联验证：构思仍自动闭环', !!cascadeIdea?.closed_at, JSON.stringify(cascadeIdea?.closed_at || null));
+  check('级联验证：目标不被 host 自动闭环', !cascadeAfter.loop.children[0].closed_at,
+    JSON.stringify(cascadeAfter.loop.children[0].closed_at || null));
+  check('级联验证：闭环不被 host 自动闭环', !cascadeAfter.loop.closed_at,
+    JSON.stringify(cascadeAfter.loop.closed_at || null));
 } catch (error) {
   ok = false;
   console.error('[action-mock] 异常：', error);
