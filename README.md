@@ -336,6 +336,10 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 详情卡底部按节点类型给出结构化 prompt；**合成只有一份实现**（`lib/prompt.mjs`），
 面板与 host 动作会话共用同一份文本。格式规范见 [docs/prompts.md](docs/prompts.md)。
 
+![查看：列表摘要 + 结构视图](preview-prompt-structure.png)
+
+![发送：先预览结构、可改原文，再发](preview-prompt-send.png)
+
 固定结构（纯文本，气泡不渲染 markdown）：
 
 ```
