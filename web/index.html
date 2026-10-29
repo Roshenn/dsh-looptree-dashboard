@@ -924,14 +924,17 @@ function summarizeField(text, label){
 function cardToProject(card, file){
   const ws = card.project && card.project.workspace ? card.project.workspace : '';
   const tail = ws.split('/').filter(Boolean).slice(-2).join('/');
-  const conv = (n) => ({
+  const conv = (n) => {
+    // 执行记录（计划 / 执行 / 反馈）只是会话日志：卡片上不再铺验证、证据这类字段摘要
+    const isRec = n.kind === 'exec' && !!n.action;
+    return {
     id: n.id,
     kind: n.kind,
     raw: n,
     title: n.title,
     status: n.status || 'plan',
     closed: !!n.closed_at,
-    metaFull: n.kind === 'exec' ? (n.verify || '') : (n.kind === 'loop' ? (n.intent || '') : (n.approach || n.acceptance || '')),
+    metaFull: isRec ? '' : (n.kind === 'exec' ? (n.verify || '') : (n.kind === 'loop' ? (n.intent || '') : (n.acceptance || ''))),
     chips: (() => {
       const kids = n.children || [];
       const byKind = { goal: 0, idea: 0, exec: 0 };
@@ -948,14 +951,15 @@ function cardToProject(card, file){
       }
       return out;
     })(),
-    meta: n.kind === 'exec'
+    meta: isRec ? '' : (n.kind === 'exec'
       ? summarizeField(n.verify, '验证')
       : (n.kind === 'loop'
         ? (summarizeField(n.intent, '意图') || summarizeField(n.acceptance, '验收'))
-        : (n.approach ? summarizeField(n.approach, '方案') : summarizeField(n.acceptance, '验收'))),
+        : summarizeField(n.acceptance, '验收'))),
     issues: (n.issues || []).filter(i => !i.resolved_at).map(i => i.text),
     children: (n.children || []).map(conv),
-  });
+    };
+  };
   const root = conv(card.loop);
   autoCloseTree(root);   // 旧数据里「子节点全闭环但父节点没关」的，进入面板时先按结构补正
   if (card.loop.closed_at) root.convergedAt = new Date(card.loop.closed_at).toLocaleString('sv-SE').slice(0,16);
@@ -1111,7 +1115,8 @@ function hasIssues(n){ return nodeIssues(n).length > 0; }
 function anyBlocked(n){ let h=false; walk(n, x=>{ if(hasIssues(x) && !x.closed) h=true; }); return h; }
 function blockCount(n){ let c=0; walk(n, x=>{ if(hasIssues(x) && !x.closed) c++; }); return c; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
-const INFO_FIELDS = ['intent','scenario','constraints','acceptance','approach','verify','proof'];
+// 构思没有「方案」字段（2026-10-29 退役），所以这里也不再拿它判「有内容」
+const INFO_FIELDS = ['intent','scenario','constraints','acceptance','verify','proof'];
 // 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
 const PLACEHOLDER_RE = /^[（(]待补[）)]/;
 function isFilled(v){
@@ -2038,13 +2043,13 @@ function buildIdeaPrompt(p, n){
     '请给出 3 条候选构思，供人挑选（可能只采纳其中 1 条）。',
     '硬性限制：',
     '- 标题 6–14 字的名词短语，说清「走哪条路」，不要写口号，也不要写成任务清单。',
-    '- 方案（approach）说清关键做法、与其它候选的差异、代价与适用条件，特别是对目标验收方式的影响；单条 ≤220 字。',
+    '- 只给方向，不写实现细节：不要把做法、步骤、风险、验收方式铺开（构思不再有「方案」字段，展开留给后面的计划）。',
     '- 3 条必须是**不同的实现路线**（不要同一条路的不同细节），不要重复已有构思。',
-    '严格只输出一个 JSON 对象：{"ideas":[{"title":"...","approach":"..."}]}，只含这 3 条，不要输出其它文字。',
+    '严格只输出一个 JSON 对象：{"ideas":[{"title":"..."}]}，只含这 3 条，不要输出其它文字。',
   ].filter(Boolean).join('\n');
 }
 
-/** 从模型输出里抠出 ideas 数组 */
+/** 从模型输出里抠出 ideas 数组（只取标题：构思不再有方案字段） */
 function parseIdeas(text){
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -2056,7 +2061,6 @@ function parseIdeas(text){
   if (!arr) return [];
   return arr.map(x => ({
     title: String((x && (x.title || x.name)) || '').trim(),
-    approach: String((x && (x.approach || x.plan || x.detail)) || '').trim(),
   })).filter(x => x.title).slice(0, 3);
 }
 
@@ -2105,7 +2109,7 @@ async function aiSplitIdeas(pid, nid, opts = {}){
   toast('AI 拆构思超时（3 分钟）：可在节点「会话」里看进展');
 }
 
-/** 预览：默认全选，标题/方案可改，确认后才写卡片 */
+/** 预览：默认全选，标题可改，确认后才写卡片（构思只有标题，没有方案字段） */
 let lastIdeaCtx = null;
 function openIdeasPreview(pid, nid, ideas, draft = null){
   const p0 = PROJECTS.find(x => x.id === pid);
@@ -2115,22 +2119,20 @@ function openIdeasPreview(pid, nid, ideas, draft = null){
       <input type="checkbox" data-ipick="${i}" checked>
       <span class="gsel-main">
         <input class="gsel-title" data-ititle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
-        <textarea class="gsel-acc" data-iapproach="${i}" rows="3" spellcheck="false">${esc(g.approach)}</textarea>
       </span>
     </label>`).join('');
   const recovered = draft
     ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
          <button type="button" class="tbtn" id="idea-regen" style="margin-left:2px">重新生成</button></div>`
     : '';
-  askConfirm('AI 拆出的构思', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。标题与方案都能直接改。</div>`, '写入选中的', () => {
+  askConfirm('AI 拆出的构思', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。标题能直接改。</div>`, '写入选中的', () => {
     const picked = [];
     ideas.forEach((g, i) => {
       const box = document.querySelector(`#ask-body [data-ipick="${i}"]`);
       if (!box || !box.checked) return;
       const titleEl = document.querySelector(`#ask-body [data-ititle="${i}"]`);
-      const apprEl = document.querySelector(`#ask-body [data-iapproach="${i}"]`);
       const title = titleEl ? titleEl.value.trim() : '';
-      if (title) picked.push({ title, approach: apprEl ? apprEl.value.trim() : '' });
+      if (title) picked.push({ title });
     });
     if (!picked.length) return toast('没有勾选任何构思');
     applyIdeas(pid, nid, picked);
@@ -2150,9 +2152,9 @@ function applyIdeas(pid, nid, ideas){
   n.raw.children = n.raw.children || [];
   const stamp = Date.now().toString(36);
   ideas.forEach((g, i) => {
+    // 构思只留标题：不再写「（待补）方案要点」占位（方案字段已退役）
     const rawChild = {
       id: `${n.id}-i${stamp}${i}`, kind: 'idea', title: g.title,
-      approach: g.approach || '（待补）方案要点',
       status: 'plan', closed_at: null,
     };
     n.children.push({ id: rawChild.id, kind: 'idea', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
@@ -2358,8 +2360,9 @@ const isBlankTitle = (t) => {
   const s = String(t || '').trim();
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
-const EDIT_FIELDS = { loop:['intent','scenario','constraints','acceptance'], goal:['constraints','acceptance'], idea:['approach'], exec:['verify','proof'] };
-const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', approach:'方案', verify:'验证', proof:'证据' };
+/* 可点开直接改的字段：构思只留标题（「方案」2026-10-29 退役），不改描述类字段 */
+const EDIT_FIELDS = { loop:['intent','scenario','constraints','acceptance'], goal:['constraints','acceptance'], idea:[], exec:['verify','proof'] };
+const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
 
 /* ─────────── Prompt 模板 ─────────── */
 const PROMPT_TASKS = {
@@ -2368,11 +2371,11 @@ const PROMPT_TASKS = {
     { id:'closed',  title:'检查是否真闭合',  ask:'检查这个闭环是否真的闭合：每个目标是否都服务于同一个闭环意图、有没有目标其实不属于它、以及缺了哪一环。' },
   ],
   goal: [
-    { id:'ideas',   title:'拆出构思',        ask:'针对这个目标给出 2–3 条可选实现路径（构思），每条写清方案要点、风险，以及对目标验收方式的影响。' },
+    { id:'ideas',   title:'拆出构思',        ask:'针对这个目标给出 2–3 条可选实现路径（构思），每条只写一句方向标题型的路子，不要铺开做法细节与验收建议。' },
     { id:'verify',  title:'验收可判定性',    ask:'检查这个目标的验收方式是否可判定；如果不可判定，改写为可执行的检查步骤或命令。' },
   ],
   idea: [
-    { id:'regen',   title:'重新生成构思',    ask:'保留目标与约束，重新生成这个构思：给出 1–2 个替代方案，说明与当前方案的差异、代价与适用条件。' },
+    { id:'regen',   title:'重新生成构思',    ask:'保留目标与约束，重新给出 1–2 条替代构思（只给方向标题），并各用一句话说明与原构思的差异与代价。' },
     { id:'plan',    title:'梳理执行计划',    ask:'把这个构思拆成执行计划：3–6 个可执行动作，每个动作给出验证方式与预期证据，并标注依赖顺序。' },
     { id:'risk',    title:'预演失败点',      ask:'预演这个构思落地会遇到什么：列出 3 个最可能的失败点与各自的早期信号。' },
   ],
@@ -2397,7 +2400,7 @@ function taskListFor(p, n){
 /* 上下文段可配：prompt_context.fields 有序列表；siblings 控制兄弟节点条数 */
 const CTX_DEFAULT = {
   fields: ['project','loop','loop.intent','loop.acceptance','goal','goal.acceptance',
-           'idea','idea.approach','node','node.acceptance','node.approach',
+           'idea','node','node.acceptance',
            'exec.verify','exec.proof','exec.issues','children'],
   siblings: 0,
   refs: [],
@@ -2410,7 +2413,6 @@ const CTX_DEF = {
   'goal':            { sec:'ctx',  r:(p,t,n)=>{ const g=t.find(x=>x.kind==='goal'); return g && g!==n ? `- 当前目标：${g.title}` : null; } },
   'goal.acceptance': { sec:'ctx',  r:(p,t,n)=>{ const g=t.find(x=>x.kind==='goal'); return g && g!==n && g.raw && g.raw.acceptance ? `  - 目标验收：${g.raw.acceptance}` : null; } },
   'idea':            { sec:'ctx',  r:(p,t,n)=>{ const i=t.find(x=>x.kind==='idea'); return i && i!==n ? `- 当前构思：${i.title}` : null; } },
-  'idea.approach':   { sec:'ctx',  r:(p,t,n)=>{ const i=t.find(x=>x.kind==='idea'); return i && i!==n && i.raw && i.raw.approach ? `  - 方案：${i.raw.approach}` : null; } },
   'siblings':        { sec:'ctx',  r:(p,t,n,cfg)=>{
       const parent = t[t.length-2];
       if (!parent) return null;
@@ -2426,22 +2428,23 @@ const CTX_DEF = {
         if (!x) return null;
         const r = x.raw || {};
         const bits = [`状态 ${stateOf(x).label}`];
-        if (x.kind === 'exec') {
+        // 执行记录是会话日志：只带状态与未处置反馈，不再带验证 / 证据
+        if (x.kind === 'exec' && !isRecord(x)) {
           if (r.verify) bits.push(`验证 ${r.verify}`);
           if (r.proof) bits.push(`证据 ${r.proof}`);
+        }
+        if (x.kind === 'exec') {
           const open = (r.issues||[]).filter(i=>!i.resolved_at).map(i=>i.text);
           if (open.length) bits.push(`未处置反馈 ${open.join('；')}`);
-        } else if (x.kind === 'idea' && r.approach) bits.push(`方案 ${r.approach}`);
-        else if (r.acceptance) bits.push(`验收 ${r.acceptance}`);
+        } else if (r.acceptance) bits.push(`验收 ${r.acceptance}`);
         return `- 引用·${KIND[x.kind]}「${x.title}」(${x.id})：${bits.join('；')}`;
       }).filter(Boolean);
       return lines.length ? lines.join('\n') : null;
     } },
   'node':            { sec:'node', r:(p,t,n)=> `- 类型：${KIND[n.kind]}（id: ${n.id}）\n- 标题：${n.title}\n- 状态：${stateOf(n).label}` },
   'node.acceptance': { sec:'node', r:(p,t,n)=> (n.kind==='loop'||n.kind==='goal') && n.raw && n.raw.acceptance ? `- 验收：${n.raw.acceptance}` : null },
-  'node.approach':   { sec:'node', r:(p,t,n)=> n.kind==='idea' && n.raw && n.raw.approach ? `- 方案：${n.raw.approach}` : null },
-  'exec.verify':     { sec:'node', r:(p,t,n)=> n.kind==='exec' && n.raw && n.raw.verify ? `- 验证方式：${n.raw.verify}` : null },
-  'exec.proof':      { sec:'node', r:(p,t,n)=> n.kind==='exec' ? `- 证据：${(n.raw && n.raw.proof) || '（未填写）'}` : null },
+  'exec.verify':     { sec:'node', r:(p,t,n)=> n.kind==='exec' && !isRecord(n) && n.raw && n.raw.verify ? `- 验证方式：${n.raw.verify}` : null },
+  'exec.proof':      { sec:'node', r:(p,t,n)=> n.kind==='exec' && !isRecord(n) ? `- 证据：${(n.raw && n.raw.proof) || '（未填写）'}` : null },
   'exec.issues':     { sec:'node', r:(p,t,n)=>{
       const open = ((n.raw && n.raw.issues) || []).filter(i=>!i.resolved_at).map(i=>i.text);
       return open.length ? `- 未处置反馈：${open.join('；')}` : null;
@@ -2540,7 +2543,7 @@ function sessionMarkup(p, n, opts){
       ${sessId ? `<button class="tbtn" data-view-session="${sessId}">查看会话</button>` : ''}
       ${sessId ? `<button class="tbtn" data-open-session="${sessId}" title="切到 DSH 里这个会话">在 DSH 打开</button>` : ''}
       ${p.file ? `<button class="tbtn" data-sess-list="1">最近会话</button>` : ''}
-      ${r && r.result && n.kind === 'exec' ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
+      ${r && r.result && n.kind === 'exec' && !isRecord(n) ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
     </div>
   </div>`;
 }
@@ -2647,16 +2650,24 @@ function detailMarkup(p, n){
   const st = stateOf(n);
   const tone = nodeTone(n);
   const kids = n.children || [];
-  const fields = EDIT_FIELDS[n.kind] || [];
+  // 执行记录（计划 / 执行 / 反馈）没有描述字段：详情卡只留动作、会话、耗时、结果这些只读信息
+  const rec = isRecord(n);
+  const fields = rec ? [] : (EDIT_FIELDS[n.kind] || []);
   // 「生成」：标题是唯一必需项；有标题就能把其余空字段一次补出来
-  const GEN_FIELDS = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: ['approach'], exec: ['verify'] };
-  const genMissing = (GEN_FIELDS[n.kind] || []).filter(f => !String(r[f] || '').trim());
+  const GEN_FIELDS = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: [], exec: ['verify'] };
+  const genFields = rec ? [] : (GEN_FIELDS[n.kind] || []);
+  const genMissing = genFields.filter(f => !String(r[f] || '').trim());
   const hasTitle = !isBlankTitle(n.title);
   const canGen = hasTitle && genMissing.length > 0;
   const genLabel = canGen ? `生成 ${genMissing.length} 项` : '生成';
   const genTitle = canGen
     ? '按标题补全：' + genMissing.map(f => FIELD_LABEL[f] || f).join('、')
     : (hasTitle ? '没有缺失项' : '先写标题，再用它生成其余字段');
+  // 这一类节点没有可补的字段（构思、执行记录）：整颗按钮都不出现，不留一个永远灰着的「生成」
+  const genBtn = genFields.length
+    ? `<button class="tbtn genbtn" data-gen="1" data-nid="${n.id}" data-proj="${p.id}"
+        ${canGen ? '' : 'disabled'} title="${genTitle}">${genLabel}</button>`
+    : '';
   const editable = fields.map((f) => {
     return `<div class="detail-row editable" data-field="${f}" data-nid="${n.id}" data-proj="${p.id}">
        <dt>${FIELD_LABEL[f]}</dt>
@@ -2723,8 +2734,7 @@ function detailMarkup(p, n){
     <h3 class="detail-title" data-nid="${n.id}" data-proj="${p.id}" title="点击编辑标题">${esc(n.title)}</h3>
     <div class="detail-path-row">
       <div class="detail-path">${pathHtml}</div>
-      <button class="tbtn genbtn" data-gen="1" data-nid="${n.id}" data-proj="${p.id}"
-        ${canGen ? '' : 'disabled'} title="${genTitle}">${genLabel}</button>
+      ${genBtn}
     </div>
     <dl class="detail-sec" style="margin-top:0;padding-top:0;border-top:0">
       <div class="detail-row"><dt>状态</dt>
@@ -2925,8 +2935,9 @@ async function viewSession(sessionId){
   }
 }
 
-/** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片） */
-const GEN_FIELDS_CLIENT = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: ['approach'], exec: ['verify'] };
+/** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
+    构思与执行记录没有可补的字段（方案已退役、记录只留只读信息），这里给空数组把入口关掉 */
+const GEN_FIELDS_CLIENT = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: [], exec: ['verify'] };
 /* ─────────── 候选池 ─────────── */
 const CAND_POOL = new Map();     // `${file}::${nodeId}` → 候选数组
 const CAND_COUNTS = new Map();   // `${file}::${nodeId}` → 候选条数（按项目批量拉，节点卡直接用）
@@ -3289,7 +3300,7 @@ async function generateMissing(pid, nid, btn){
   if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
   if (!p0.file) return toast('该项目没有可写回的卡片文件');
   if (!API_BASE) return toast('未连接服务，无法生成');
-  const need = (GEN_FIELDS_CLIENT[n0.kind] || []).filter(f => !String(n0.raw[f] || '').trim());
+  const need = (isRecord(n0) ? [] : (GEN_FIELDS_CLIENT[n0.kind] || [])).filter(f => !String(n0.raw[f] || '').trim());
   if (!need.length) return toast('没有缺失项');
   const oldText = btn.textContent;
   btn.disabled = true; btn.textContent = '生成中…';
