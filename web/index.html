@@ -225,6 +225,9 @@
     transition:background-color 160ms var(--ease-out),color 160ms var(--ease-out),transform 160ms var(--ease-out)}
   .tbtn:hover{background:var(--l4);color:var(--tx1)}
   .tbtn:active{transform:scale(.96)}
+  .tbtn:disabled{opacity:.45;cursor:default;pointer-events:none}
+  /* 候选池计数槽位定宽：数字 0→6 变化不改变按钮宽度，节点卡不会因刷新而换行/长高 */
+  .cand-n{display:inline-block;min-width:8px;margin-left:3px;text-align:right;font-variant-numeric:tabular-nums}
   .tbtn.primary{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:color-mix(in srgb,var(--amber) 40%,transparent);color:var(--amber)}
   .tbtn.primary-converge{background:color-mix(in srgb,var(--green) 18%,transparent);border-color:color-mix(in srgb,var(--green) 40%,transparent);color:var(--green)}
   .tbtn.ghost{background:transparent;border-style:dashed;color:var(--tx4)}
@@ -1451,6 +1454,16 @@ function nodeMarkup(n, p){
   const canClose = !n.closed && !kidsExist;
   const closeLabel = n.kind==='loop' ? '确认收敛' : '完成';
   const addKind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
+  // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
+  const poolCount = (addKind && p) ? candidateCount(p, n) : 0;
+  const candGen = addKind
+    ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
+         title="${poolCount ? '候选池还有未处理的候选' : '让会话给出若干候选' + KIND[addKind] + '，挑完再写入卡片'}">生成候选</button>`
+    : '';
+  const candPool = addKind
+    ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
+         title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
+    : '';
   const bars = kidsExist ? `<span class="bars">${n.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>` : '';
   const issues = (n.issues||[]).map(i=>`<div class="issue">⚠ ${i}</div>`).join('');
   const upstream = p ? activeAncestorOf(p, n) : null;
@@ -1458,6 +1471,7 @@ function nodeMarkup(n, p){
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
+    candGen, candPool,
   ].filter(Boolean).join('');
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
@@ -2532,7 +2546,7 @@ function detailMarkup(p, n){
     : '';
   const poolBtn = childKind
     ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
-         title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">候选池${poolCount ? ' ' + poolCount : ''}</button>`
+         title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
   const acts = [
     canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' ? '确认收敛' : '完成'}</button>` : '',
@@ -2753,9 +2767,33 @@ async function viewSession(sessionId){
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片） */
 const GEN_FIELDS_CLIENT = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: ['approach'], exec: ['verify'] };
 /* ─────────── 候选池 ─────────── */
-const CAND_POOL = new Map();   // `${file}::${nodeId}` → 候选数组
+const CAND_POOL = new Map();     // `${file}::${nodeId}` → 候选数组
+const CAND_COUNTS = new Map();   // `${file}::${nodeId}` → 候选条数（按项目批量拉，节点卡直接用）
 const candKeyOf = (p, n) => `${p && p.file ? p.file : (p && p.id) || ''}::${n ? n.id : ''}`;
-function candidateCount(p, n){ return (CAND_POOL.get(candKeyOf(p, n)) || []).length; }
+const candKeyPrefix = (p) => `${(p && (p.file || p.id)) || ''}::`;
+/** 计数槽位定宽：数字变化只换字，不换宽度（见 CSS .cand-n） */
+const candPoolLabel = (count) => `候选池<span class="cand-n">${count ? count : ''}</span>`;
+function candidateCount(p, n){
+  const key = candKeyOf(p, n);
+  const known = CAND_COUNTS.get(key);
+  return Number.isFinite(known) ? known : (CAND_POOL.get(key) || []).length;
+}
+
+/** 一次拿整个项目的候选条数：节点卡渲染前先灌好，避免每个节点各发一个请求 */
+async function loadCandidateCounts(p){
+  if (!p || !p.file) return;
+  try {
+    const r = await fetch(api('/candidates/counts?file=' + encodeURIComponent(p.file)));
+    if (!r.ok) return;
+    const j = await r.json();
+    const prefix = candKeyPrefix(p);
+    for (const key of [...CAND_COUNTS.keys()]) if (key.startsWith(prefix)) CAND_COUNTS.delete(key);
+    for (const [nid, c] of Object.entries(j.counts || {})) if (c > 0) CAND_COUNTS.set(prefix + nid, c);
+  } catch {}
+}
+async function loadAllCandidateCounts(){
+  await Promise.all(PROJECTS.filter(p => p.file).map(loadCandidateCounts));
+}
 
 async function loadCandidates(p, n){
   if (!p || !n || !p.file) return [];
@@ -2764,6 +2802,7 @@ async function loadCandidates(p, n){
     const j = await r.json();
     const list = (j.candidates || []);
     CAND_POOL.set(candKeyOf(p, n), list);
+    CAND_COUNTS.set(candKeyOf(p, n), list.length);
     return list;
   } catch { return CAND_POOL.get(candKeyOf(p, n)) || []; }
 }
@@ -2792,7 +2831,8 @@ async function generateCandidates(pid, nid, btn){
       if (run.status === 'done' && run.candidatesError){ toast('候选生成失败：' + run.candidatesError); break; }
       if (run.status === 'done' && run.candidatesAdded){
         await loadCandidates(p0, n0);
-        if (detailNode === n0.id) openDetail(n0.id);
+        await loadCandidateCounts(p0);
+        render();   // 节点卡与详情卡的「生成候选 / 候选池 n」一起换挡
         toast(`候选池已就绪：${run.candidatesAdded} 条，点「候选池」挑一个`);
         break;
       }
@@ -2804,26 +2844,37 @@ async function generateCandidates(pid, nid, btn){
   }
 }
 
+/** 把候选条数刷到所有装着这两个按钮的地方（详情卡 + 节点卡），不重建 DOM */
+function paintCandButtons(count, ...boxes){
+  for (const box of boxes){
+    if (!box) continue;
+    const gen = box.querySelector('[data-cand-gen]');
+    const pool = box.querySelector('[data-cand-pool]');
+    if (gen) gen.disabled = count > 0;
+    if (pool){
+      pool.disabled = count === 0;
+      pool.innerHTML = candPoolLabel(count);
+      pool.title = count ? `候选池：${count} 条待选` : '候选池为空';
+    }
+  }
+}
+
 /** 载入候选数量并原地更新「生成候选 / 候选池」按钮，避免整卡重绘 */
 async function refreshPoolCount(p, n){
   if (!p || !n || !p.file) return;
   const list = await loadCandidates(p, n);
-  if (detailNode !== n.id) return;
-  const gen = document.querySelector('#detail [data-cand-gen]');
-  const pool = document.querySelector('#detail [data-cand-pool]');
-  const count = list.length;
-  if (gen){ gen.disabled = count > 0; }
-  if (pool){
-    pool.disabled = count === 0;
-    pool.textContent = count ? `候选池 ${count}` : '候选池';
-    pool.title = count ? `候选池：${count} 条待选` : '候选池为空';
-  }
+  paintCandButtons(list.length,
+    detailNode === n.id ? $('#detail') : null,
+    document.querySelector(`.tnode[data-nid="${n.id}"]`));
 }
 
 async function openCandidatePool(pid, nid){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
   const list = await loadCandidates(p0, n0);
+  paintCandButtons(list.length,
+    detailNode === n0.id ? $('#detail') : null,
+    document.querySelector(`.tnode[data-nid="${n0.id}"]`));
   const rows = list.map((c, i) => `
     <div class="cand-row">
       <div class="cand-main">
@@ -2843,7 +2894,9 @@ async function openCandidatePool(pid, nid){
         body: JSON.stringify({ file: p0.file, nodeId: n0.id, all: true }),
       });
       await loadCandidates(p0, n0);
-      if (detailNode === n0.id) openDetail(n0.id);
+      paintCandButtons(0,
+        detailNode === n0.id ? $('#detail') : null,
+        document.querySelector(`.tnode[data-nid="${n0.id}"]`));
       toast('候选池已清空');
     } : null);
 }
@@ -2962,6 +3015,7 @@ async function reloadProjects(){
     const j = await r.json();
     const list = (j.cards || []).filter(x => x.card);
     PROJECTS = list.map(x => cardToProject(x.card, x.file));
+    await loadAllCandidateCounts();   // 节点卡上的「候选池 n」要跟着卡片一起刷新
     render();
     if (detailNode && findProjectByNode(detailNode)) openDetail(detailNode);
     return true;
@@ -4144,6 +4198,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   }
   if (!PROJECTS.some(p => p.id === state.focusId)) state.focusId = PROJECTS[0] ? PROJECTS[0].id : '';
   document.documentElement.dataset.theme = state.theme;
+  await loadAllCandidateCounts();   // 先灌候选条数，节点卡首帧就能显示「候选池 n」
   render();
   notifyPendingSplits();
   const src = $('#data-src');
