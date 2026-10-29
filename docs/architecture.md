@@ -31,6 +31,9 @@ DSH 进程
 | 服务进程 | 进程内（内存） | services；插件 dispose 时兜底杀掉 |
 
 卡片字段见 `rotation-card-spec.md`；注册表只有指针：`{ id, name, workspace, file }`。
+注册表是多台机器共用的文件（`~/.dsh` 走 git 同步），但 `workspace` 是各机器的绝对路径；
+`lib/store.mjs` 用 `isLocalEntry` / `partitionRegistry` 按「`workspace` 目录在本机存在」区分两半：
+本机条目参与显示、查重、移除，另一台机器的条目既不显示也不占 id，写回时原样保留。
 
 ## 四、关键决定
 

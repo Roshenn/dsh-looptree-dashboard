@@ -37,6 +37,8 @@ try {
   await run(npm, ['run', 'mock:action'], { PORT: String(Number(port) + 1) });
   console.log('── mock:prompt ──');
   await run(npm, ['run', 'mock:prompt']);
+  console.log('── mock:registry ──');
+  await run(npm, ['run', 'mock:registry']);
   console.log('── validate:samples ──');
   await run(npm, ['run', 'validate:samples']);
   console.log('── verify:tarball ──');

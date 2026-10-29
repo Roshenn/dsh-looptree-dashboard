@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 0.9.1 — 注册表按「本机可见」解析：另一台机器登记的项目不再挡住添加
+
+- **根因**：`~/.dsh` 走 git 同步，`rotation/registry.json` 是共享文件，但 `workspace` 是各机器的绝对路径。
+  2026-10-28 一次「同步本机注册表」把 Windows 的 `I:\dev\business\english-shadow` 写进来、覆盖了 Mac 的两条登记：
+  卡片路径读不到 → `/api/cards` 返回 error 条目 → 面板按 `x.card` 过滤 → 显示「还没有项目」；
+  但 `POST /api/projects` 仍拿整份注册表查重 → 添加同 id 项目永远 409「项目 id 已存在」，两个视图各说各话
+- **修复**（`lib/store.mjs`）：新增 `isLocalEntry` / `partitionRegistry`——`workspace` 目录不在本机的条目视为
+  「另一台机器的登记」：`listProjects` 不返回（面板、`/api/workspaces` 已登记集合、`findProject` 只认本机），
+  `addProject` 的 id / 目录查重只看本机，`removeProject` 只删本机；写回时整份列表保留别的机器条目，
+  git 同步不再互相冲掉。本机登记但卡片已丢的条目改为「接管」，不再 409
+- **数据**：本机两条真实项目（english-shadow / demand-collection）按新口径重新登记（复用原卡片，不写模板）；
+  Windows 的 `I:\` 残留条目已从本机注册表移除（`git show ed5b20b:rotation/registry.json` 可查，
+  另一台机器升级后点一次「+ 项目」即可重新登记）；`~/.dsh` 里 `rotation/registry.json` 的改动留给用户自己提交
+- **测试**：新增 `scripts/registry-mock.mjs`（12 项断言：别的机器条目不显示 / 不占 id、写回保留、真重复仍 409、
+  死卡片接管、移除只删本机），并入 `npm run preflight`
+- 验证：`npm run preflight` 全绿；dev-host 复现原场景（注册表只有 Windows 条目）→ POST 添加 200、
+  `GET /api/cards` 返回 1 张卡、注册表两条并存；真机面板刷新后 english-shadow / demand-collection 两泳道回归；版本 0.9.1
+
 ## 0.9.0 — prompt 结构统一：首行任务、空行分块、先看再发
 
 - **根因**：动作 prompt 被 `oneLine()` 压成一行塞进 `/plan`，人和模型都只看到一段糊墙；

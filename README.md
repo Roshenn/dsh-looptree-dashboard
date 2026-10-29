@@ -38,6 +38,9 @@ curl -s localhost:4180/rotation/api/health
 <workspace>/.dsh/rotation.json    卡片真身（rotation/v1，跟着项目走）
 ```
 
+注册表按「本机可见」解析：`workspace` 目录不在本机的条目视为另一台机器的登记（`~/.dsh` 走 git 同步，
+绝对路径各机器不同），不显示、不占 id / 目录，写回时原样保留——不会把另一台机器的登记冲掉。
+
 接口：
 
 | 方法 | 路径 | 说明 |

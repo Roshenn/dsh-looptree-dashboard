@@ -1,6 +1,6 @@
 {
   "name": "dsh-looptree-dashboard",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "轮转闭环树面板：多项目「闭环 → 目标 → 构思 → 执行验证反馈记录」泳道视图，含节点会话、DSH /plan 与 /goal 动作、项目服务拉起",
   "type": "module",
   "main": "lib/index.js",
@@ -45,6 +45,7 @@
     "mock:action": "node scripts/action-mock.mjs",
     "mock:prompt": "node scripts/prompt-mock.mjs",
     "mock:idea-lock": "node scripts/idea-lock-mock.mjs",
+    "mock:registry": "node scripts/registry-mock.mjs",
     "mock:client": "node scripts/dev-client-mock.mjs",
     "lint:plugin": "node scripts/lint-plugin.mjs",
     "preflight": "node scripts/preflight.mjs",
