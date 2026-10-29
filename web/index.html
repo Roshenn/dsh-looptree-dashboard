@@ -557,6 +557,20 @@
   .pgen-input:focus{outline:2px solid var(--brand);outline-offset:1px;color:var(--tx1)}
   .pgen-bar{display:flex;align-items:center;gap:6px;margin-top:4px}
   .pgen-hint{font-size:9.5px;color:var(--tx4);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pgen-warn{font-size:9.5px;color:var(--amber);margin-top:3px;white-space:pre-wrap}
+  .ptitle{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
+  .ptt{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx2)}
+  .psum{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9.5px;color:var(--tx4)}
+  .pview{max-height:250px;overflow:auto;border:1px solid var(--b2);border-radius:8px;background:var(--l1);
+    padding:8px 10px;font:10.5px/1.66 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx2)}
+  .pview-h{font-weight:600;color:var(--tx1);margin-bottom:5px;white-space:pre-wrap;word-break:break-word}
+  .pview-b{margin-top:7px}
+  .pview-k{font-size:9px;letter-spacing:.08em;color:var(--brand);margin-bottom:1px}
+  .pview-l{white-space:pre-wrap;word-break:break-word}
+  .pcmd{font:10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--l1);border:1px solid var(--b2);
+    border-radius:7px;padding:7px 9px;color:var(--tx2);white-space:pre-wrap;word-break:break-word;
+    max-height:130px;overflow:auto}
+  #launch-objective{width:100%;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
   .detail-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
   .tnode.is-active{border-color:color-mix(in srgb,var(--brand) 60%,var(--b3));box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 26%,transparent)}
 
@@ -2063,33 +2077,6 @@ function chooseAddMenu(which){
   }
 }
 
-/** 给模型的拆构思 prompt：目标 + 约束 + 落地场景，要求 3 条互斥路线，每条先写优势（最终只写 1 条） */
-function buildIdeaPrompt(p, n){
-  const r = n.raw || {};
-  const kids = (n.children || []).map(k => `- ${k.title}`).join('\n') || '（暂无）';
-  const ws = (p.card && p.card.project && p.card.project.workspace) || '';
-  const loop = (p.card && p.card.loop) || {};
-  return [
-    `你在给「${p.name}」这个项目的目标拆构思（实现路径）。${ws ? '项目目录：' + ws : ''}`,
-    '先按需读项目里的文件（README、脚本、配置、最近的提交与产物）再作答；不确定就去查，不要凭空编。',
-    '',
-    `目标：${n.title}`,
-    r.acceptance ? `目标验收：${r.acceptance}` : '',
-    r.constraints ? `目标约束：${r.constraints}` : '',
-    loop.intent ? `所属闭环目标：${loop.intent}` : '',
-    loop.scenario ? `已定的落地场景流程（约束与验收的唯一依据）：\n${loop.scenario}` : '',
-    `已有的构思 / 执行项：\n${kids}`,
-    '',
-    '请给出 3 条候选构思（同一个目标的互斥路线，最终只会写入 1 条——一个目标只落地一个方案）。',
-    '硬性限制：',
-    '- 标题 6–14 字的名词短语，说清「走哪条路」，不要写口号，也不要写成任务清单。',
-    '- 每条先写一句优势（strength）：这条路为什么比另外两条强——省时 / 好验证 / 复用现有资产 / 风险更低，要能横向比较，不写空话。',
-    '- 只给方向，不写实现细节：不要把做法、步骤、风险、验收方式铺开（构思不再有「方案」字段，展开留给后面的计划）。',
-    '- 3 条必须是**不同的实现路线**（不要同一条路的不同细节），不要重复已有构思。',
-    '严格只输出一个 JSON 对象：{"ideas":[{"title":"...","strength":"..."}]}，只含这 3 条，不要输出其它文字。',
-  ].filter(Boolean).join('\n');
-}
-
 /** 从模型输出里抠出 ideas 数组（标题 + 优势；优势只用于候选对比，不写进卡片） */
 function parseIdeas(text){
   const raw = String(text || '');
@@ -2125,7 +2112,7 @@ async function aiSplitIdeas(pid, nid, opts = {}){
   try {
     const res = await fetch(api('/run'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt: buildIdeaPrompt(p, n), taskId: 'split-ideas' }),
+      body: JSON.stringify({ file: p.file, nodeId: n.id, taskId: 'split-ideas' }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -2215,30 +2202,6 @@ function applyIdeas(pid, nid, ideas){
   });
 }
 
-/** 给模型的拆目标 prompt：只给真实上下文，要求 JSON、3 条候选 */
-function buildSplitPrompt(p, n){
-  const r = n.raw || {};
-  const kids = (n.children || []).map(k => `- ${k.title}`).join('\n') || '（暂无）';
-  const ws = (p.card && p.card.project && p.card.project.workspace) || '';
-  return [
-    `你在给「${p.name}」这个项目的闭环拆目标。${ws ? '项目目录：' + ws : ''}`,
-    '先按需读项目里的文件（README、脚本、配置、最近的提交与产物）再作答；不确定就去查，不要凭空编。',
-    '',
-    `闭环目标：${r.intent || '（还没写，按项目现状判断要做到什么）'}`,
-    r.scenario ? `已定的落地场景流程（约束与验收的唯一依据，必须逐条对上）：\n${r.scenario}` : '',
-    r.constraints ? `已知约束：${r.constraints}` : '',
-    r.acceptance ? `已有验收：${r.acceptance}` : '',
-    `已有的目标：\n${kids}`,
-    '',
-    '请给出 3 条候选目标，供人挑选（可能只采纳其中 1 条）。',
-    '硬性限制：',
-    '- 标题 8–16 字的名词短语，说清「做到什么」，不要写口号，不要写手段。',
-    '- 验收写清怎么判定通过（命令 / 文件 / 断言 / 可见结果），能落成命令就落成命令，单条 ≤300 字。',
-    '- 3 条必须互相独立，不要互相包含，也不要把已有目标重复一遍。',
-    '严格只输出一个 JSON 对象：{"goals":[{"title":"...","acceptance":"..."}]}，只含这 3 条，不要输出其它文字。',
-  ].filter(Boolean).join('\n');
-}
-
 /** 从模型输出里抠出 goals 数组（容忍 ```json 围栏与多余文字） */
 function parseGoals(text){
   const raw = String(text || '');
@@ -2300,7 +2263,7 @@ async function aiSplitGoals(pid, nid, opts = {}){
   try {
     const res = await fetch(api('/run'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt: buildSplitPrompt(p, n), taskId: SPLIT_TASK }),
+      body: JSON.stringify({ file: p.file, nodeId: n.id, taskId: SPLIT_TASK }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -2409,128 +2372,128 @@ const isBlankTitle = (t) => {
 const EDIT_FIELDS = { loop:['intent','scenario','constraints','acceptance'], goal:['constraints','acceptance'], idea:[], exec:['verify','proof'] };
 const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
 
-/* ─────────── Prompt 模板 ─────────── */
-const PROMPT_TASKS = {
-  loop: [
-    { id:'split',   title:'拆成目标',        ask:'把上面这个闭环拆成 3–5 个目标，每个目标都要能单独验证；并为每个目标给出验收方式（优先写成可直接执行的命令）。' },
-    { id:'closed',  title:'检查是否真闭合',  ask:'检查这个闭环是否真的闭合：每个目标是否都服务于同一个闭环意图、有没有目标其实不属于它、以及缺了哪一环。' },
-  ],
-  goal: [
-    { id:'ideas',   title:'拆出构思',        ask:'针对这个目标给出 1 条最合适的实现路径（构思，一个目标只落地一个方案）：先用一句写清它为什么优于其它可能路线（省时 / 好验证 / 复用现有资产 / 风险低），再给方向标题；不要铺开做法细节与验收建议。' },
-    { id:'verify',  title:'验收可判定性',    ask:'检查这个目标的验收方式是否可判定；如果不可判定，改写为可执行的检查步骤或命令。' },
-  ],
-  idea: [
-    { id:'regen',   title:'重新生成构思',    ask:'保留目标与约束，重新给出 1 条替代构思（只给方向标题），并说明它相对原构思的优势与代价（一个目标只保留一个构思）。' },
-    { id:'plan',    title:'梳理执行计划',    ask:'把这个构思拆成执行计划：3–6 个可执行动作，每个动作给出验证方式与预期证据，并标注依赖顺序。' },
-    { id:'risk',    title:'预演失败点',      ask:'预演这个构思落地会遇到什么：列出 3 个最可能的失败点与各自的早期信号。' },
-  ],
-  exec: [
-    { id:'steps',   title:'给出执行步骤',    ask:'把这条执行项拆成具体可执行的操作步骤，每一步给出验证命令与通过标准。' },
-    { id:'proof',   title:'补齐证据',        ask:'这条执行项准备关闭但证据不足。请列出应该采集哪些证据（命令、输出、截图）以及采集方式。' },
-    { id:'blocker', title:'定位阻塞',        ask:'这条执行项当前阻塞。给出 3 个可能原因与各自的验证方法，按最可能优先排序。' },
-  ],
-};
-const PROMPT_OUTPUT = '输出用 Markdown，小节标题固定；不要复述上下文，直接给结论与步骤。';
+/* ─────────── Prompt：查看 / 变更 / 发送 ───────────
+ * 合成只有一份实现（host 的 lib/prompt.mjs），面板通过 GET /api/prompts 取；
+ * 这里只负责：列表摘要、结构视图、原文编辑、发送预览。
+ */
+const promptCache = new Map();          // `${file}::${nodeId}` → { from, list, error }
+const PROMPT_BLOCKS = ['背景','当前节点','任务','要做什么','验收','约束','输出','验证命令','步骤','提交方式','收尾','质量要求'];
+const pkeyOf = (file, nid) => `${file}::${nid}`;
 
-function taskListFor(p, n){
-  const cardPrompts = p.card && p.card.prompts;
-  const nodePrompts = n.raw && n.raw.prompts;
-  if (Array.isArray(nodePrompts) && nodePrompts.length) return { list: nodePrompts, from: '节点自定义' };
-  if (cardPrompts && Array.isArray(cardPrompts[n.kind]) && cardPrompts[n.kind].length) {
-    return { list: cardPrompts[n.kind], from: 'rotation.json' };
+/** 拉一次某个节点的模板列表（from + list[{id,title,summary,prompt,warnings}]） */
+async function fetchPromptList(p, n){
+  if (!p || !n) return { from:'', list:[], error:'节点不存在' };
+  if (!p.file) return { from:'', list:[], error:'这个项目没有可写回的卡片文件' };
+  if (!API_BASE) return { from:'', list:[], error:'只读模式：提示词由服务生成，双击打开的页面看不了' };
+  try {
+    const res = await fetch(api(`/prompts?file=${encodeURIComponent(p.file)}&nodeId=${encodeURIComponent(n.id)}`));
+    if (res.status === 404) return { from:'', list:[], error:'宿主进程还是旧版：重启 DSH 后这里才有预览（面板文件已更新）' };
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) return { from:'', list:[], error:j.error || ('HTTP ' + res.status) };
+    return { from: j.from || '', list: j.list || [], error:'' };
+  } catch (error) {
+    return { from:'', list:[], error:'生成失败：' + error.message };
   }
-  return { list: PROMPT_TASKS[n.kind] || [], from: '内置' };
 }
 
-/* 上下文段可配：prompt_context.fields 有序列表；siblings 控制兄弟节点条数 */
-const CTX_DEFAULT = {
-  fields: ['project','loop','loop.intent','loop.acceptance','goal','goal.acceptance',
-           'idea','node','node.acceptance',
-           'exec.verify','exec.proof','exec.issues','children'],
-  siblings: 0,
-  refs: [],
-};
-const CTX_DEF = {
-  'project':         { sec:'ctx',  r:(p)=> `- 项目：${p.name}` },
-  'loop':            { sec:'ctx',  r:(p,t)=> t[0] ? `- 当前待闭环：${t[0].title}` : null },
-  'loop.intent':     { sec:'ctx',  r:(p,t)=> t[0] && t[0].raw && t[0].raw.intent ? `  - 闭环意图：${t[0].raw.intent}` : null },
-  'loop.acceptance': { sec:'ctx',  r:(p,t)=> t[0] && t[0].raw && t[0].raw.acceptance ? `  - 闭环验收：${t[0].raw.acceptance}` : null },
-  'goal':            { sec:'ctx',  r:(p,t,n)=>{ const g=t.find(x=>x.kind==='goal'); return g && g!==n ? `- 当前目标：${g.title}` : null; } },
-  'goal.acceptance': { sec:'ctx',  r:(p,t,n)=>{ const g=t.find(x=>x.kind==='goal'); return g && g!==n && g.raw && g.raw.acceptance ? `  - 目标验收：${g.raw.acceptance}` : null; } },
-  'idea':            { sec:'ctx',  r:(p,t,n)=>{ const i=t.find(x=>x.kind==='idea'); return i && i!==n ? `- 当前构思：${i.title}` : null; } },
-  'siblings':        { sec:'ctx',  r:(p,t,n,cfg)=>{
-      const parent = t[t.length-2];
-      if (!parent) return null;
-      const sibs = (parent.children||[]).filter(x=>x.id!==n.id).slice(0, cfg.siblings || 3);
-      if (!sibs.length) return null;
-      return `- 同级${KIND[sibs[0].kind]}：${sibs.map(x=>`${x.title}${x.closed?'（已关闭）':''}`).join('；')}`;
-    } },
-  'refs':            { sec:'ctx',  r:(p,t,n,cfg)=>{
-      const list = cfg.refs || [];
-      if (!list.length) return null;
-      const lines = list.map(id => {
-        const x = findNode(p.root, id);
-        if (!x) return null;
-        const r = x.raw || {};
-        const bits = [`状态 ${stateOf(x).label}`];
-        // 执行记录是会话日志：只带状态与未处置反馈，不再带验证 / 证据
-        if (x.kind === 'exec' && !isRecord(x)) {
-          if (r.verify) bits.push(`验证 ${r.verify}`);
-          if (r.proof) bits.push(`证据 ${r.proof}`);
-        }
-        if (x.kind === 'exec') {
-          const open = (r.issues||[]).filter(i=>!i.resolved_at).map(i=>i.text);
-          if (open.length) bits.push(`未处置反馈 ${open.join('；')}`);
-        } else if (r.acceptance) bits.push(`验收 ${r.acceptance}`);
-        return `- 引用·${KIND[x.kind]}「${x.title}」(${x.id})：${bits.join('；')}`;
-      }).filter(Boolean);
-      return lines.length ? lines.join('\n') : null;
-    } },
-  'node':            { sec:'node', r:(p,t,n)=> `- 类型：${KIND[n.kind]}（id: ${n.id}）\n- 标题：${n.title}\n- 状态：${stateOf(n).label}` },
-  'node.acceptance': { sec:'node', r:(p,t,n)=> (n.kind==='loop'||n.kind==='goal') && n.raw && n.raw.acceptance ? `- 验收：${n.raw.acceptance}` : null },
-  'exec.verify':     { sec:'node', r:(p,t,n)=> n.kind==='exec' && !isRecord(n) && n.raw && n.raw.verify ? `- 验证方式：${n.raw.verify}` : null },
-  'exec.proof':      { sec:'node', r:(p,t,n)=> n.kind==='exec' && !isRecord(n) ? `- 证据：${(n.raw && n.raw.proof) || '（未填写）'}` : null },
-  'exec.issues':     { sec:'node', r:(p,t,n)=>{
-      const open = ((n.raw && n.raw.issues) || []).filter(i=>!i.resolved_at).map(i=>i.text);
-      return open.length ? `- 未处置反馈：${open.join('；')}` : null;
-    } },
-  'children':        { sec:'node', r:(p,t,n)=>{
-      const kids = (n.children||[]).map(k=>`${KIND[k.kind]}·${k.title}`).slice(0, 8);
-      return kids.length ? `- 已有子节点：${kids.join('；')}` : null;
-    } },
-};
-function contextConf(p, n){
-  const fromNode = n.raw && n.raw.prompt_context;
-  const fromCard = p.card && p.card.prompt_context;
-  const cfg = fromNode || fromCard || {};
-  const refs = Array.isArray(cfg.refs) ? cfg.refs.filter(x => typeof x === 'string') : CTX_DEFAULT.refs;
-  let fields = Array.isArray(cfg.fields) && cfg.fields.length ? cfg.fields.slice() : CTX_DEFAULT.fields.slice();
-  if (refs.length && !fields.includes('refs')) fields = fields.concat(['refs']);   // refs 写了但 fields 没列 → 自动补在末尾
-  return {
-    fields,
-    siblings: Number.isFinite(cfg.siblings) ? cfg.siblings : CTX_DEFAULT.siblings,
-    refs,
-  };
+/** 详情卡打开时兜一次：拿到后只重绘 Prompt 段，不整卡闪 */
+async function ensurePromptList(p, n){
+  const key = pkeyOf(p.file, n.id);
+  if (promptCache.has(key)) return promptCache.get(key);
+  const next = await fetchPromptList(p, n);
+  promptCache.set(key, next);
+  if (detailNode === n.id && $('#prompt-sec')) repaintPromptSection(p, n);
+  return next;
 }
 
-function composePrompt(p, n, task){
-  const trail = pathTo(p.root, n.id);
-  const cfg = contextConf(p, n);
-  const ctx = [], node = [];
-  for (const key of cfg.fields){
-    const f = CTX_DEF[key];
-    if (!f) continue;
-    let v = null;
-    try { v = f.r(p, trail, n, cfg); } catch { v = null; }
-    if (!v) continue;
-    (f.sec === 'ctx' ? ctx : node).push(v);
-  }
+function repaintPromptSection(p, n){
+  const old = $('#prompt-sec');
+  if (!old) return;
+  const holder = document.createElement('div');
+  holder.innerHTML = promptSectionMarkup(p, n);
+  const next = holder.firstElementChild;
+  if (next) old.replaceWith(next);
+  restorePgen(p, n);
+}
+
+/** 某条模板的当前文本：手改过就用手改的，否则用 host 合成的 */
+function promptStateOf(p, n, taskId){
+  const cache = promptCache.get(pkeyOf(p.file, n.id));
+  const list = (cache && cache.list) || [];
+  const task = list.find(x => x.id === taskId) || list[0];
+  if (!task) return null;
+  const key = promptKey(n.id, task.id);
+  const edited = promptEdits.has(key);
+  return { task, key, text: edited ? promptEdits.get(key) : task.prompt, edited, warnings: task.warnings || [] };
+}
+
+/** 面板侧的结构提醒（host 也给一份，这里用于「改过之后」即时提示） */
+function promptWarnings(text){
   const out = [];
-  if (ctx.length){ out.push('# 上下文', ...ctx, ''); }
-  if (node.length){ out.push('# 当前节点', ...node, ''); }
-  out.push('# 任务', task.ask, '');
-  out.push('# 输出要求', PROMPT_OUTPUT);
-  return out.join('\n');
+  const lines = String(text || '').split('\n');
+  if (!lines[0] || !lines[0].includes(' · ')) out.push('首行应为「动作 · 对象」');
+  else if (lines.length > 1 && lines[1].trim() !== '') out.push('首行后面要空一行');
+  lines.forEach((line, i) => {
+    if ([...line].length > 72) out.push(`第 ${i + 1} 行超过 72 字`);
+    if (/\*\*/.test(line)) out.push(`第 ${i + 1} 行有 markdown 粗体（气泡不渲染）`);
+  });
+  return [...new Set(out)].slice(0, 3);
+}
+
+/** 结构视图：首行标题 + 块标签加粗 + 等宽正文（纯文本，不解析 markdown） */
+function promptViewHtml(text){
+  const lines = String(text || '').split('\n');
+  const out = [];
+  let open = false;
+  const close = () => { if (open){ out.push('</div>'); open = false; } };
+  lines.forEach((line, i) => {
+    if (i === 0){
+      out.push(`<div class="pview-h">${esc(line)}</div>`);
+      return;
+    }
+    if (!line.trim()){ close(); return; }
+    const label = line.trim();
+    if (PROMPT_BLOCKS.includes(label)){
+      close();
+      out.push(`<div class="pview-b"><div class="pview-k">${esc(label)}</div>`);
+      open = true;
+      return;
+    }
+    if (!open){ out.push('<div class="pview-b">'); open = true; }
+    out.push(`<div class="pview-l">${esc(line)}</div>`);
+  });
+  close();
+  return `<div class="pview">${out.join('')}</div>`;
+}
+
+function promptSectionMarkup(p, n){
+  const cache = promptCache.get(pkeyOf(p.file, n.id));
+  const head = `<div class="detail-k">Prompt 模板<span class="psrc">${esc(cache ? (cache.from || '') : '载入中')}</span></div>`;
+  if (!cache) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote">载入中…</div></div>`;
+  if (cache.error) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote" style="color:var(--amber)">${esc(cache.error)}</div></div>`;
+  if (!cache.list.length) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote">这个节点没有可用的 prompt 模板</div></div>`;
+  const rows = cache.list.map(t => `<div class="prow" data-task="${esc(t.id)}">
+      <button class="ptitle" data-preview-prompt="${esc(t.id)}" data-nid="${n.id}" data-proj="${p.id}" title="展开看结构 / 改原文">
+        <span class="ptt">${esc(t.title)}</span><span class="psum">${esc(t.summary || '')}</span>
+      </button>
+      <button class="pbtn" data-copy-prompt="${esc(t.id)}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
+      <button class="pbtn run" data-prompt-run="${esc(t.id)}" data-nid="${n.id}" data-proj="${p.id}" title="预览后发起会话">发起</button>
+    </div>`).join('');
+  return `<div class="detail-sec" id="prompt-sec">
+    ${head}
+    <div class="mnote">结构：首行任务 → 背景 → 当前节点 → 任务 → 输出。点标题展开；改过的内容会带进「发起」。</div>
+    <div class="prompt-list">${rows}</div>
+    <div class="pgen-wrap" id="pgen-wrap" hidden>
+      <div id="pgen-view"></div>
+      <div class="pgen-bar">
+        <button class="pbtn" data-pgen-edit="1">编辑原文</button>
+        <span class="pgen-hint" id="pgen-hint"></span>
+        <button class="pbtn" data-pgen-reset="1">重置</button>
+      </div>
+      <textarea class="pgen-input" id="pgen-input" spellcheck="false" hidden></textarea>
+      <div class="pgen-warn" id="pgen-warn"></div>
+    </div>
+  </div>`;
 }
 
 async function copyText(txt){
@@ -2733,7 +2696,6 @@ function detailMarkup(p, n){
     .concat(trail.slice(1).map(x => `<span>›</span><button data-jump="${x.id}" data-proj="${p.id}">${x.title}</button>`)).join('');
 
   const issues = (r.issues || []).map(i => `<div class="issue">⚠ ${i.text}${i.resolved_at ? ' · 已处置' : ''}</div>`).join('');
-  const tasks = taskListFor(p, n);
   const kidsHtml = kids.length
     ? `<div class="detail-sec"><div class="detail-k">子节点 ${kids.length}</div><div class="detail-chips">
         ${kids.map(k => {
@@ -2799,39 +2761,35 @@ function detailMarkup(p, n){
     ${lessonsMarkup(n)}
     ${sessionMarkup(p, n, { compact: isRecord(n) })}
 
-    <div class="detail-sec">
-      <div class="detail-k">Prompt 模板 · 点复制直接粘给模型<span class="psrc">${tasks.from}</span></div>
-      <div class="prompt-list">
-        ${tasks.list.map(t => `<div class="prow" data-task="${t.id}">
-          <button class="ptitle" data-preview-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}">${esc(t.title)}</button>
-          <button class="pbtn" data-copy-prompt="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="复制完整 prompt">复制</button>
-          <button class="pbtn run" data-prompt-run="${t.id}" data-nid="${n.id}" data-proj="${p.id}" title="用这条 prompt 发起会话">发起</button>
-        </div>`).join('')}
-      </div>
-      <div class="pgen-wrap" id="pgen-wrap" hidden>
-        <textarea class="pgen-input" id="pgen-input" spellcheck="false"></textarea>
-        <div class="pgen-bar">
-          <span class="pgen-hint" id="pgen-hint">点模板名展开，可直接改；「发起」会带上改过的内容</span>
-          <button class="pbtn" data-pgen-reset="1">重置</button>
-        </div>
-      </div>
-    </div>
+    ${promptSectionMarkup(p, n)}
     <div class="detail-acts">${acts}</div>`;
 }
 
 let detailNode = null;
 function restorePgen(p, n){
   if (!pgenOpen || pgenOpen.nid !== n.id) return;
-  const task = taskListFor(p, n).list.find(t => t.id === pgenOpen.task);
   const wrap = $('#pgen-wrap');
-  if (!task || !wrap) return;
-  const key = promptKey(n.id, task.id);
-  wrap.dataset.task = task.id; wrap.dataset.nid = n.id; wrap.dataset.proj = p.id;
-  $('#pgen-input').value = promptEdits.get(key) ?? composePrompt(p, n, task);
-  $('#pgen-hint').textContent = promptEdits.has(key)
-    ? '已手动修改（会带进「发起」）'
-    : '点模板名展开，可直接改；「发起」会带上改过的内容';
+  const state = promptStateOf(p, n, pgenOpen.task);
+  if (!state || !wrap) return;
+  wrap.dataset.task = state.task.id; wrap.dataset.nid = n.id; wrap.dataset.proj = p.id;
   wrap.hidden = false;
+  $('#pgen-view').innerHTML = promptViewHtml(state.text);
+  const warn = $('#pgen-warn');
+  if (warn){
+    const list = state.edited ? promptWarnings(state.text) : [];
+    warn.textContent = list.length ? '⚠ ' + list.join('；') : '';
+  }
+  $('#pgen-hint').textContent = state.edited
+    ? '已手动修改（会带进「发起」）'
+    : '点标题旁的「编辑原文」可以直接改';
+  const ta = $('#pgen-input');
+  if (ta){
+    ta.value = state.text;
+    ta.hidden = !pgenOpen.editing;
+    if (pgenOpen.editing) requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); });
+  }
+  const editBtn = wrap.querySelector('[data-pgen-edit]');
+  if (editBtn) editBtn.textContent = pgenOpen.editing ? '收起原文' : '编辑原文';
 }
 
 function closeDetail(){
@@ -2861,6 +2819,7 @@ function _openDetail(id, origin){
   if (!anchor) return;
   const d = $('#detail'), card = d.querySelector('.detail-card');
   card.innerHTML = detailMarkup(p, n);
+  ensurePromptList(p, n).catch(() => {});   // Prompt 段异步补数据，拿到后只重绘这一段
   if (n.kind !== 'idea') refreshPoolCount(p, n);   // 构思卡不再有候选池按钮
   d.hidden = false;
   document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
@@ -3139,9 +3098,8 @@ function stopActionPolls(){
   for (const t of actionPolls.values()) t.cancelled = true;
   actionPolls.clear();
 }
-/** 本地点一下就去跑：POST 建记录 + 起会话，然后轮询 /api/runs 等该构思的 run 终止 */
-async function runIdeaAction(projId, nid, action, btn){
-  const p0 = PROJECTS.find(x => x.id === projId), n0 = p0 && findNode(p0.root, nid);
+/** 发送预览确认后真正起会话：POST 建记录 + 起会话，然后轮询 /api/runs */
+async function startIdeaAction(p0, n0, action, btn, override = {}){
   if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
   if (!p0.file) return toast('该项目没有可写回的卡片文件');
   if (!API_BASE) return toast('未连接服务，无法发起会话');
@@ -3157,7 +3115,7 @@ async function runIdeaAction(projId, nid, action, btn){
   try {
     const res = await fetch(api(cfg.path), {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file: p0.file, nodeId: n0.id }),
+      body: JSON.stringify({ file: p0.file, nodeId: n0.id, ...override }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -3456,6 +3414,7 @@ async function reloadProjects(){
     const j = await r.json();
     const list = (j.cards || []).filter(x => x.card);
     PROJECTS = list.map(x => cardToProject(x.card, x.file));
+    promptCache.clear();              // 卡片变了，prompt 的上下文也跟着变
     await loadAllCandidateCounts();   // 节点卡上的「候选池 n」要跟着卡片一起刷新
     render();
     if (detailNode && findProjectByNode(detailNode)) openDetail(detailNode);
@@ -3746,70 +3705,182 @@ function openFieldEditor(label, value, nodeLabel){
   });
 }
 
-let launchCtx = null;   // { p, n, tasks, selected }
-function openLaunch(opts){
-  const id = (opts && opts.nodeId) || detailNode;
-  if (!id) return;
-  const p = findProjectByNode(id); const n = p && findNode(p.root, id);
-  if (!p || !n) return;
-  const tasks = taskListFor(p, n).list;
-  if (!tasks.length) return toast('这个节点没有可用的 prompt 模板');
-  const preset = (opts && opts.taskId) || (tasks[0] && tasks[0].id);
-  launchCtx = { p, n, tasks, selected: preset, edited: false };
-  if (!RUN_CFG){ toast('服务未连接：无法发起会话'); return; }
+/* ─────────── 发送预览弹窗：模板发起 / 计划发送 / 执行发送 ─────────── */
+let launchCtx = null;   // { mode:'run'|'plan'|'exec', p, n, task, text, objective, fallback }
+const launchWorkdir = (p) => (p && p.card && p.card.project && p.card.project.workspace) || '';
 
-  $('#launch-title').textContent = `${opts && opts.mode === 'edit' ? '修改 prompt' : '发起会话'} · ${KIND[n.kind]}「${n.title}」`;
-  $('#launch-body').innerHTML = `
-    <div class="detail-k" style="margin-bottom:5px">用哪条模板</div>
-    <div class="lsel">${tasks.map(t => `<label class="lopt"><input type="radio" name="ltask" value="${t.id}" ${t.id===preset?'checked':''}>
-      <span>${esc(t.title)}</span></label>`).join('')}</div>
-    <div class="detail-k" style="margin:12px 0 5px">Prompt（可直接改，改完再发起）
-      <span class="psrc" id="launch-edited" hidden>已手动修改</span></div>
-    <textarea id="launch-prompt" class="dfield" rows="9" spellcheck="false"></textarea>
-    <div class="mnote" style="margin-top:8px">工作目录 <span class="mono">${esc((p.card && p.card.project && p.card.project.workspace) || '')}</span></div>
-    ${RUN_CFG.hasApiKey === false ? `<div class="mnote" style="color:var(--amber)">⚠ 运行器没拿到模型凭据（服务进程环境里没有 DEEPSEEK_API_KEY），现在发起大概率会失败。用 <code>DEEPSEEK_API_KEY=… node serve.mjs</code> 启动服务即可。</div>` : ''}
-    <div class="mnote">会真实调用模型并按 headless profile 执行，可能需要一两分钟。同一节点同时只允许一个会话，并发上限 ${RUN_CFG.maxConcurrent}。</div>`;
-
+function launchEditVisible(on){
   const ta = $('#launch-prompt');
-  const fill = () => {
-    const t = tasks.find(x => x.id === launchCtx.selected) || tasks[0];
-    ta.value = composePrompt(p, n, t);
-    launchCtx.edited = false;
-    const badge = $('#launch-edited'); if (badge) badge.hidden = true;
-  };
-  fill();
-  if (opts && typeof opts.initialText === 'string' && opts.initialText.trim()){
-    ta.value = opts.initialText;
-    launchCtx.edited = true;
-    const badge = $('#launch-edited'); if (badge) badge.hidden = false;
-  }
-  ta.addEventListener('input', () => {
-    launchCtx.edited = true;
-    const badge = $('#launch-edited'); if (badge) badge.hidden = false;
-  });
-  $('#launch-body').querySelectorAll('input[name=ltask]').forEach(r => r.addEventListener('change', () => {
-    launchCtx.selected = r.value; fill();
-  }));
-
-  const m = $('#launch');
-  showModal(m);
-  requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); });
+  const view = $('#launch-view');
+  if (ta) ta.hidden = !on;
+  if (view) view.hidden = on;
+  const btn = $('#launch-edit');
+  if (btn) btn.textContent = on ? '收起原文' : '编辑原文';
 }
-function closeLaunch(){ hideModal($('#launch')); }
+
+/** 模板 / 计划：结构视图 + 原文编辑 */
+function paintTextLaunch({ text, commandLines, workdir, note }){
+  $('#launch-body').innerHTML = `
+    ${commandLines && commandLines.length ? `<div class="detail-k" style="margin:0 0 4px">会发出去的命令</div>
+      <div class="pcmd">${commandLines.map((x) => `<div>${esc(x)}</div>`).join('')}</div>` : ''}
+    <div class="detail-k" style="margin:${commandLines && commandLines.length ? '11px' : '0'} 0 4px">Prompt（发送预览）
+      <span class="psrc" id="launch-edited" hidden>已手动修改</span></div>
+    <div id="launch-view">${promptViewHtml(text)}</div>
+    <div class="pgen-bar">
+      <button class="pbtn" id="launch-edit">编辑原文</button>
+      <span class="pgen-hint" id="launch-hint">结构视图只读；要改就点「编辑原文」</span>
+    </div>
+    <textarea id="launch-prompt" class="dfield" rows="10" spellcheck="false" hidden></textarea>
+    <div class="pgen-warn" id="launch-warn"></div>
+    ${workdir ? `<div class="mnote">工作目录 <span class="mono">${esc(workdir)}</span></div>` : ''}
+    ${note ? `<div class="mnote">${esc(note)}</div>` : ''}`;
+  const ta = $('#launch-prompt');
+  ta.value = text;
+  const warn = $('#launch-warn');
+  warn.textContent = '';
+  ta.addEventListener('input', () => {
+    const value = ta.value;
+    if (launchCtx) launchCtx.text = value;
+    const badge = $('#launch-edited');
+    if (badge) badge.hidden = false;
+    const name = $('#launch-hint');
+    if (name) name.textContent = '已手工修改：发送的就是这版';
+    const list = promptWarnings(value);
+    warn.textContent = list.length ? '⚠ ' + list.join('；') : '';
+  });
+  const editBtn = $('#launch-edit');
+  editBtn.addEventListener('click', () => {
+    const on = ta.hidden;
+    launchEditVisible(on);
+    if (on){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    const name = $('#launch-hint');
+    if (name && on) name.textContent = '可直接改；改完自动更新上面的结构视图';
+  });
+}
+
+/** 执行计划：命令两行 + 可改的单行目标 + 只读的退回正文 */
+function paintExecLaunch({ objective, fallback, workdir }){
+  $('#launch-body').innerHTML = `
+    <div class="detail-k" style="margin:0 0 4px">会发出去的命令</div>
+    <div class="pcmd"><div>/plan off</div><div id="launch-goal">/goal ${esc(objective)}</div></div>
+    <div class="detail-k" style="margin:11px 0 4px">目标（可改，单行）</div>
+    <input id="launch-objective" class="dfield" spellcheck="false" value="${esc(objective)}" />
+    <div class="pgen-warn" id="launch-warn"></div>
+    <div class="detail-k" style="margin:11px 0 4px">命令不可用时的退回正文<span class="psrc">只读</span></div>
+    <div id="launch-view">${promptViewHtml(fallback)}</div>
+    <div class="mnote">工作目录 <span class="mono">${esc(workdir || '')}</span></div>
+    <div class="mnote">执行会续用上一轮计划会话：先 /plan off，再用 /goal 跑目标驱动的多轮执行。</div>`;
+  const input = $('#launch-objective');
+  const sync = () => {
+    const value = input.value;
+    if (launchCtx) launchCtx.objective = value;
+    const line = $('#launch-goal');
+    if (line) line.textContent = `/goal ${value}`;
+    const warn = $('#launch-warn');
+    const list = [];
+    if (!value.trim()) list.push('目标不能为空');
+    if (value.includes('\n')) list.push('目标只能是单行');
+    if ([...value].length > 240) list.push('目标超过 240 字，会截断');
+    if (warn) warn.textContent = list.length ? '⚠ ' + list.join('；') : '';
+  };
+  input.addEventListener('input', sync);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter'){ event.preventDefault(); doLaunch(); }
+  });
+  requestAnimationFrame(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); });
+}
+
+/** 模板发起（含「再跑一轮」「修改 prompt」） */
+async function openLaunch(opts = {}){
+  const id = opts.nodeId || detailNode;
+  if (!id) return;
+  const p = findProjectByNode(id);
+  const n = p && findNode(p.root, id);
+  if (!p || !n) return;
+  if (!RUN_CFG) return toast('服务未连接：无法发起会话');
+  const list = await ensurePromptList(p, n);
+  if (list.error) return toast(list.error);
+  const task = list.list.find((t) => t.id === opts.taskId) || list.list[0];
+  if (!task) return toast('这个节点没有可用的 prompt 模板');
+  const initial = typeof opts.initialText === 'string' && opts.initialText.trim() ? opts.initialText : '';
+  const editedText = promptEdits.get(promptKey(n.id, task.id));
+  const text = initial || editedText || task.prompt;
+  launchCtx = { mode: 'run', p, n, task, text };
+  $('#launch-title').textContent = `${opts.mode === 'edit' ? '修改 prompt' : '发送预览'} · ${KIND[n.kind]}「${n.title}」`;
+  paintTextLaunch({
+    text,
+    workdir: launchWorkdir(p),
+    note: `任务：${task.title}。确认后起一条会话，把这段作为消息发出去。`,
+  });
+  const badge = $('#launch-edited');
+  if (badge) badge.hidden = !(initial || editedText);
+  $('#launch-ok').textContent = '发送';
+  showModal($('#launch'));
+}
+
+/** 动作会话发送前：先看再发（生成计划 / 执行计划） */
+async function openActionPreview(projId, nid, action){
+  const p = PROJECTS.find((x) => x.id === projId);
+  const n = p && findNode(p.root, nid);
+  if (!p || !n) return;
+  if (!RUN_CFG) return toast('服务未连接：无法发起会话');
+  let data;
+  try {
+    data = await fetchActionPreview(p, n, action);
+  } catch (error) {
+    return toast('预览失败：' + error.message);
+  }
+  const item = (data.list || [])[0] || {};
+  if (action === 'exec'){
+    launchCtx = { mode: 'exec', p, n, action, objective: data.objective || '', fallback: data.fallback || item.prompt || '' };
+    $('#launch-title').textContent = `发送预览 · 执行计划 · 构思「${n.title}」`;
+    paintExecLaunch({ objective: data.objective || '', fallback: data.fallback || item.prompt || '', workdir: launchWorkdir(p) });
+  } else {
+    launchCtx = { mode: 'plan', p, n, action, text: item.prompt || '' };
+    $('#launch-title').textContent = `发送预览 · 生成计划 · 构思「${n.title}」`;
+    paintTextLaunch({
+      text: item.prompt || '',
+      commandLines: data.command && data.command.length ? [data.command[0].split('\n')[0] + ' …（整段作为正文）'] : [],
+      workdir: launchWorkdir(p),
+      note: '先 /plan 进计划模式，再把上面这段作为正文发出去；会话产出计划后写回卡片。',
+    });
+  }
+  $('#launch-ok').textContent = '发送';
+  showModal($('#launch'));
+}
+
+function closeLaunch(){
+  hideModal($('#launch'));
+  launchCtx = null;
+}
+
+async function fetchActionPreview(p, n, action){
+  const res = await fetch(api(`/prompts?file=${encodeURIComponent(p.file)}&nodeId=${encodeURIComponent(n.id)}&action=${encodeURIComponent(action)}`));
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) throw new Error(j.error || ('HTTP ' + res.status));
+  return j;
+}
+
 async function doLaunch(){
   if (!launchCtx || !RUN_CFG) return;
-  const { p, n, tasks, selected } = launchCtx;
-  const ta = $('#launch-prompt');
-  const prompt = (ta && ta.value || '').trim();
-  if (!prompt) return toast('prompt 是空的');
-  const task = tasks.find(x => x.id === selected) || tasks[0];
+  const ctx = launchCtx;
+  const { mode, p, n, task, action } = ctx;
+  if (mode === 'exec'){
+    const objective = String(($('#launch-objective') || {}).value || ctx.objective || '').trim();
+    if (!objective) return toast('目标不能为空');
+    closeLaunch();
+    return startIdeaAction(p, n, 'exec', null, { objective });
+  }
+  const text = String(($('#launch-prompt') || {}).value || ctx.text || '').trim();
+  if (!text) return toast('prompt 是空的');
   closeLaunch();
+  if (mode === 'plan') return startIdeaAction(p, n, 'plan', null, { prompt: text });
   toast('会话启动中…');
   try {
     const res = await fetch(api('/run'), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-rotation-token': RUN_CFG.token },
-      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt, taskId: task && task.id }),
+      body: JSON.stringify({ file: p.file, nodeId: n.id, prompt: text, taskId: task && task.id }),
     });
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
@@ -3817,9 +3888,15 @@ async function doLaunch(){
     paintRunBadges(); refreshRuns();
     if (detailNode === n.id) openDetail(n.id);
     toast('会话已启动');
-  } catch (e) {
-    toast('发起失败：' + e.message);
+  } catch (error) {
+    toast('发起失败：' + error.message);
   }
+}
+
+function launchCopyText(){
+  if (!launchCtx) return '';
+  if (launchCtx.mode === 'exec') return `/plan off\n/goal ${String(($('#launch-objective') || {}).value || launchCtx.objective || '').trim()}`;
+  return String(($('#launch-prompt') || {}).value || launchCtx.text || '');
 }
 
 function showModal(m){
@@ -3878,8 +3955,8 @@ $('#launch-x').addEventListener('click', closeLaunch);
 $('#launch-cancel').addEventListener('click', closeLaunch);
 $('#launch-ok').addEventListener('click', doLaunch);
 $('#launch-copy').addEventListener('click', () => {
-  const ta = $('#launch-prompt');
-  copyText(ta ? ta.value : '').then(ok => toast(ok ? '已复制 prompt' : '复制失败：剪贴板被拒'));
+  const text = launchCopyText();
+  copyText(text).then(ok => toast(ok ? '已复制（与发送内容一致）' : '复制失败：剪贴板被拒'));
 });
 $('#launch').addEventListener('click', (e) => { if (e.target.id === 'launch') closeLaunch(); });
 $('#modal-x').addEventListener('click', closeConfirm);
@@ -4022,6 +4099,7 @@ async function persist(p){
       throw new Error((j.error || ('HTTP ' + res.status)) + detail);
     }
     markSave(`已写入 ${p.file} · ${new Date().toLocaleTimeString('sv-SE')}`, 'ok');
+    promptCache.clear();   // 卡片字段变了，prompt 上下文要重新合成
     return { ok:true, warnings: j.warnings || [] };
   } catch (e) {
     markSave('写入失败：' + e.message, 'err');
@@ -4045,15 +4123,22 @@ document.addEventListener('input', (e) => {
   if (!e.target.closest('#pgen-input')) return;
   const wrap = $('#pgen-wrap');
   if (!wrap || !wrap.dataset.task) return;
-  const v = e.target.value;
-  const key = promptKey(wrap.dataset.nid, wrap.dataset.task);
   const p0 = PROJECTS.find(x => x.id === wrap.dataset.proj);
   const n0 = p0 && findNode(p0.root, wrap.dataset.nid);
-  const task = p0 && n0 && taskListFor(p0, n0).list.find(t => t.id === wrap.dataset.task);
-  if (p0 && n0 && task && v === composePrompt(p0, n0, task)) promptEdits.delete(key);
-  else promptEdits.set(key, v);
+  if (!p0 || !n0) return;
+  const state = promptStateOf(p0, n0, wrap.dataset.task);
+  if (!state) return;
+  const value = e.target.value;
+  const key = promptKey(n0.id, state.task.id);
+  if (value === state.task.prompt) promptEdits.delete(key);
+  else promptEdits.set(key, value);
+  const view = $('#pgen-view');
+  if (view) view.innerHTML = promptViewHtml(value);
+  const warn = $('#pgen-warn');
+  const list = promptWarnings(value);
+  if (warn) warn.textContent = list.length ? '⚠ ' + list.join('；') : '';
   const hint = $('#pgen-hint');
-  if (hint) hint.textContent = promptEdits.has(key) ? '已手动修改（会带进「发起」）' : '点模板名展开，可直接改；「发起」会带上改过的内容';
+  if (hint) hint.textContent = promptEdits.has(key) ? '已手动修改（会带进「发起」）' : '点「编辑原文」可以直接改';
 });
 
 document.addEventListener('change', (e) => {
@@ -4311,7 +4396,7 @@ document.addEventListener('click', (e)=>{
   if (candGen){ generateCandidates(candGen.dataset.proj, candGen.dataset.nid, candGen); return; }
   const ideaAct = e.target.closest('[data-idea-act]');
   if (ideaAct){
-    if (!ideaAct.disabled) runIdeaAction(ideaAct.dataset.proj, ideaAct.dataset.nid, ideaAct.dataset.ideaAct, ideaAct);
+    if (!ideaAct.disabled) openActionPreview(ideaAct.dataset.proj, ideaAct.dataset.nid, ideaAct.dataset.ideaAct);
     return;
   }
   const planDoc = e.target.closest('[data-plan-doc]');
@@ -4372,9 +4457,25 @@ document.addEventListener('click', (e)=>{
       promptEdits.delete(promptKey(wrap.dataset.nid, wrap.dataset.task));
       const p0 = PROJECTS.find(x => x.id === wrap.dataset.proj);
       const n0 = p0 && findNode(p0.root, wrap.dataset.nid);
-      const task = p0 && n0 && taskListFor(p0, n0).list.find(t => t.id === wrap.dataset.task);
-      if (p0 && n0 && task){ $('#pgen-input').value = composePrompt(p0, n0, task); $('#pgen-hint').textContent = '已恢复默认'; }
+      if (p0 && n0){
+        if (pgenOpen) pgenOpen.editing = false;
+        restorePgen(p0, n0);
+        const hint = $('#pgen-hint');
+        if (hint) hint.textContent = '已恢复默认';
+      }
     }
+    return;
+  }
+  if (e.target.closest('[data-pgen-edit]')){
+    if (!pgenOpen) return;
+    pgenOpen.editing = !pgenOpen.editing;
+    const ta = $('#pgen-input');
+    const view = $('#pgen-view');
+    if (ta) ta.hidden = !pgenOpen.editing;
+    if (view) view.hidden = pgenOpen.editing;
+    const btn = e.target.closest('[data-pgen-edit]');
+    if (btn) btn.textContent = pgenOpen.editing ? '收起原文' : '编辑原文';
+    if (pgenOpen.editing && ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
     return;
   }
   const foldBtn = e.target.closest('[data-fold]');
@@ -4475,12 +4576,6 @@ document.addEventListener('click', (e)=>{
     });
     return;
   }
-  const editBtn = e.target.closest('[data-prompt-edit]');
-  if (editBtn){
-    const p0 = PROJECTS.find(x => x.id === editBtn.dataset.proj);
-    if (p0) openLaunch({ nodeId: editBtn.dataset.nid, taskId: editBtn.dataset.promptEdit, mode:'edit' });
-    return;
-  }
   if (e.target.closest('[data-run-again]')){
     const id0 = detailNode;
     const p0 = findProjectByNode(id0); const n0 = p0 && findNode(p0.root, id0);
@@ -4512,43 +4607,32 @@ document.addEventListener('click', (e)=>{
   if (copyPrompt){
     const p0 = PROJECTS.find(x => x.id === copyPrompt.dataset.proj);
     const n0 = p0 && findNode(p0.root, copyPrompt.dataset.nid);
-    const task = taskListFor(p0, n0).list.find(t => t.id === copyPrompt.dataset.copyPrompt);
-    if (p0 && n0 && task){
-      const txt = promptEdits.get(promptKey(n0.id, task.id)) ?? composePrompt(p0, n0, task);
-      copyText(txt).then(ok => {
-        if (ok) { toast(`已复制「${task.title}」prompt`); return; }
-        // 剪贴板被拒：展开原文并选中，方便手动 ⌘C
-        const pre = $('#pgen');
-        if (pre){
-          pre.textContent = txt; pre.dataset.task = task.id; pre.hidden = false;
-          const range = document.createRange(); range.selectNodeContents(pre);
-          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
-        }
-        toast('剪贴板被拒：已展开并选中文本，按 ⌘C 复制');
-      });
-    }
+    if (!p0 || !n0) return;
+    const state = promptStateOf(p0, n0, copyPrompt.dataset.copyPrompt);
+    if (!state) return toast('prompt 还在载入，稍等再点');
+    copyText(state.text).then(ok => {
+      if (ok){ toast(`已复制「${state.task.title}」prompt`); return; }
+      // 剪贴板被拒：展开原文并选中，方便手动复制
+      pgenOpen = { nid: n0.id, task: state.task.id, editing: true };
+      restorePgen(p0, n0);
+      const ta = $('#pgen-input');
+      if (ta){ ta.focus(); ta.select(); }
+      toast('剪贴板被拒：已展开并选中文本，按 Ctrl+C 复制');
+    });
     return;
   }
   const previewPrompt = e.target.closest('[data-preview-prompt]');
   if (previewPrompt){
     const p0 = PROJECTS.find(x => x.id === previewPrompt.dataset.proj);
     const n0 = p0 && findNode(p0.root, previewPrompt.dataset.nid);
-    const task = taskListFor(p0, n0).list.find(t => t.id === previewPrompt.dataset.previewPrompt);
     const wrap = $('#pgen-wrap');
-    if (p0 && n0 && task && wrap){
-      const same = wrap.dataset.task === task.id;
-      if (same && !wrap.hidden){ wrap.hidden = true; wrap.dataset.task = ''; pgenOpen = null; return; }
-      pgenOpen = { nid: n0.id, task: task.id };
-      const key = promptKey(n0.id, task.id);
-      $('#pgen-input').value = promptEdits.get(key) ?? composePrompt(p0, n0, task);
-      wrap.dataset.task = task.id;
-      wrap.dataset.nid = n0.id;
-      wrap.dataset.proj = p0.id;
-      wrap.hidden = false;
-      $('#pgen-hint').textContent = promptEdits.has(key) ? '已手动修改（会带进「发起」）' : '点模板名展开，可直接改；「发起」会带上改过的内容';
-      $('#pgen-input').focus();
-      wrap.scrollIntoView({ block:'nearest' });
-    }
+    if (!p0 || !n0 || !wrap) return;
+    const taskId = previewPrompt.dataset.previewPrompt;
+    const same = pgenOpen && pgenOpen.nid === n0.id && pgenOpen.task === taskId;
+    if (same && !wrap.hidden){ wrap.hidden = true; pgenOpen = null; return; }
+    pgenOpen = { nid: n0.id, task: taskId, editing: false };
+    restorePgen(p0, n0);
+    wrap.scrollIntoView({ block:'nearest' });
     return;
   }
   const jump = e.target.closest('[data-jump]');
