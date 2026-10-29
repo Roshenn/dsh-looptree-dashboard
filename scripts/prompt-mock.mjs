@@ -157,6 +157,16 @@ const accIdea = JSON.parse(JSON.stringify(fx));
 accIdea.loop.children[0].children[0].acceptance = '章节与情节可双向查询';
 const accPlan = composePlanPrompt({ ...fxArgs, card: accIdea });
 check('构思自己的验收单独成块', accPlan.includes('\n验收\n- 章节与情节可双向查询'), '');
+// 长字段卡片（真实卡可能几百字场景/约束/验收）：裁剪预算必须兜住 1500 字 + 72 列
+const longCard = JSON.parse(JSON.stringify(fx));
+longCard.loop.scenario = Array.from({ length: 6 }, (_, i) => `${i + 1})操作：打开面板选择项目\n预期：看到预览\n体验：10 秒内完成`).join('\n');
+longCard.loop.constraints = Array.from({ length: 5 }, (_, i) => `${i + 1})仅本机单用户，不开放公网，也不做跨设备同步`).join('；');
+longCard.loop.children[0].acceptance = Array.from({ length: 5 }, (_, i) => `${i + 1})步骤${i + 1}：pnpm test:e2e 用例全绿且新增断言可复现`).join('；');
+const longPlan = composePlanPrompt({ ...fxArgs, card: longCard });
+const longWarn = lintPrompt(longPlan, { maxLength: 1500 }).warnings;
+check('长字段卡片：计划仍 ≤1500 字', [...longPlan].length <= 1500, String([...longPlan].length));
+check('长字段卡片：计划 lint 无警告（含 72 列）', longWarn.length === 0, JSON.stringify(longWarn.slice(0, 2)));
+check('长字段裁掉后有「全文见卡片」提示', longPlan.includes('（全文见卡片）'), '');
 // /goal 计划指针：240 字用来写「计划在哪」，不内联步骤
 const pointerXr = composeGoalObjective({ ...fxArgs, card: readCard('execution-records.rotation.json'), nodeId: 'xr-i1' });
 check('/goal 指向卡片文件', pointerXr.includes('/.dsh/rotation.json'), pointerXr.slice(0, 60));
