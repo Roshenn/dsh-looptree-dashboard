@@ -487,8 +487,20 @@
   .fp-count[data-over="1"]{color:var(--red)}
   .cand-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .cand-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;
-    border:1px solid color-mix(in srgb,var(--b2) 70%,transparent);background:color-mix(in srgb,#fff 18%,transparent)}
-  .cand-main{flex:1;min-width:0}
+    border:1px solid color-mix(in srgb,var(--b2) 70%,transparent);background:color-mix(in srgb,#fff 18%,transparent);
+    max-height:110px;overflow:hidden;
+    transition:opacity 180ms var(--ease-out),transform 180ms var(--ease-out),max-height 200ms var(--ease-out),
+      padding 200ms var(--ease-out),border-color 200ms var(--ease-out),background 200ms var(--ease-out)}
+  /* 已加入：整行立刻换绿、正文降透明度；0.5s 后收缩退场，不再参与点击 */
+  .cand-row[data-added="1"]{border-color:color-mix(in srgb,var(--green) 42%,transparent);
+    background:color-mix(in srgb,var(--green) 10%,transparent)}
+  .cand-row[data-added="1"] .cand-main{opacity:.55}
+  .cand-row[data-leaving="1"]{opacity:0;transform:translateX(-8px);max-height:0;
+    padding-top:0;padding-bottom:0;border-color:transparent;pointer-events:none}
+  .tbtn.added{background:color-mix(in srgb,var(--green) 16%,transparent);
+    border-color:color-mix(in srgb,var(--green) 45%,transparent);color:var(--green);pointer-events:none}
+  .cand-empty{padding:16px 4px 10px;text-align:center;font-size:11.5px;color:var(--tx4);line-height:1.6}
+  .cand-main{flex:1;min-width:0;transition:opacity 200ms var(--ease-out)}
   .cand-title{font-size:12px;color:var(--tx1);font-weight:500}
   .cand-acc{font-size:10.5px;color:var(--tx4);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
@@ -2868,64 +2880,153 @@ async function refreshPoolCount(p, n){
     document.querySelector(`.tnode[data-nid="${n.id}"]`));
 }
 
-async function openCandidatePool(pid, nid){
-  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
-  if (!p0 || !n0) return;
-  const list = await loadCandidates(p0, n0);
-  paintCandButtons(list.length,
-    detailNode === n0.id ? $('#detail') : null,
-    document.querySelector(`.tnode[data-nid="${n0.id}"]`));
-  const rows = list.map((c, i) => `
-    <div class="cand-row">
+/** 候选池弹窗的临时状态：当前项目 / 节点、剩余候选顺序、本次已加入条数 */
+const CAND_META = { p0: null, n0: null, list: [], added: 0 };
+let CAND_UID = 0;
+/** 每行只认前端一次性 uid；服务器索引在每次操作时现算，避免删除/添加后错位 */
+const candUid = (c) => c.__uid || (c.__uid = ++CAND_UID);
+const candIndexOf = (uid) => CAND_META.list.findIndex(c => String(candUid(c)) === String(uid));
+
+const candRowHtml = (c, p0, n0) => `
+    <div class="cand-row" data-cand-row="${candUid(c)}">
       <div class="cand-main">
         <div class="cand-title">${esc(c.title || '（未命名）')}</div>
         ${c.acceptance ? `<div class="cand-acc">${esc(c.acceptance)}</div>` : ''}
       </div>
-      <button class="tbtn primary" data-cand-adopt="${i}" data-nid="${n0.id}" data-proj="${p0.id}">添加</button>
-      <button class="tbtn" data-cand-del="${i}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
-    </div>`).join('');
-  askConfirm(`候选池 · ${list.length} 条`,
-    `<div class="cand-list">${rows || '<div class="mnote">候选池是空的：先点「生成候选」。</div>'}</div>
-     <div class="mnote">加入后即成为真实的子节点；也可以逐条删除或清空。</div>`,
-    list.length ? '清空候选池' : '关闭',
-    list.length ? async () => {
-      await fetch(api('/candidates/delete'), {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ file: p0.file, nodeId: n0.id, all: true }),
-      });
-      await loadCandidates(p0, n0);
-      paintCandButtons(0,
-        detailNode === n0.id ? $('#detail') : null,
-        document.querySelector(`.tnode[data-nid="${n0.id}"]`));
-      toast('候选池已清空');
-    } : null);
+      <button class="tbtn primary" data-cand-adopt="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}">添加</button>
+      <button class="tbtn" data-cand-del="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
+    </div>`;
+
+const candEmptyHtml = (added) => `<div class="cand-empty">${added
+  ? `本次已加入 ${added} 条子节点`
+  : '候选池是空的：先点「生成候选」'}</div>`;
+
+const candNoteText = () => CAND_META.list.length
+  ? '点「添加」写入为真实子节点；确认后会自己退场。'
+  : '';
+
+const candPoolBody = () => CAND_META.list.length
+  ? `<div class="cand-list">${CAND_META.list.map(c => candRowHtml(c, CAND_META.p0, CAND_META.n0)).join('')}</div>
+    <div class="mnote">${candNoteText()}</div>`
+  : `<div class="cand-list">${candEmptyHtml(CAND_META.added)}</div>`;
+
+/** 标题计数与底部按钮换挡；行内容交给退场动画处理，不整窗重建 */
+function paintCandChrome(){
+  const n = CAND_META.list.length;
+  $('#ask-title').textContent = n ? `候选池 · ${n} 条` : '候选池 · 已清空';
+  $('#ask-ok').textContent = n ? '清空候选池' : '关闭';
+  if (!n){
+    askCb = null;
+    $('#ask-cancel').style.display = 'none';      // 空池只剩「关闭」，不留一个无意义的取消
+    $('#ask-body .mnote')?.remove();              // 「会自己退场」的说明此刻已失效
+    return;
+  }
+  $('#ask-cancel').style.display = '';
+  const note = $('#ask-body .mnote');
+  if (note) note.textContent = candNoteText();
 }
 
-async function adoptCandidate(pid, nid, index){
+/** 行全退场后才把列表换成空池文案，避免最后一条没来得及显示「已添加」 */
+function syncCandEmpty(){
+  const box = $('#ask-body .cand-list');
+  if (box && !box.querySelector('.cand-row')) box.innerHTML = candEmptyHtml(CAND_META.added);
+}
+
+/** 面板上的「候选池 n / 生成候选」按剩余条数换挡（详情卡 + 节点卡两处） */
+function paintPoolButtons(){
+  if (!CAND_META.n0) return;
+  paintCandButtons(CAND_META.list.length,
+    detailNode === CAND_META.n0.id ? $('#detail') : null,
+    document.querySelector(`.tnode[data-nid="${CAND_META.n0.id}"]`));
+}
+
+async function openCandidatePool(pid, nid){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
+  const list = await loadCandidates(p0, n0);
+  CAND_META.p0 = p0; CAND_META.n0 = n0;
+  CAND_META.list = list.slice();
+  CAND_META.added = 0;
+  paintPoolButtons();
+  askConfirm(
+    CAND_META.list.length ? `候选池 · ${CAND_META.list.length} 条` : '候选池 · 已清空',
+    candPoolBody(),
+    CAND_META.list.length ? '清空候选池' : '关闭',
+    CAND_META.list.length ? async () => {
+      await fetch(api('/candidates/delete'), {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ file: CAND_META.p0.file, nodeId: CAND_META.n0.id, all: true }),
+      });
+      await loadCandidates(CAND_META.p0, CAND_META.n0);
+      CAND_META.list = [];
+      paintPoolButtons();
+      toast('候选池已清空');
+    } : null,
+  );
+}
+
+/** 添加：行内立刻切成「✓ 已添加」，0.5s 后收缩退场；期间不整窗重建，也不打断下一个点击 */
+async function adoptCandidate(uid, btn){
+  const idx = candIndexOf(uid);
+  const row = btn && btn.closest('.cand-row');
+  if (idx < 0 || !row || row.dataset.busy === '1') return;
+  row.dataset.busy = '1';
+  row.dataset.added = '1';
+  btn.classList.remove('primary');
+  btn.classList.add('added');
+  btn.disabled = true;
+  btn.textContent = '✓ 已添加';
+  const del = row.querySelector('[data-cand-del]');
+  if (del) del.disabled = true;
   try {
     const res = await fetch(api('/candidates/adopt'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file: p0.file, nodeId: n0.id, index: Number(index) }),
+      body: JSON.stringify({ file: CAND_META.p0.file, nodeId: CAND_META.n0.id, index: idx }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
-    toast(`已加入子节点：${j.child && j.child.title}`);
-    await reloadProjects();
-    if (detailNode) openDetail(detailNode);
-  } catch (error) { toast('加入失败：' + error.message); }
+    CAND_META.list.splice(idx, 1);
+    CAND_META.added += 1;
+    paintCandChrome();
+    toast(`已加入子节点：${(j.child && j.child.title) || ''}`);
+    reloadProjects();   // 卡片上的「候选池 n」与新子节点一起刷新，不挡退场动画
+    setTimeout(() => {
+      row.dataset.leaving = '1';
+      setTimeout(() => { row.remove(); syncCandEmpty(); paintPoolButtons(); }, 200);
+    }, 480);
+  } catch (error) {
+    delete row.dataset.added;
+    delete row.dataset.busy;
+    btn.classList.remove('added');
+    btn.classList.add('primary');
+    btn.disabled = false;
+    btn.textContent = '添加';
+    if (del) del.disabled = false;
+    toast('加入失败：' + error.message);
+  }
 }
 
-async function deleteCandidate(pid, nid, index){
-  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
-  if (!p0 || !n0) return;
-  await fetch(api('/candidates/delete'), {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ file: p0.file, nodeId: n0.id, index: Number(index) }),
-  }).catch(() => {});
-  await loadCandidates(p0, n0);
-  await openCandidatePool(pid, nid);
+/** 删除：同样按行退场，不再重开一次弹窗 */
+async function deleteCandidate(uid, btn){
+  const idx = candIndexOf(uid);
+  const row = btn && btn.closest('.cand-row');
+  if (idx < 0 || !row || row.dataset.busy === '1') return;
+  row.dataset.busy = '1';
+  row.dataset.leaving = '1';
+  try {
+    const res = await fetch(api('/candidates/delete'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: CAND_META.p0.file, nodeId: CAND_META.n0.id, index: idx }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    CAND_META.list.splice(idx, 1);
+    paintCandChrome();
+    setTimeout(() => { row.remove(); syncCandEmpty(); paintPoolButtons(); }, 200);
+  } catch (error) {
+    delete row.dataset.leaving;
+    delete row.dataset.busy;
+    toast('删除失败：' + error.message);
+  }
 }
 
 /** 手动添加子节点：只问标题，其余字段进详情再填 */
@@ -3510,6 +3611,7 @@ function askConfirm(title, bodyHtml, okLabel, onOk){
   $('#ask-title').textContent = title;
   $('#ask-body').innerHTML = bodyHtml;
   $('#ask-ok').textContent = okLabel || '确认';
+  $('#ask-cancel').style.display = '';    // 候选池空态会临时藏掉「取消」，每次开窗都还原
   askCb = onOk;
   showModal($('#ask'));
 }
@@ -3845,7 +3947,7 @@ document.addEventListener('click', (e)=>{
   if (e.target.closest('#fp-mask') || e.target.closest('#field-pop')) return;
   // 点详情卡外面 → 关闭；点到别的节点则交给下面的节点逻辑切换
   const dEl = $('#detail');
-  if (dEl && !dEl.hidden && !e.target.closest('.detail-card')){
+  if (dEl && !dEl.hidden && !e.target.closest('.detail-card') && !e.target.closest('#ask')){
     const inOtherNode = e.target.closest('.tnode');
     if (!inOtherNode || e.target.closest('button')) closeDetail();
   }
@@ -3862,9 +3964,9 @@ document.addEventListener('click', (e)=>{
   const candPool = e.target.closest('[data-cand-pool]');
   if (candPool){ openCandidatePool(candPool.dataset.proj, candPool.dataset.nid); return; }
   const candAdopt = e.target.closest('[data-cand-adopt]');
-  if (candAdopt){ adoptCandidate(candAdopt.dataset.proj, candAdopt.dataset.nid, candAdopt.dataset.candAdopt); return; }
+  if (candAdopt){ adoptCandidate(candAdopt.dataset.candAdopt, candAdopt); return; }
   const candDel = e.target.closest('[data-cand-del]');
-  if (candDel){ deleteCandidate(candDel.dataset.proj, candDel.dataset.nid, candDel.dataset.candDel); return; }
+  if (candDel){ deleteCandidate(candDel.dataset.candDel, candDel); return; }
   const manualAdd = e.target.closest('[data-manual-add]');
   if (manualAdd){ manualAddChild(manualAdd.dataset.proj, manualAdd.dataset.nid); return; }
   const delNode = e.target.closest('[data-del-node]');
