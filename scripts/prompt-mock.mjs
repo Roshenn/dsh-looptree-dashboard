@@ -16,6 +16,7 @@ import {
   actionCommand,
   composeActionPrompt,
   composeCandidatePrompt,
+  composeCollectServicesPrompt,
   composeFillPrompt,
   composeGoalObjective,
   composeIdeaPrompt,
@@ -127,6 +128,19 @@ check('候选要 JSON 数组', candText.includes('[{"title"'));
 const fillText = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['acceptance'] });
 check('补全要 JSON 对象', fillText.includes('{"acceptance": "..."'));
 check('补全带字段上限', fillText.includes('≤300 字'));
+
+/* 服务信息收集：项目级 prompt，要求平台化 start + JSON 契约 */
+const collectText = composeCollectServicesPrompt({
+  projectName: 'X', workspace: '/w', platform: 'darwin',
+  existing: [{ id: 'web', name: '本地预览', url: 'http://127.0.0.1:5273', start: 'pnpm dev' }],
+});
+check('收集服务首行是「动作 · 对象」', collectText.startsWith('收集服务 · 项目「X」'), collectText.split('\n')[0]);
+check('收集服务要求 mac 与 windows 两条', collectText.includes('mac') && collectText.includes('windows'));
+check('收集服务要 JSON services', collectText.includes('{"services":[{"id":"web"'));
+check('收集服务带已有 services 作为参考', collectText.includes('已有 services') && collectText.includes('http://127.0.0.1:5273'));
+check('收集服务 lint 无警告', lintPrompt(collectText).warnings.length === 0, JSON.stringify(lintPrompt(collectText).warnings.slice(0, 2)));
+check('收集服务：无已有服务时写「无」',
+  composeCollectServicesPrompt({ projectName: 'Y', workspace: '/w' }).includes('- 已有 services：无'));
 
 /* ── 4. 模板优先级与 prompt_context 配置 ── */
 const custom = JSON.parse(JSON.stringify(fx));

@@ -97,10 +97,11 @@
     border-right:1px solid var(--b2);position:sticky;left:0;z-index:7;background:inherit;
     border-radius:9px 0 0 9px}
   .lane-name{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--tx1)}
-  .lane-x{margin-left:auto;width:16px;height:16px;line-height:14px;border-radius:4px;border:1px solid transparent;
-    background:transparent;color:var(--tx4);font-size:10px;opacity:0;transition:opacity 140ms var(--ease-out),color 140ms var(--ease-out)}
-  .lane:hover .lane-x{opacity:1}
-  .lane-x:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
+  .lane-menu{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+    border-radius:5px;border:1px solid transparent;background:transparent;color:var(--tx4);font-size:14px;line-height:1;
+    opacity:.55;transition:opacity 140ms var(--ease-out),color 140ms var(--ease-out),background-color 140ms var(--ease-out),border-color 140ms var(--ease-out)}
+  .lane:hover .lane-menu,.lane-menu[aria-expanded="true"]{opacity:1}
+  .lane-menu:hover,.lane-menu[aria-expanded="true"]{color:var(--tx1);background:var(--hover);border-color:var(--b2)}
   .lane-tag{font-size:10.5px;color:var(--tx4);letter-spacing:.04em}
   .lane-prog{margin-top:2px;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--tx4)}
   .lane-actions{display:flex;gap:5px;margin-top:4px}
@@ -254,6 +255,10 @@
   .addmenu .am-ai .am-sub{color:color-mix(in srgb,var(--brand) 60%,var(--tx4))}
   .addmenu button.is-locked{opacity:.55;cursor:not-allowed}
   .addmenu button.is-locked:hover{background:transparent}
+  /* 危险项（移除项目）：红字，只在 hover 时铺底色 */
+  .addmenu .am-danger{color:var(--red)}
+  .addmenu .am-danger:hover{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
+  .addmenu .am-danger .am-sub{color:color-mix(in srgb,var(--red) 55%,var(--tx4))}
   @media (prefers-reduced-motion: reduce){ .addmenu{transition:none} }
   /* AI 拆目标的预览行（ask 弹窗内） */
   .gsel{display:flex;gap:8px;padding:8px 6px}
@@ -268,6 +273,19 @@
   .gsel-acc:focus{outline:2px solid var(--brand);outline-offset:0}
   .gsel-str{font-size:11px;color:var(--tx3);line-height:1.5}
   .gsel-str b{color:var(--tx2);font-weight:500}
+  /* 服务信息收集的预览行（ask 弹窗内）：勾选 → 探活 → 改 url / 平台命令 → 确认写回 */
+  .svc-cand{display:flex;gap:8px;padding:9px 8px;border:1px solid var(--b1);border-radius:8px;background:var(--l1)}
+  .svc-cand[data-dup="1"]{border-style:dashed}
+  .svc-cand input[type="checkbox"]{margin-top:4px;accent-color:var(--brand);flex:0 0 auto}
+  .svc-cand-main{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+  .svc-cand-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx1);min-width:0}
+  .svc-cand-head b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .svc-probe{margin-left:auto;font-style:normal;font-size:10px;color:var(--tx4);white-space:nowrap}
+  .svc-probe[data-ok="1"]{color:var(--green)}
+  .svc-probe[data-ok="0"]{color:var(--amber)}
+  .svc-cand .dfield{font-size:11px;padding:4px 6px}
+  .svc-cand-cmds{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .svc-cand-meta{font-size:10px;color:var(--tx4);line-height:1.5;word-break:break-all}
   .tfootline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
     margin:7px -9px 0 -11px;padding:5px 9px 6px 11px;
     border-top:1px solid var(--b1);background:color-mix(in srgb,var(--bg-base) 34%,transparent);border-radius:0 0 8px 8px}
@@ -306,6 +324,11 @@
   .lane-svc .svc-url{font-size:10px;padding:0 0 2px}
   .lane-svc .svc-acts{gap:3px}
   .lane-svc .pbtn{height:19px;padding:0 6px;font-size:10px}
+  /* 平台化启动命令：当前平台那条会真正执行 */
+  .lane-svc .svc-cmd{font-size:10px;color:var(--tx4);padding:0 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lane-svc .svc-cmd b{color:var(--tx3);font-weight:500}
+  .lane-svc .svc-warn{font-size:10px;color:var(--amber);padding:0 0 2px}
+  .lane-svc .svc-collecting{font-size:10.5px;color:var(--tx3);line-height:1.6;padding:2px 0 4px}
 
   /* ───────── 服务（兼容信息列） ───────── */
   .lane-svc{margin-top:8px;padding-top:8px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:4px}
@@ -754,6 +777,7 @@
 </div>
 
 <div class="addmenu" id="addmenu" hidden role="menu" aria-label="添加子节点"></div>
+<div class="addmenu" id="prjmenu" hidden role="menu" aria-label="项目菜单"></div>
 
 <div class="toast" id="toast" role="status"><span class="dot"></span><span id="toast-text"></span></div>
 
@@ -999,6 +1023,7 @@ let RUN_CFG = null;                 // { token, maxConcurrent, timeoutMs }
 const runMap = new Map();           // `${file}::${nodeId}` -> run
 const runKey = (p, n) => `${p.file || ''}::${n.id}`;
 const serviceMap = new Map();      // file -> [{ id, name, url, status, latencyMs, ... }]
+let servicePlatform = { id: '', label: '当前平台' };   // 当前宿主平台（host 用 process.platform 解析 start）
 const SVC_LABEL = { up:'运行中', down:'未启动', starting:'启动中', failed:'启动失败' };
 const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)', failed:'var(--red)' };
 const promptEdits = new Map();      // `${nodeId}::<taskId>` -> 手改后的 prompt
@@ -1222,15 +1247,28 @@ function progressOf(n){
 function hasBlocked(p){ return anyBlocked(p.root); }
 
 function svcRows(p){
+  if (!p.file) return '';
+  const busy = collecting.get(p.file);
+  if (busy && busy.status === 'running'){
+    return `<div class="svc-collecting">正在收集服务信息…<br>AI 正在读项目文件（约 10–40 秒）</div>`;
+  }
   const list = serviceMap.get(p.file);
   if (!list) return `<div class="info-empty">检测中…</div>`;
-  if (!list.length) return `<div class="info-empty">这张卡没配 services（在 rotation.json 里加 url / start）</div>`;
-  return list.map(svc => {
+  if (!list.length) return `<div class="info-empty">这张卡没配 services：点项目名右侧 <b>⋯</b> →「服务信息收集」自动补</div>`;
+  const failed = busy && busy.status === 'failed'
+    ? `<div class="svc-warn">上次收集失败：${esc(busy.error || '未知原因')}（可再点一次）</div>` : '';
+  return failed + list.map(svc => {
     const tone = SVC_TONE[svc.status] || 'var(--tx4)';
     const st = SVC_LABEL[svc.status] || svc.status;
     const lat = svc.status === 'up' && svc.latencyMs != null ? ` · ${svc.latencyMs}ms` : '';
-    const canStart = svc.start && svc.status !== 'up' && svc.status !== 'starting';
+    // 平台化 start：只有当前平台那条才算「能拉起」；旧宿主只给字符串 start 时按字符串兜底
+    const startCommand = svc.startCommand || (typeof svc.start === 'string' ? svc.start : '');
+    const canStart = startCommand && svc.status !== 'up' && svc.status !== 'starting';
     const canStop = (svc.status === 'up' || svc.status === 'starting') && svc.pid;
+    const platform = svc.startPlatform || '当前平台';
+    const cmdLine = startCommand
+      ? `<div class="svc-cmd mono" title="${esc(startCommand)}"><b>启动（${esc(platform)}）</b> ${esc(startCommand)}</div>`
+      : (svc.start ? `<div class="svc-warn mono">没有 ${esc(platform)} 的启动命令${(svc.startPlatforms || []).length ? `（只有 ${esc((svc.startPlatforms || []).join(' / '))}）` : ''}</div>` : '');
     return `<div class="svc">
       <div class="svc-top">
         <i class="svc-dot" style="--tone:${tone}"></i>
@@ -1238,6 +1276,7 @@ function svcRows(p){
         <span class="svc-st" style="color:${tone}">${st}${lat}</span>
       </div>
       <button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>
+      ${cmdLine}
       <div class="svc-acts">
         <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
         ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}">一键拉起</button>` : ''}
@@ -1751,7 +1790,7 @@ function laneMarkup(p){
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${p.root.closed}">
     <div class="lane-head">
       <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}
-        ${p.file ? `<button class="lane-x" data-project-remove="${esc(p.file)}" title="从轮转列表移除（不删项目文件）">✕</button>` : ''}</div>
+        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标关闭</div>
       ${laneServices(p)}
@@ -1871,7 +1910,7 @@ function renderFocus(){
       <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}">
         <div class="lane-head">
           <div class="lane-name"><span class="dot ${p.root.closed?'done':(hasBlocked(p)?'blocked':'doing')}"></span>${p.name}
-        ${p.file ? `<button class="lane-x" data-project-remove="${esc(p.file)}" title="从轮转列表移除（不删项目文件）">✕</button>` : ''}</div>
+        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 移除项目">⋯</button>` : ''}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
           ${laneServices(p)}
@@ -2074,6 +2113,244 @@ function chooseAddMenu(which){
   if (which === 'ai'){
     const p = PROJECTS.find(x => x.id === ctx.pid), n = p && findNode(p.root, ctx.nid);
     return (n && n.kind === 'goal') ? aiSplitIdeas(ctx.pid, ctx.nid) : aiSplitGoals(ctx.pid, ctx.nid);
+  }
+}
+
+/* ─────────── 项目菜单：服务信息收集 / 移除项目 ─────────── */
+let projMenuCtx = null;                   // { pid, btn }
+const collecting = new Map();             // file -> { status:'running'|'failed', error?, at }
+
+function openProjMenu(btn){
+  const p = PROJECTS.find(x => x.id === btn.dataset.projmenu);
+  if (!p || !p.file) return;
+  const menu = $('#prjmenu');
+  const busy = collecting.get(p.file);
+  const running = busy && busy.status === 'running';
+  menu.innerHTML = `
+    <button type="button" class="am-ai${running ? ' is-locked' : ''}" data-prj-act="collect" role="menuitem"${running ? ' aria-disabled="true"' : ''}>
+      <span>服务信息收集</span><span class="am-sub">${running ? '收集中…' : 'AI 读项目后填 services'}</span>
+    </button>
+    <div class="am-sep"></div>
+    <button type="button" class="am-danger" data-prj-act="remove" role="menuitem">
+      <span>移除项目</span><span class="am-sub">只取消登记</span>
+    </button>`;
+  projMenuCtx = { pid: p.id, btn };
+  btn.setAttribute('aria-expanded', 'true');
+  menu.hidden = false;
+  // 贴按钮定位：默认下方右对齐；下方放不下就翻到上方（与「+ 目标」菜单同一套）
+  const r = btn.getBoundingClientRect();
+  const mw = menu.offsetWidth || 200, mh = menu.offsetHeight || 82;
+  const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+  const below = r.bottom + 6;
+  const flip = below + mh > window.innerHeight - 8;
+  menu.style.left = left + 'px';
+  menu.style.top = (flip ? Math.max(8, r.top - mh - 6) : below) + 'px';
+  menu.dataset.flip = flip ? '1' : '0';
+  requestAnimationFrame(() => { menu.dataset.show = 'true'; });
+}
+
+function closeProjMenu(){
+  const menu = $('#prjmenu');
+  if (!menu || menu.hidden) return;
+  if (projMenuCtx && projMenuCtx.btn) projMenuCtx.btn.setAttribute('aria-expanded', 'false');
+  projMenuCtx = null;
+  menu.dataset.show = 'false';
+  setTimeout(() => { if (menu.dataset.show !== 'true') menu.hidden = true; }, 150);
+}
+
+function chooseProjMenu(act){
+  const ctx = projMenuCtx;
+  closeProjMenu();
+  if (!ctx) return;
+  const p = PROJECTS.find(x => x.id === ctx.pid);
+  if (!p) return;
+  if (act === 'collect') collectServices(p);
+  else if (act === 'remove') removeProjectConfirm(p);
+}
+
+/** 移除项目：只从注册表移除，项目里的 rotation.json 不动（沿用原来的关闭按钮语义） */
+function removeProjectConfirm(p){
+  askConfirm('从轮转列表移除',
+    `<div class="detail-row"><dt>卡片</dt><dd class="mono">${esc(p.file)}</dd></div>
+     <div class="mnote">只从注册表移除，项目里的 <code>.dsh/rotation.json</code> 不会被删除；下次可以再「添加项目」加回来。</div>`,
+    '移除', async () => {
+      try {
+        const res = await fetch(api('/projects/') + encodeURIComponent(p.file), { method: 'DELETE' });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+        toast('已移除，正在重新载入');
+        setTimeout(() => location.reload(), 500);
+      } catch (error) { toast('移除失败：' + error.message); }
+    });
+}
+
+/** 服务信息收集：先捞上次草稿；没有就起 AI 会话，跑完弹预览（探活 + 可改）→ 确认才写回 */
+async function collectServices(p){
+  if (!p.file) return toast('该项目没有可写回的卡片文件');
+  if (!API_BASE) return toast('未连接服务：需在 DSH 或本地服务里打开面板');
+  if (!RUN_CFG) return toast('服务未连接：无法发起会话');
+  const state0 = collecting.get(p.file);
+  if (state0 && state0.status === 'running') return toast('正在收集，稍等');
+  try {
+    const res = await fetch(api('/services/collect?file=') + encodeURIComponent(p.file));
+    const j = await res.json();
+    const draft = j && j.draft;
+    if (draft && Array.isArray(draft.services) && draft.services.length){
+      toast('已恢复上次未确认的收集结果');
+      return openServicesPreview(p, draft.services, draft);
+    }
+  } catch {}
+  collecting.set(p.file, { status: 'running', at: Date.now() });
+  paintServiceBlocks();
+  let run = null;
+  try {
+    const res = await fetch(api('/services/collect'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p.file }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    run = j.run;
+    toast('已发起服务信息收集（AI 读项目，约 10–40 秒）');
+  } catch (error) {
+    collecting.set(p.file, { status: 'failed', error: error.message });
+    paintServiceBlocks();
+    return toast('收集发起失败：' + error.message);
+  }
+  const key = (run && run.key) || (p.file + '::services-collect');
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline){
+    await new Promise(r => setTimeout(r, 1800));
+    let runs = [];
+    try { runs = (await fetch(api('/runs')).then(r => r.json())).runs || []; } catch { continue; }
+    runs.forEach(r => runMap.set(r.key, r));
+    const hit = runs.find(r => r.key === key);
+    if (!hit) continue;
+    if (hit.status === 'done'){
+      let draft = null;
+      try { draft = (await fetch(api('/services/collect?file=') + encodeURIComponent(p.file)).then(r => r.json())).draft; } catch {}
+      const list = draft && Array.isArray(draft.services) ? draft.services : [];
+      collecting.delete(p.file);
+      paintServiceBlocks();
+      if (!list.length) return toast('服务信息收集失败：' + ((draft && draft.error) || '没有解析出 services'));
+      return openServicesPreview(p, list, draft);
+    }
+    if (hit.status === 'failed' || hit.status === 'cancelled'){
+      collecting.set(p.file, { status: 'failed', error: hit.error || hit.status });
+      paintServiceBlocks();
+      return toast('服务信息收集失败：' + (hit.error || hit.status));
+    }
+  }
+  collecting.delete(p.file);
+  paintServiceBlocks();
+  toast('收集超时（3 分钟）：点「刷新」后重试');
+}
+
+/** 候选里的 start → 预览里的 mac / windows 两栏（字符串按两边相同处理） */
+function platformCommandsOf(start){
+  if (typeof start === 'string' && start.trim()) return { mac: start.trim(), windows: start.trim() };
+  if (!start || typeof start !== 'object') return { mac: '', windows: '' };
+  const pick = (...keys) => keys.map(k => (typeof start[k] === 'string' ? start[k].trim() : '')).find(Boolean) || '';
+  return {
+    mac: pick('mac', 'darwin', 'macos', 'osx', 'default'),
+    windows: pick('windows', 'win32', 'win', 'default'),
+  };
+}
+
+function openServicesPreview(p, services, draft){
+  const existingIds = new Set(((p.card && Array.isArray(p.card.services)) ? p.card.services : []).map(s => s.id));
+  const rows = services.map((s, i) => {
+    const cmds = platformCommandsOf(s.start);
+    const dup = existingIds.has(s.id);
+    const meta = [
+      s.evidence ? `证据：${s.evidence}` : '',
+      s.confidence ? `置信度 ${s.confidence}` : '',
+      s.health ? `health ${s.health}` : '',
+      dup ? '已有同 id（默认不勾，勾了会覆盖）' : '',
+    ].filter(Boolean).join(' · ');
+    return `<label class="svc-cand" data-svc-cand="${i}" data-dup="${dup ? 1 : 0}">
+      <input type="checkbox" data-svc-pick="${i}" ${dup ? '' : 'checked'}>
+      <span class="svc-cand-main">
+        <span class="svc-cand-head"><b>${esc(s.name || s.id)}</b><i class="svc-probe mono" data-svc-probe="${i}" data-ok="pending">探活中…</i></span>
+        <input class="dfield mono" data-svc-url="${i}" value="${esc(s.url)}" spellcheck="false" aria-label="服务地址">
+        <span class="svc-cand-cmds">
+          <input class="dfield mono" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(cmds.mac)}" placeholder="mac 启动命令" spellcheck="false" aria-label="mac 启动命令">
+          <input class="dfield mono" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(cmds.windows)}" placeholder="windows 启动命令" spellcheck="false" aria-label="windows 启动命令">
+        </span>
+        <span class="svc-cand-meta">${esc(meta || '没有证据说明（来自 AI 推断）')}</span>
+      </span>
+    </label>`;
+  }).join('');
+  const note = draft && draft.at
+    ? `生成于 ${new Date(draft.at).toLocaleString('sv-SE').slice(0, 16)}；打开时自动探活（未启动的显示离线，不影响写回）。`
+    : '打开时自动探活（未启动的显示离线，不影响写回）。';
+  askConfirm('服务信息收集 · 确认后写回',
+    `<div class="cand-list">${rows}</div>
+     <div class="mnote">${esc(note)}<br>
+     start 按平台各存一条，当前机器（${esc(servicePlatform.label || '当前平台')}）点「一键拉起」会跑对应那条；确认后写入 <code>rotation.json</code> 的 <code>services</code>。</div>`,
+    '写回 services', () => {
+      const p0 = PROJECTS.find(x => x.id === p.id);
+      if (!p0) return toast('项目列表已变，刷新后重试');
+      const picked = [];
+      services.forEach((s, i) => {
+        const box = document.querySelector(`#ask-body [data-svc-pick="${i}"]`);
+        if (!box || !box.checked) return;
+        const urlEl = document.querySelector(`#ask-body [data-svc-url="${i}"]`);
+        const macEl = document.querySelector(`#ask-body [data-svc-cmd-i="${i}"][data-svc-cmd="mac"]`);
+        const winEl = document.querySelector(`#ask-body [data-svc-cmd-i="${i}"][data-svc-cmd="windows"]`);
+        const url = urlEl ? urlEl.value.trim() : '';
+        if (!url) return;
+        const start = {};
+        if (macEl && macEl.value.trim()) start.mac = macEl.value.trim();
+        if (winEl && winEl.value.trim()) start.windows = winEl.value.trim();
+        const svc = { id: s.id, name: s.name || s.id, url };
+        if (s.health) svc.health = s.health;
+        if (Object.keys(start).length) svc.start = start;
+        if (s.cwd) svc.cwd = s.cwd;
+        if (s.confidence) svc.confidence = s.confidence;
+        picked.push(svc);
+      });
+      if (!picked.length) return toast('至少勾一条要写回的服务');
+      const old = (p0.card && Array.isArray(p0.card.services)) ? p0.card.services.slice() : [];
+      const merged = old.filter(o => !picked.some(x => x.id === o.id)).concat(picked);
+      putServices(p0, merged);
+    });
+  // 逐条探活：在线 / 离线 / 超时只作参考，不拦截写回
+  services.forEach((s, i) => {
+    fetch(api('/services/probe'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: s.url, health: s.health || '' }),
+    }).then(r => r.json()).then(j => {
+      const el = document.querySelector(`#ask-body [data-svc-probe="${i}"]`);
+      if (!el) return;
+      const pr = j && j.probe;
+      if (!pr){ el.textContent = '未探活'; el.dataset.ok = '0'; return; }
+      if (pr.ok){ el.textContent = `在线${pr.latencyMs != null ? ' · ' + pr.latencyMs + 'ms' : ''}`; el.dataset.ok = '1'; }
+      else { el.textContent = pr.error === 'timeout' ? '超时（可能未启动）' : '离线（可能未启动）'; el.dataset.ok = '0'; }
+    }).catch(() => {
+      const el = document.querySelector(`#ask-body [data-svc-probe="${i}"]`);
+      if (el){ el.textContent = '探活失败'; el.dataset.ok = '0'; }
+    });
+  });
+}
+
+/** 写回 services（只替换这个字段；写前服务端还会再校验一遍） */
+async function putServices(p, list){
+  try {
+    const res = await fetch(api('/services'), {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p.file, services: list }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (p.card){
+      if (j.services && j.services.length) p.card.services = j.services;
+      else delete p.card.services;
+    }
+    await refreshServices();
+    toast(`已写回 ${(j.services || []).length} 个服务到 rotation.json`);
+  } catch (error) {
+    toast('写回失败：' + error.message);
   }
 }
 
@@ -3968,6 +4245,7 @@ $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') clos
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('#addmenu').hidden) { closeAddMenu(); return; }
+  if (!$('#prjmenu').hidden) { closeProjMenu(); return; }
   if (!$('#ask').hidden) hideModal($('#ask'));
   else if (!$('#launch').hidden) closeLaunch();
   else if (!$('#modal').hidden) closeConfirm();
@@ -4010,14 +4288,20 @@ async function refreshServices(){
       const res = await fetch(api('/services?file=') + encodeURIComponent(p.file));
       if (!res.ok) continue;
       const j = await res.json();
-      if (j.ok) serviceMap.set(p.file, j.services || []);
+      if (j.ok) {
+        serviceMap.set(p.file, j.services || []);
+        if (j.platform && j.platform.label) servicePlatform = j.platform;
+      }
     } catch {}
   }
+  paintServiceBlocks();
+}
+/** 只重画服务块（矩阵与聚焦视图各一块），不动整棵树 */
+function paintServiceBlocks(){
   document.querySelectorAll('[data-svc]').forEach(el => {
     const p0 = PROJECTS.find(x => x.id === el.dataset.svc);
     if (!p0) return;
-    const head = '<div class="info-k">服务</div>';
-    el.innerHTML = head + svcRows(p0);
+    el.innerHTML = '<div class="info-k">服务</div>' + svcRows(p0);
   });
 }
 function svcFor(btn){
@@ -4516,23 +4800,6 @@ document.addEventListener('click', (e)=>{
     }
     return;
   }
-  const prjRemove = e.target.closest('[data-project-remove]');
-  if (prjRemove){
-    const file = prjRemove.dataset.projectRemove;
-    askConfirm('从轮转列表移除',
-      `<div class="detail-row"><dt>卡片</dt><dd class="mono">${esc(file)}</dd></div>
-       <div class="mnote">只从注册表移除，项目里的 <code>.dsh/rotation.json</code> 不会被删除；下次可以再「添加项目」加回来。</div>`,
-      '移除', async () => {
-        try {
-          const res = await fetch(api('/projects/') + encodeURIComponent(file), { method: 'DELETE' });
-          const j = await res.json();
-          if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
-          toast('已移除，正在重新载入');
-          setTimeout(() => location.reload(), 500);
-        } catch (error) { toast('移除失败：' + error.message); }
-      });
-    return;
-  }
   const svcLog = e.target.closest('[data-svc-log]');
   if (svcLog){
     const { svc } = svcFor(svcLog);
@@ -4547,9 +4814,11 @@ document.addEventListener('click', (e)=>{
     const { p0, svc } = svcFor(svcStart);
     if (p0 && svc && RUN_CFG){
       askConfirm(`一键拉起：${svc.name}`,
-        `<div class="detail-row"><dt>命令</dt><dd class="mono">${esc(svc.start)}</dd></div>
+        `<div class="detail-row"><dt>平台</dt><dd class="mono">${esc(svc.startPlatform || '当前平台')}</dd></div>
+         <div class="detail-row"><dt>命令</dt><dd class="mono">${esc(svc.startCommand || svc.start || '（没有当前平台的命令）')}</dd></div>
+         <div class="detail-row"><dt>工作目录</dt><dd class="mono">${esc(svc.cwd || (p0.card && p0.card.project && p0.card.project.workspace) || '项目目录')}</dd></div>
          <div class="detail-row"><dt>地址</dt><dd class="mono">${esc(svc.url)}</dd></div>
-         <div class="mnote">会在 ${esc((p0.card && p0.card.project && p0.card.project.workspace) || '项目目录')} 下启动，日志可在卡片里查看状态；启动后可点「停止」结束。</div>`,
+         <div class="mnote">命令按当前平台（${esc(svc.startPlatform || '当前平台')}）从 rotation.json 的 start 里挑；日志可在卡片里查看状态，启动后可点「停止」结束。</div>`,
         '启动', async () => {
           try {
             const res = await fetch(api('/service/start'), { method:'POST',
@@ -4669,6 +4938,11 @@ document.addEventListener('click', (e)=>{
   if (reopenBtn){ e.stopPropagation(); reopenNode(reopenBtn.dataset.reopen); return; }
   const addMenuBtn = e.target.closest('[data-addmenu]');
   if (addMenuBtn){ e.stopPropagation(); openAddMenu(addMenuBtn); return; }
+  const projMenuBtn = e.target.closest('[data-projmenu]');
+  if (projMenuBtn){ e.stopPropagation(); openProjMenu(projMenuBtn); return; }
+  const prjAct = e.target.closest('[data-prj-act]');
+  if (prjAct){ e.stopPropagation(); chooseProjMenu(prjAct.dataset.prjAct); return; }
+  if (!$('#prjmenu').hidden && !e.target.closest('#prjmenu')) closeProjMenu();
   if (e.target.closest('#split-regen')){ e.stopPropagation(); regenSplit(); return; }
   const aim = e.target.closest('[data-aim]');
   if (aim){ e.stopPropagation(); chooseAddMenu(aim.dataset.aim); return; }
