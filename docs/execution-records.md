@@ -19,9 +19,21 @@
 
 | 动作 | 触发 | 对 DSH 做的事 | 产出 |
 |---|---|---|---|
-| 生成计划 | 手动（构思卡） | 起会话 → `/plan` → 发计划任务；agent 用 exit_plan_mode 交计划 | `idea.plan`（目标 / 验证命令 / 步骤 / 全文） |
+| 生成计划 | 手动（构思卡） | 起会话（挂 DSH 默认 agent preset）→ `/plan` → 发计划任务；agent 用 exit_plan_mode 交计划，**拿到计划就中断审批回合（不执行）** | `idea.plan`（目标 / 验证命令 / 步骤 / 全文） |
 | 执行计划 | 手动（构思卡） | 同一会话 `/plan off` → `/goal <objective>`，由 goal 轮次驱动执行 | 执行记录 + 会话结果 |
 | 反馈提炼 | 自动（执行记录 done 后） | 同一会话追问「复盘踩坑，只输出 JSON」 | `loop.lessons[]`（闭环经验积累） |
+
+### 会话 preset：`/plan`、`/goal`、`exit_plan_mode` 从哪来
+
+它们都是 DSH 挂在 **agent preset** 里的插件，不是 profile 根上的全局工具。所以 runner 建
+plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取默认 preset，再
+`mount()` 到 agent ctx，同时把 `agentPreset` 写进会话头 meta）；不挂的会话只有 profile 根上的插件工具
+（记忆、IM、agent-team 之类），`ctx.commands.execute(agent, '/plan …')` 查不到命令会返回
+`undefined`，于是静默退回提示词——表现就是「会话开头没有 `/plan`、没有 plan 徽标、
+模型说工具集里没有 exit_plan_mode」。
+
+补全 / 候选 / 拆目标 / 反馈提炼这几类提示词会话不挂 preset（保持轻量工具集）；同一个
+`sessionId` 的计划 → 执行 → 反馈复用同一个 agent，preset 只在建 agent 时挂一次。
 
 ## 三、数据形状
 

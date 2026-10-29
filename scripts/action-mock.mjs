@@ -101,6 +101,11 @@ const ctx = {
   logger: console,
   webServer: { register(options) { routes.push(options); return () => routes.splice(routes.indexOf(options), 1); } },
   effect(fn) { return fn(); },
+  /** 真实宿主上 sessionController / agentPresets 都挂在 ctx 上；runner 走 ctx.get 取 preset */
+  get(name) {
+    if (name === 'agentPresets') return agentPresets;
+    return undefined;
+  },
   on(event, handler) {
     if (!handlers.has(event)) handlers.set(event, new Set());
     handlers.get(event).add(handler);
@@ -138,8 +143,12 @@ const ctx = {
     },
   },
   agents: {
-    async create({ sessionId }) {
-      const sess = { agent: null, planMode: false, goal: null };
+    async create({ sessionId, meta, setup }) {
+      // 会话头要带 agentPreset；preset 的 setup 要真的被调（工具 / 命令都在里面挂）
+      const sess = {
+        agent: null, planMode: false, goal: null,
+        createCount: 0, createdWith: meta?.agentPreset || '', setupCalled: false, cancelCalls: 0,
+      };
       const agent = {
         id: sessionId,
         async followup(message) {
@@ -151,13 +160,26 @@ const ctx = {
           await runPlanTurn(sessionId);
         },
         interrupt() {},
+        cancel() { sess.cancelCalls += 1; },
       };
       sess.agent = agent;
+      sess.createCount += 1;
+      if (typeof setup === 'function') {
+        await setup({ agent }, agent);
+        sess.setupCalled = true;
+      }
       sessions.set(sessionId, sess);
       return { agent };
     },
   },
 };
+
+/** 假的 agentPresets：runner 用 resolve 取默认 preset、mount 挂到 agent ctx */
+const agentPresets = {
+  async resolve() { return { id: 'mock-preset' }; },
+  async mount() { mountedPresets += 1; return { id: 'mock-preset' }; },
+};
+let mountedPresets = 0;
 
 apply(ctx, { basePath: BASE });
 
@@ -219,6 +241,12 @@ try {
   check('POST /action/plan 起会话', planned.status === 200 && planned.body?.run?.status !== undefined, JSON.stringify(planned.body?.error || ''));
   const planRun = await waitRun((r) => r.taskId === 'action-plan');
   check('计划会话跑完', !!planRun && planRun.status === 'done', planRun?.status || 'timeout');
+  // 回归：命令 / exit_plan_mode 都在 agent preset 里，不挂 preset 时会话根本进不了 plan 模式
+  const planSess = sessions.get(planRun?.sessionId);
+  check('计划会话挂了 agent preset', planSess?.createdWith === 'mock-preset', planSess?.createdWith || 'none');
+  check('preset setup 已执行', !!planSess?.setupCalled);
+  // 计划拿到就收手：exit_plan_mode 的审批回合要中断，别让它批准后直接开跑
+  check('计划拿到后中断审批回合', (planSess?.cancelCalls || 0) >= 1, String(planSess?.cancelCalls || 0));
 
   let after = await readCard(project);
   const idea = after.loop.children[0].children[0];
@@ -235,6 +263,9 @@ try {
   const execRun = await waitRun((r) => r.taskId === 'action-exec');
   check('执行会话等 goal 完成才结束', !!execRun && execRun.status === 'done', execRun?.status || 'timeout');
   check('执行复用同一 session', !!planSession && execRun?.sessionId === planSession, `${planSession} vs ${execRun?.sessionId}`);
+  const execSess = sessions.get(execRun?.sessionId);
+  check('执行复用已挂 preset 的 agent', execSess?.createCount === 1 && execSess?.createdWith === 'mock-preset',
+    `create=${execSess?.createCount || 0} preset=${execSess?.createdWith || 'none'}`);
 
   // ── 3. 反馈提炼（自动） ──
   const reflectRun = await waitRun((r) => r.taskId === 'action-reflect');

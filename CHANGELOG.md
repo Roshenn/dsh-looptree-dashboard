@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 0.8.2 — 生成计划 / 执行计划真的进 plan 模式（会话挂 agent preset）
+
+- 根因：`lib/runner.mjs` 取 preset 组合用的是 `ctx.agents.composeAgent`，可这个方法在 DSH 的
+  `agents` 服务上不存在（组合入口是 `agentPresets` 注册表），`composed` 恒为 `undefined` →
+  计划/执行会话没挂任何 preset。`/plan`、`/goal`、`exit_plan_mode` 都挂在 preset 里，
+  命令不存在时 `ctx.commands.execute` 返回 `undefined`，于是静默退回纯提示词：
+  会话开头没有 `/plan`、没有 plan 徽标、工具集里也没有 `bash/read/exit_plan_mode`
+- 修法：`composeSessionPreset()` 走 `ctx.get('agentPresets')`：`resolve()` 取默认 preset 再
+  `mount()` 到 agent ctx（`sessionController.composeAgent` 在服务对象上不可见，试过但不是入口）；
+  **只有 plan / exec 会话挂 preset**（补全 / 候选 / 拆目标 / 反馈继续用轻量工具集），
+  `meta.agentPreset` 一并写进会话头
+- 计划拿到就收手：捕获 `exit_plan_mode` 的计划后中断还挂在「计划审批」上的回合，
+  计划只落盘、不执行；执行仍走「执行计划」按钮（同会话 `/plan off` + `/goal`）
+- 停回合改用真实的 `agent.cancel()`（原来的 `agent.interrupt()` 在 DSH 上不存在，
+  超时 / 取消其实没停掉会话）
+- `scripts/action-mock.mjs` 补 4 项断言：计划会话挂了 preset、preset setup 执行、
+  拿到计划后中断回合、执行复用已挂 preset 的同一 agent（17 项）
+- 版本 0.8.2；验证：`npm run preflight` 全绿；用 `rotationtest` profile 起独立 DSH 实例
+  真跑一次「生成计划」，会话日志里有 `command/run plan`、`plan/mode active`、
+  `exit_plan_mode` 工具，计划写回 `idea.plan`
+
 ## 0.8.1 — 构思去掉「方案」字段；执行记录只留只读信息
 
 - 构思节点不再有「方案」：详情卡的可填行、「生成 N 项」入口、节点卡摘要、AI 拆构思（prompt / 预览 / 写入）
