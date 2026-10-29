@@ -794,6 +794,7 @@ const KIND = { loop:'闭环', goal:'目标', idea:'构思', exec:'执行' };
 /** 执行记录按 action 区分显示（计划 / 执行 / 反馈）；老记录没有 action 仍显示「执行」 */
 const ACTION_LABEL = { plan:'计划', exec:'执行', reflect:'反馈' };
 const isRecord = (n) => !!(n && n.kind === 'exec' && n.raw && n.raw.action);
+const recordActionOf = (n) => ((n && isRecord(n)) ? n.raw.action : '');
 const kindLabel = (n) => isRecord(n) ? (ACTION_LABEL[n.raw.action] || '执行') : (KIND[n.kind] || n.kind);
 const KIND_TONE = { loop:'var(--brand)', goal:'var(--blue-300)', idea:'var(--amber)', exec:'var(--green)' };
 const STATUS = {
@@ -1184,17 +1185,31 @@ function hasInfo(n){
   return INFO_FIELDS.some(f => isFilled(r[f]));
 }
 /* 四种状态，全部由结构派生（不再手改）：
-   未开始 = 只有标题；规划中 = 有内容但没子节点；进行中 = 有子节点未全闭环；已闭环 = 子节点全闭环（或叶子被完成） */
+   未开始 = 只有标题；规划中 = 有内容但还没执行；进行中 = 有工作子节点/执行记录未全闭环；
+   已闭环 = 子节点全闭环（或叶子被完成） */
 const STATE_DEF = {
   todo:   { label:'未开始', tone:'var(--tx4)' },
   plan:   { label:'规划中', tone:'var(--tx3)' },
   doing:  { label:'进行中', tone:'var(--brand-2)' },
   closed: { label:'已闭环', tone:'var(--green)' },
 };
+/** 构思的「记录全闭环」判据：计划 / 执行 / 反馈都关闭，且至少有一次执行（只出计划不算完成） */
+function ideaRecordsDone(n){
+  if (!n || n.kind !== 'idea') return false;
+  const kids = n.children || [];
+  if (!kids.length || !kids.every(k => k.closed)) return false;
+  return kids.some(k => recordActionOf(k) === 'exec') && kids.some(k => recordActionOf(k) === 'reflect');
+}
 function deriveState(n){
   if (n.closed) return 'closed';
   const wk = workKids(n);
   if (wk.length) return wk.every(k => k.closed) ? 'closed' : 'doing';
+  // 构思的子节点全是会话记录：有计划但没执行 = 规划中，执行过 = 进行中，记录全闭环 = 已闭环
+  if (n.kind === 'idea'){
+    if (ideaRecordsDone(n)) return 'closed';
+    if ((n.children || []).some(k => recordActionOf(k) === 'exec')) return 'doing';
+    return (hasInfo(n) || (n.raw && n.raw.plan)) ? 'plan' : 'todo';
+  }
   // 记录本身的状态跟着会话走：开始即进行中，结束后 closed_at 才会写
   if (isRecord(n) && n.raw.status === 'doing') return 'doing';
   if (n.raw && n.raw.plan) return 'plan';
@@ -1217,8 +1232,11 @@ function autoCloseTree(root){
   while (changed){
     changed = false;
     walk(root, (x)=>{
-      // 有真实子节点、且所有子节点（含未完结的记录）都闭环，才自动闭环
-      if (!x.closed && workKids(x).length && (x.children || []).every(k => k.closed)){
+      // 有真实子节点、且所有子节点（含未完结的记录）都闭环，才自动闭环；
+      // 构思只有会话记录时，按「记录全闭环（含一次执行）」这一条同样自动闭环
+      const kids = x.children || [];
+      if (!x.closed && kids.length && kids.every(k => k.closed)
+        && (workKids(x).length > 0 || ideaRecordsDone(x))){
         x.closed = true;
         if (x.raw) x.raw.closed_at = new Date().toISOString();
         changed = true;
@@ -1244,6 +1262,11 @@ function syncRawStatus(root){
     if (n.closed){ n.raw.status = 'done'; return; }
     const wk = workKids(n);
     if (wk.length){ n.raw.status = wk.every(k => k.closed) ? 'done' : 'doing'; return; }
+    // 构思：记录里有执行就算 doing，只出计划/还没动作算 plan
+    if (n.kind === 'idea'){
+      n.raw.status = (n.children || []).some(k => recordActionOf(k) === 'exec') ? 'doing' : 'plan';
+      return;
+    }
     n.raw.status = 'plan';
   });
 }
@@ -1587,10 +1610,11 @@ function nodeMarkup(n, p){
   const st = stateOf(n), tone = nodeTone(n), pr = progressOf(n);
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
-  // 只有叶子能手动「完成」；父节点在子节点全闭环时自动闭环
-  const canClose = !n.closed && !kidsExist;
-  const closeLabel = n.kind==='loop' ? '确认收敛' : '完成';
   const isIdea = n.kind === 'idea';
+  // 只有叶子能手动「完成」；构思的记录还有未闭环的也不给关（父节点关闭+子节点未关会被校验拒绝）
+  const recordOpen = isIdea && (n.children || []).some(k => !k.closed);
+  const canClose = !n.closed && !kidsExist && !recordOpen;
+  const closeLabel = n.kind==='loop' ? '确认收敛' : '完成';
   const addKind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
   // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
   // 构思卡不再抽候选：改为「生成计划 / 执行计划」，目标卡与闭环卡保持候选池

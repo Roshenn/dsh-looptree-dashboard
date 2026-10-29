@@ -286,6 +286,7 @@ try {
   check('idea.plan 有步骤', Array.isArray(idea?.plan?.steps) && idea.plan.steps.length >= 2, JSON.stringify(idea?.plan?.steps || []));
   const pRec = (idea?.children || []).find((n) => n.action === 'plan');
   check('计划记录已关闭', !!pRec && !!pRec.closed_at && !!pRec.session, pRec?.id || 'missing');
+  check('只出计划不自动闭环构思', !idea?.closed_at, JSON.stringify(idea?.closed_at || null));
 
   // ── 2. 执行计划（同会话） ──
   const planSession = pRec?.session?.id;
@@ -316,6 +317,8 @@ try {
   const rRec = (idea2.children || []).find((n) => n.action === 'reflect');
   check('执行记录已关闭', !!eRec && !!eRec.closed_at, eRec?.id || 'missing');
   check('反馈记录已关闭', !!rRec && !!rRec.closed_at, rRec?.id || 'missing');
+  check('记录全闭环后构思自动闭环', !!idea2?.closed_at && idea2.status === 'done', JSON.stringify({ closed_at: idea2?.closed_at || null, status: idea2?.status }));
+  check('同级构思未完成，目标不提前闭环', !after.loop.children[0].closed_at, JSON.stringify(after.loop.children[0].closed_at || null));
   check('loop.lessons 写入', Array.isArray(after.loop.lessons) && after.loop.lessons.some((l) => /JSON/.test(l.text)), JSON.stringify(after.loop.lessons || []));
 
   // ── 4. 发送预览里改过的正文：原样发出去 ──
