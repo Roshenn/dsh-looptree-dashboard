@@ -1512,6 +1512,15 @@ function ideaLockTip(n){
   return `该目标已有构思「${(k && k.title) || k && k.id || ''}」，一个目标只能有一个构思`;
 }
 
+/** 卡片与详情卡共用的会话 id：运行中的优先，其次卡片落盘的 session，最后构思的计划会话 */
+function sessionIdOf(p, n){
+  const r = p ? runFor(p, n) : null;
+  const cardSess = n && n.raw && n.raw.session;
+  const planSess = n && n.kind === 'idea' && n.raw && n.raw.plan && n.raw.plan.session;
+  return (r && r.sessionId) || (cardSess && cardSess.id)
+    || (typeof planSess === 'string' ? planSess : (planSess && planSess.id)) || '';
+}
+
 function nodeMarkup(n, p){
   const st = stateOf(n), tone = nodeTone(n), pr = progressOf(n);
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
@@ -1537,6 +1546,11 @@ function nodeMarkup(n, p){
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
   const ideaActs = isIdea ? ideaActionButtons(p, n, 'card') : '';
+  // 「查看会话」放卡片下缘：点它直接切到 DSH 里这条会话的对话页（独立打开时退化为看全文）
+  const sessId = p ? sessionIdOf(p, n) : '';
+  const viewSess = sessId
+    ? `<button class="tbtn" data-open-session="${esc(sessId)}" title="切到 DSH 里这条会话的对话页面">查看会话</button>`
+    : '';
   const bars = kidsExist ? `<span class="bars">${kids.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>` : '';
   const issues = (n.issues||[]).map(i=>`<div class="issue">⚠ ${i}</div>`).join('');
   const upstream = p ? activeAncestorOf(p, n) : null;
@@ -1544,7 +1558,7 @@ function nodeMarkup(n, p){
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    candGen, candPool, ideaActs,
+    candGen, candPool, ideaActs, viewSess,
   ].filter(Boolean).join('');
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
@@ -2553,7 +2567,7 @@ function sessionMarkup(p, n, opts){
   const r = runFor(p, n);
   const cardSess = n.raw && n.raw.session;
   const planSess = n.kind === 'idea' && n.raw && n.raw.plan && n.raw.plan.session;
-  const sessId = (r && r.sessionId) || (cardSess && cardSess.id) || (typeof planSess === 'string' ? planSess : (planSess && planSess.id)) || '';
+  const sessId = sessionIdOf(p, n);
   const st = r ? (RUN_LABEL[r.status] || r.status) : (sessId ? '已完成（记录在卡片）' : '无会话');
   const tone = r ? (RUN_TONE[r.status] || 'var(--tx3)') : 'var(--tx4)';
   const secs = r ? Math.round((r.elapsedMs || 0) / 1000) : 0;
@@ -2568,11 +2582,9 @@ function sessionMarkup(p, n, opts){
       <div class="detail-row"><dt>目录</dt><dd class="mono">${r.cwd || '—'}</dd></div>`}
       ${tail ? `<div class="detail-row"><dt>最后</dt><dd>${esc(tail.brief || tail.type || '—')}</dd></div>` : ''}
       ${(r.error && !compact) ? `<div class="detail-row"><dt>问题</dt><dd style="color:var(--red)">${esc(r.error)}</dd></div>` : ''}
-      ${(r.result || (cardSess && cardSess.result)) ? `<div class="detail-row"><dt>输出</dt><dd class="mnote" style="margin:0">模型已返回内容（${(r.result || cardSess.result).length} 字），点「查看会话」看完整过程</dd></div>` : ''}`
-      : `<div class="detail-row"><dt>说明</dt><dd>${sessId ? (planSess ? '计划已用这个会话产出；点「执行计划」会在同一会话里按计划跑' : '这个节点有历史会话记录，点「查看会话」看全文') : '还没有跑过会话；在下面每条 prompt 后面点「发起」即可'}</dd></div>`}
+      ${(r.result || (cardSess && cardSess.result)) ? `<div class="detail-row"><dt>输出</dt><dd class="mnote" style="margin:0">模型已返回内容（${(r.result || cardSess.result).length} 字），点卡片下缘「查看会话」到 DSH 看完整过程</dd></div>` : ''}`
+      : `<div class="detail-row"><dt>说明</dt><dd>${sessId ? (planSess ? '计划已用这个会话产出；点「执行计划」会在同一会话里按计划跑' : '这个节点有历史会话记录，点卡片下缘「查看会话」到 DSH 打开') : '还没有跑过会话；在下面每条 prompt 后面点「发起」即可'}</dd></div>`}
     <div class="detail-acts" style="margin-top:8px">${btn}
-      ${sessId ? `<button class="tbtn" data-view-session="${sessId}">查看会话</button>` : ''}
-      ${sessId ? `<button class="tbtn" data-open-session="${sessId}" title="切到 DSH 里这个会话">在 DSH 打开</button>` : ''}
       ${p.file ? `<button class="tbtn" data-sess-list="1">最近会话</button>` : ''}
       ${r && r.result && n.kind === 'exec' && !isRecord(n) ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
     </div>
@@ -2936,17 +2948,41 @@ async function listProjectSessions(){
   }
 }
 
-/** 请宿主切到这条会话（client 半监听 postMessage） */
+/** 请宿主切到这条会话：面板在 iframe 里，只能让 client 半转发；独立打开时退化为看全文 */
+let dshOpenSeq = 0;
+const dshOpenPending = new Map();   // reqId → { timer, onFail }
+
+window.addEventListener('message', (e) => {
+  const d = e && e.data;
+  if (!d || d.type !== 'rotation-open-session-result') return;
+  const pending = dshOpenPending.get(d.reqId);
+  if (!pending) return;
+  dshOpenPending.delete(d.reqId);
+  clearTimeout(pending.timer);
+  if (!d.ok) pending.onFail(d.error || 'DSH 拒绝了这次切换');
+});
+
 function openInDsh(sessionId){
   if (!sessionId) return;
+  const fallback = (why) => { toast(why); viewSession(sessionId); };
+  let embedded = false;
+  try { embedded = !!(window.parent && window.parent !== window); } catch { embedded = false; }
+  if (!embedded) return fallback('独立打开时切不到 DSH，先看这条会话的全文');
+  const reqId = 'rotation-' + (++dshOpenSeq);
+  const onFail = (why) => fallback('切到 DSH 失败：' + why);
+  const timer = setTimeout(() => {
+    if (!dshOpenPending.has(reqId)) return;
+    dshOpenPending.delete(reqId);
+    onFail('宿主没有响应（插件需要重启 DSH 后才生效）');
+  }, 1500);
+  dshOpenPending.set(reqId, { timer, onFail });
   try {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'rotation-open-session', sessionId }, '*');
-      toast('已在 DSH 中切换到该会话');
-      return;
-    }
-  } catch { /* noop */ }
-  toast('独立打开时无法切换 DSH，请用「查看会话」看全文');
+    window.parent.postMessage({ type: 'rotation-open-session', sessionId: String(sessionId), reqId }, '*');
+  } catch (error) {
+    clearTimeout(timer);
+    dshOpenPending.delete(reqId);
+    onFail(error.message || '无法给 DSH 发消息');
+  }
 }
 
 /** 查看会话全文：直接读 DSH 落盘的 session.v4.jsonl.zstd */

@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.8.3 — 「查看会话」挪到节点卡下缘，点了直接切到 DSH 会话页
+
+- 详情卡的「查看会话」与「在 DSH 打开」合并成一个按钮，移到每张节点卡的下缘（`.tfootline`），
+  只在卡片有会话时出现：运行中的优先，其次卡片落盘的 `session.id`，最后构思的 `plan.session`
+- 点击不再只弹面板内全文：面板把 `{type:'rotation-open-session', sessionId, reqId}` postMessage 给宿主，
+  `lib/client.js` 收到后调 `ctx.get('uiWorkspace').openSession(id)`，DSH 主区直接切到那条会话
+- 宿主侧回执 `rotation-open-session-result`：失败或 1.5s 无响应时，面板退化为弹会话全文并提示原因
+  （旧版「在 DSH 打开」只发消息、宿主没监听，点了是假成功）
+- 独立打开（非 iframe）时明确退化：直接弹全文，不再声称「已在 DSH 中切换」
+- 验证：`npm run preflight` 全绿；Playwright 断言 9 张卡里 7 张带按钮、详情卡动作行只剩
+  「再跑一轮 / 最近会话」、独立打开点击退化弹全文、模拟宿主回执 ok / 失败两条路都按预期；
+  `lib/client.js` 用 stub ctx 单测：同源消息转发到 `openSession`、跨源忽略、缺 `uiWorkspace` 回 `ok:false`
+
 ## 0.8.2 — 生成计划 / 执行计划真的进 plan 模式（会话挂 agent preset）
 
 - 根因：`lib/runner.mjs` 取 preset 组合用的是 `ctx.agents.composeAgent`，可这个方法在 DSH 的
