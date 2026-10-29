@@ -31,6 +31,8 @@ try {
   await run(npm, ['run', 'mock:client']);
   console.log('── mock:session ──');
   await run('node', ['scripts/dev-session-mock.mjs'], { ROTATION_HOME: home, MOCK_WS: ws, PORT: port });
+  console.log('── mock:idea-lock ──');
+  await run('node', ['scripts/idea-lock-mock.mjs'], { PORT: String(Number(port) + 2) });
   console.log('── mock:action ──');
   await run(npm, ['run', 'mock:action'], { PORT: String(Number(port) + 1) });
   console.log('── validate:samples ──');

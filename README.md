@@ -104,6 +104,22 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 验证：`npm run mock:action`（假命令服务 + 假 agent 走通 计划 → 执行 → 提炼），已并入 `npm run preflight`；
 样例见 `samples/execution-records.rotation.json`。
 
+## 一个目标一个构思（0.8.3）
+
+一个目标只落地一条实现路径。候选池不是「多个构思」，而是**同一个构思槽位的对比**：
+
+- 候选池（目标卡「生成候选」）：仍生成 3 条互斥路线，每条带 `strength`（优势：省时 / 好验证 /
+  复用现有资产 / 风险更低），弹窗在标题下展示「优势」便于横向对比；优势只用于对比，采纳时不写进卡片
+- 采纳即锁定：采纳 1 条后目标锁定，其余候选由服务端清空；再「生成候选 / 采纳」返回 409 `IDEA_EXISTS`，
+  面板上这两个按钮同步禁用并给原因
+- AI 拆构思（详情卡「AI 拆出构思」/「+ 构思」菜单）：预览从多选改成**单选**，只写入 1 条；
+  prompt 要求每条先写一句优势；目标已有构思时入口直接禁用
+- 卡片写回（PUT）：目标从 0–1 个构思增加到 2 个时 422 拒绝；旧卡里已经有多条的仍可保存（只给警告）
+- 存量清理：`npm run migrate:single-idea` 干跑看清楚，`--write` 才写盘；每个目标保留第一条构思，
+  其余整体移入 `<卡片>.single-idea-backup.json`，不删数据
+- prompt 模板「拆出构思 / 重新生成构思」改成只要 1 条 + 优势
+- 验证：`npm run mock:idea-lock`（12 项断言：采纳锁定、重复采纳 409、重复生成 409、PUT 422、旧卡放行、迁移备份），已并入 `npm run preflight`
+
 ## 真机验证（已完成一部分）
 
 用 `scripts/real-plugin-check.sh` 在**真实 DSH 进程**里验证过（复制 web profile 成一次性 `rotationtest`）：

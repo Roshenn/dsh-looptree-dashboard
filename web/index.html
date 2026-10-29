@@ -226,6 +226,8 @@
   .tbtn:hover{background:var(--l4);color:var(--tx1)}
   .tbtn:active{transform:scale(.96)}
   .tbtn:disabled{opacity:.45;cursor:default;pointer-events:none}
+  /* 锁定态用 aria-disabled 而不是 disabled：按钮还能点，点一下用 toast 说清为什么不能生成 */
+  .tbtn.is-locked{opacity:.5;cursor:not-allowed}
   /* 候选池计数槽位定宽：数字 0→6 变化不改变按钮宽度，节点卡不会因刷新而换行/长高 */
   .cand-n{display:inline-block;min-width:8px;margin-left:3px;text-align:right;font-variant-numeric:tabular-nums}
   .tbtn.primary{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:color-mix(in srgb,var(--amber) 40%,transparent);color:var(--amber)}
@@ -250,6 +252,8 @@
   .addmenu .am-ai{color:var(--brand-2)}
   .addmenu .am-ai:hover{background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-2)}
   .addmenu .am-ai .am-sub{color:color-mix(in srgb,var(--brand) 60%,var(--tx4))}
+  .addmenu button.is-locked{opacity:.55;cursor:not-allowed}
+  .addmenu button.is-locked:hover{background:transparent}
   @media (prefers-reduced-motion: reduce){ .addmenu{transition:none} }
   /* AI 拆目标的预览行（ask 弹窗内） */
   .gsel{display:flex;gap:8px;padding:8px 6px}
@@ -262,6 +266,8 @@
   .gsel-acc{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--b1);background:var(--l1);
     color:var(--tx3);font:inherit;font-size:11.5px;resize:vertical;min-height:34px}
   .gsel-acc:focus{outline:2px solid var(--brand);outline-offset:0}
+  .gsel-str{font-size:11px;color:var(--tx3);line-height:1.5}
+  .gsel-str b{color:var(--tx2);font-weight:500}
   .tfootline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
     margin:7px -9px 0 -11px;padding:5px 9px 6px 11px;
     border-top:1px solid var(--b1);background:color-mix(in srgb,var(--bg-base) 34%,transparent);border-radius:0 0 8px 8px}
@@ -503,6 +509,8 @@
   .cand-main{flex:1;min-width:0;transition:opacity 200ms var(--ease-out)}
   .cand-title{font-size:12px;color:var(--tx1);font-weight:500}
   .cand-acc{font-size:10.5px;color:var(--tx4);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .cand-str{font-size:10.5px;color:var(--tx3);margin-top:4px;line-height:1.5;
+    padding-left:7px;border-left:2px solid color-mix(in srgb,var(--brand) 40%,transparent)}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -1496,6 +1504,14 @@ function runBadge(p, n){
     <i class="rdot"></i>${RUN_LABEL[r.status] || r.status}${el ? ' · ' + el : ''}</span></div>`;
 }
 
+/* 一个目标只能有一个构思：目标下出现了 idea 子节点即锁定，生成/采纳都拦在这一层 */
+function ideaKidOf(n){ return ((n && n.children) || []).find(k => k && k.kind === 'idea') || null; }
+function ideaLocked(n){ return !!(n && n.kind === 'goal' && ideaKidOf(n)); }
+function ideaLockTip(n){
+  const k = ideaKidOf(n);
+  return `该目标已有构思「${(k && k.title) || k && k.id || ''}」，一个目标只能有一个构思`;
+}
+
 function nodeMarkup(n, p){
   const st = stateOf(n), tone = nodeTone(n), pr = progressOf(n);
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
@@ -1507,10 +1523,14 @@ function nodeMarkup(n, p){
   const addKind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
   // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
   // 构思卡不再抽候选：改为「生成计划 / 执行计划」，目标卡与闭环卡保持候选池
+  const locked = ideaLocked(n);
   const poolCount = (!isIdea && addKind && p) ? candidateCount(p, n) : 0;
+  const genTitle = locked ? ideaLockTip(n)
+    : poolCount ? '候选池还有未处理的候选'
+      : `让会话给出若干候选${KIND[addKind]}，挑完再写入卡片`;
   const candGen = (!isIdea && addKind)
-    ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
-         title="${poolCount ? '候选池还有未处理的候选' : '让会话给出若干候选' + KIND[addKind] + '，挑完再写入卡片'}">生成候选</button>`
+    ? `<button class="tbtn primary${locked ? ' is-locked' : ''}" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${locked ? 'aria-disabled="true"' : poolCount ? 'disabled' : ''}
+         title="${esc(genTitle)}">生成候选</button>`
     : '';
   const candPool = (!isIdea && addKind)
     ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
@@ -1957,6 +1977,7 @@ function addChild(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
   const kind = n.kind==='loop' ? 'goal' : n.kind==='goal' ? 'idea' : 'exec';
+  if (kind === 'idea' && ideaLocked(n)) return toast(ideaLockTip(n));
   const title = kind==='goal' ? '新目标（待命名）' : kind==='idea' ? '新构思（待命名）' : '新执行项（待命名）';
   n.children = n.children || [];
   const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null };
@@ -1982,12 +2003,17 @@ function openAddMenu(btn){
   if (!p || !n) return;
   const menu = $('#addmenu');
   const isGoal = n.kind === 'goal';
+  const locked = ideaLocked(n);
+  // 锁定态用 aria-disabled：入口仍可点，点一下由 addChild / aiSplitIdeas 统一 toast 原因
+  const lockCls = locked ? ' is-locked' : '';
+  const lockAttr = locked ? 'aria-disabled="true"' : '';
+  const aiTip = locked ? '已有构思，一个目标只能有 1 个' : '生成 3 条，选 1 条写入';
   menu.innerHTML = `
-    <button type="button" class="am-ai" data-aim="ai" role="menuitem">
-      <span>${isGoal ? 'AI 拆出构思' : 'AI 拆出目标'}</span><span class="am-sub">生成 3 条，挑完再写</span>
+    <button type="button" class="am-ai${lockCls}" data-aim="ai" role="menuitem" ${lockAttr}>
+      <span>${isGoal ? 'AI 拆出构思' : 'AI 拆出目标'}</span><span class="am-sub">${aiTip}</span>
     </button>
     <div class="am-sep"></div>
-    <button type="button" data-aim="manual" role="menuitem"><span>${isGoal ? '手动添加构思' : '手动添加目标'}</span></button>`;
+    <button type="button" class="${lockCls.trim()}" data-aim="manual" role="menuitem" ${lockAttr}><span>${isGoal ? '手动添加构思' : '手动添加目标'}</span></button>`;
   addMenuCtx = { pid: p.id, nid: n.id, btn };
   btn.setAttribute('aria-expanded', 'true');
   menu.hidden = false;
@@ -2023,7 +2049,7 @@ function chooseAddMenu(which){
   }
 }
 
-/** 给模型的拆构思 prompt：目标 + 约束 + 落地场景，要求 3 条候选构思 */
+/** 给模型的拆构思 prompt：目标 + 约束 + 落地场景，要求 3 条互斥路线，每条先写优势（最终只写 1 条） */
 function buildIdeaPrompt(p, n){
   const r = n.raw || {};
   const kids = (n.children || []).map(k => `- ${k.title}`).join('\n') || '（暂无）';
@@ -2040,16 +2066,17 @@ function buildIdeaPrompt(p, n){
     loop.scenario ? `已定的落地场景流程（约束与验收的唯一依据）：\n${loop.scenario}` : '',
     `已有的构思 / 执行项：\n${kids}`,
     '',
-    '请给出 3 条候选构思，供人挑选（可能只采纳其中 1 条）。',
+    '请给出 3 条候选构思（同一个目标的互斥路线，最终只会写入 1 条——一个目标只落地一个方案）。',
     '硬性限制：',
     '- 标题 6–14 字的名词短语，说清「走哪条路」，不要写口号，也不要写成任务清单。',
+    '- 每条先写一句优势（strength）：这条路为什么比另外两条强——省时 / 好验证 / 复用现有资产 / 风险更低，要能横向比较，不写空话。',
     '- 只给方向，不写实现细节：不要把做法、步骤、风险、验收方式铺开（构思不再有「方案」字段，展开留给后面的计划）。',
     '- 3 条必须是**不同的实现路线**（不要同一条路的不同细节），不要重复已有构思。',
-    '严格只输出一个 JSON 对象：{"ideas":[{"title":"..."}]}，只含这 3 条，不要输出其它文字。',
+    '严格只输出一个 JSON 对象：{"ideas":[{"title":"...","strength":"..."}]}，只含这 3 条，不要输出其它文字。',
   ].filter(Boolean).join('\n');
 }
 
-/** 从模型输出里抠出 ideas 数组（只取标题：构思不再有方案字段） */
+/** 从模型输出里抠出 ideas 数组（标题 + 优势；优势只用于候选对比，不写进卡片） */
 function parseIdeas(text){
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -2061,6 +2088,7 @@ function parseIdeas(text){
   if (!arr) return [];
   return arr.map(x => ({
     title: String((x && (x.title || x.name)) || '').trim(),
+    strength: String((x && (x.strength || x.edge || x.advantage)) || '').trim(),
   })).filter(x => x.title).slice(0, 3);
 }
 
@@ -2068,6 +2096,7 @@ function parseIdeas(text){
 async function aiSplitIdeas(pid, nid, opts = {}){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
   if (!p || !n) return;
+  if (ideaLocked(n)) return toast(ideaLockTip(n));
   if (!p.file) return toast('该项目没有可写回的卡片文件');
   if (!API_BASE) return toast('未连接服务，AI 拆构思不可用');
   if (!opts.skipDraft){
@@ -2109,33 +2138,34 @@ async function aiSplitIdeas(pid, nid, opts = {}){
   toast('AI 拆构思超时（3 分钟）：可在节点「会话」里看进展');
 }
 
-/** 预览：默认全选，标题可改，确认后才写卡片（构思只有标题，没有方案字段） */
+/** 预览：单选 1 条（一个目标一个构思），标题可改，确认后才写卡片（构思只有标题，没有方案字段） */
 let lastIdeaCtx = null;
 function openIdeasPreview(pid, nid, ideas, draft = null){
   const p0 = PROJECTS.find(x => x.id === pid);
   lastIdeaCtx = p0 ? { pid, nid, file: p0.file } : null;
   const rows = ideas.map((g, i) => `
     <label class="gsel">
-      <input type="checkbox" data-ipick="${i}" checked>
+      <input type="radio" name="idea-pick" data-ipick="${i}" ${i === 0 ? 'checked' : ''}>
       <span class="gsel-main">
         <input class="gsel-title" data-ititle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
+        ${g.strength ? `<span class="gsel-str"><b>优势：</b>${esc(g.strength)}</span>` : ''}
       </span>
     </label>`).join('');
   const recovered = draft
     ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
          <button type="button" class="tbtn" id="idea-regen" style="margin-left:2px">重新生成</button></div>`
     : '';
-  askConfirm('AI 拆出的构思', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。标题能直接改。</div>`, '写入选中的', () => {
-    const picked = [];
+  askConfirm('AI 拆出的构思', `${rows}${recovered}<div class="mnote">单选：只写入 1 条（一个目标只保留一个构思）；标题能直接改。对比时先看「优势」。</div>`, '写入选中的', () => {
+    let picked = null;
     ideas.forEach((g, i) => {
       const box = document.querySelector(`#ask-body [data-ipick="${i}"]`);
       if (!box || !box.checked) return;
       const titleEl = document.querySelector(`#ask-body [data-ititle="${i}"]`);
       const title = titleEl ? titleEl.value.trim() : '';
-      if (title) picked.push({ title });
+      if (title) picked = { title };
     });
-    if (!picked.length) return toast('没有勾选任何构思');
-    applyIdeas(pid, nid, picked);
+    if (!picked) return toast('请先选中 1 条构思');
+    applyIdeas(pid, nid, [picked]);
   });
   const regen = $('#idea-regen');
   if (regen) regen.addEventListener('click', () => {
@@ -2144,10 +2174,11 @@ function openIdeasPreview(pid, nid, ideas, draft = null){
   });
 }
 
-/** 把选中的构思写进卡片 */
+/** 把选中的构思写进卡片（单选：调用方只传 1 条） */
 function applyIdeas(pid, nid, ideas){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
   if (!p || !n) return;
+  if (ideaLocked(n)) return toast(ideaLockTip(n));
   n.children = n.children || [];
   n.raw.children = n.raw.children || [];
   const stamp = Date.now().toString(36);
@@ -2371,11 +2402,11 @@ const PROMPT_TASKS = {
     { id:'closed',  title:'检查是否真闭合',  ask:'检查这个闭环是否真的闭合：每个目标是否都服务于同一个闭环意图、有没有目标其实不属于它、以及缺了哪一环。' },
   ],
   goal: [
-    { id:'ideas',   title:'拆出构思',        ask:'针对这个目标给出 2–3 条可选实现路径（构思），每条只写一句方向标题型的路子，不要铺开做法细节与验收建议。' },
+    { id:'ideas',   title:'拆出构思',        ask:'针对这个目标给出 1 条最合适的实现路径（构思，一个目标只落地一个方案）：先用一句写清它为什么优于其它可能路线（省时 / 好验证 / 复用现有资产 / 风险低），再给方向标题；不要铺开做法细节与验收建议。' },
     { id:'verify',  title:'验收可判定性',    ask:'检查这个目标的验收方式是否可判定；如果不可判定，改写为可执行的检查步骤或命令。' },
   ],
   idea: [
-    { id:'regen',   title:'重新生成构思',    ask:'保留目标与约束，重新给出 1–2 条替代构思（只给方向标题），并各用一句话说明与原构思的差异与代价。' },
+    { id:'regen',   title:'重新生成构思',    ask:'保留目标与约束，重新给出 1 条替代构思（只给方向标题），并说明它相对原构思的优势与代价（一个目标只保留一个构思）。' },
     { id:'plan',    title:'梳理执行计划',    ask:'把这个构思拆成执行计划：3–6 个可执行动作，每个动作给出验证方式与预期证据，并标注依赖顺序。' },
     { id:'risk',    title:'预演失败点',      ask:'预演这个构思落地会遇到什么：列出 3 个最可能的失败点与各自的早期信号。' },
   ],
@@ -2709,9 +2740,13 @@ function detailMarkup(p, n){
     : '';
   // 构思：不再抽候选，改为「生成计划 / 执行计划」；目标与闭环保持候选池
   const ideaActs = isIdea ? ideaActionButtons(p, n, 'detail') : '';
+  const locked = ideaLocked(n);
+  const candGenTitle = locked ? ideaLockTip(n)
+    : poolCount ? '候选池还有未处理的候选'
+      : `让会话给出若干候选${KIND[childKind]}，挑完再写入卡片`;
   const candBtn = (!isIdea && childKind)
-    ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
-         title="${poolCount ? '候选池还有未处理的候选' : '让会话给出若干候选' + KIND[childKind] + '，挑完再写入卡片'}">生成候选</button>`
+    ? `<button class="tbtn primary${locked ? ' is-locked' : ''}" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${locked ? 'aria-disabled="true"' : poolCount ? 'disabled' : ''}
+         title="${esc(candGenTitle)}">生成候选</button>`
     : '';
   const poolBtn = (!isIdea && childKind)
     ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
@@ -2982,6 +3017,7 @@ async function loadCandidates(p, n){
 async function generateCandidates(pid, nid, btn){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return toast('节点已不在当前卡片里');
+  if (ideaLocked(n0)) return toast(ideaLockTip(n0));
   const oldText = btn && btn.textContent;
   if (btn){ btn.disabled = true; btn.textContent = '生成中…'; }
   try {
@@ -3017,12 +3053,22 @@ async function generateCandidates(pid, nid, btn){
 }
 
 /** 把候选条数刷到所有装着这两个按钮的地方（详情卡 + 节点卡），不重建 DOM */
-function paintCandButtons(count, ...boxes){
+function paintCandButtons(count, node, ...boxes){
+  const locked = ideaLocked(node);
   for (const box of boxes){
     if (!box) continue;
     const gen = box.querySelector('[data-cand-gen]');
     const pool = box.querySelector('[data-cand-pool]');
-    if (gen) gen.disabled = count > 0;
+    if (gen){
+      gen.disabled = !locked && count > 0;
+      gen.classList.toggle('is-locked', locked);
+      if (locked){
+        gen.setAttribute('aria-disabled', 'true');
+        gen.title = ideaLockTip(node);
+      } else {
+        gen.removeAttribute('aria-disabled');
+      }
+    }
     if (pool){
       pool.disabled = count === 0;
       pool.innerHTML = candPoolLabel(count);
@@ -3035,7 +3081,7 @@ function paintCandButtons(count, ...boxes){
 async function refreshPoolCount(p, n){
   if (!p || !n || !p.file) return;
   const list = await loadCandidates(p, n);
-  paintCandButtons(list.length,
+  paintCandButtons(list.length, n,
     detailNode === n.id ? $('#detail') : null,
     document.querySelector(`.tnode[data-nid="${n.id}"]`));
 }
@@ -3127,23 +3173,30 @@ let CAND_UID = 0;
 const candUid = (c) => c.__uid || (c.__uid = ++CAND_UID);
 const candIndexOf = (uid) => CAND_META.list.findIndex(c => String(candUid(c)) === String(uid));
 
-const candRowHtml = (c, p0, n0) => `
+const candRowHtml = (c, p0, n0) => {
+  const locked = ideaLocked(n0);
+  return `
     <div class="cand-row" data-cand-row="${candUid(c)}">
       <div class="cand-main">
         <div class="cand-title">${esc(c.title || '（未命名）')}</div>
+        ${c.strength ? `<div class="cand-str">优势：${esc(c.strength)}</div>` : ''}
         ${c.acceptance ? `<div class="cand-acc">${esc(c.acceptance)}</div>` : ''}
       </div>
-      <button class="tbtn primary" data-cand-adopt="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}">添加</button>
+      <button class="tbtn primary" data-cand-adopt="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}"
+        ${locked ? `disabled title="${esc(ideaLockTip(n0))}"` : ''}>添加</button>
       <button class="tbtn" data-cand-del="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
     </div>`;
+};
 
 const candEmptyHtml = (added) => `<div class="cand-empty">${added
   ? `本次已加入 ${added} 条子节点`
   : '候选池是空的：先点「生成候选」'}</div>`;
 
-const candNoteText = () => CAND_META.list.length
-  ? '点「添加」写入为真实子节点；确认后会自己退场。'
-  : '';
+const candNoteText = () => {
+  if (!CAND_META.list.length) return '';
+  if (ideaLocked(CAND_META.n0)) return ideaLockTip(CAND_META.n0);
+  return '点「添加」写入为真实子节点（一个目标只采纳 1 条构思，其余会自动清空）；确认后会自己退场。';
+};
 
 const candPoolBody = () => CAND_META.list.length
   ? `<div class="cand-list">${CAND_META.list.map(c => candRowHtml(c, CAND_META.p0, CAND_META.n0)).join('')}</div>
@@ -3175,7 +3228,7 @@ function syncCandEmpty(){
 /** 面板上的「候选池 n / 生成候选」按剩余条数换挡（详情卡 + 节点卡两处） */
 function paintPoolButtons(){
   if (!CAND_META.n0) return;
-  paintCandButtons(CAND_META.list.length,
+  paintCandButtons(CAND_META.list.length, CAND_META.n0,
     detailNode === CAND_META.n0.id ? $('#detail') : null,
     document.querySelector(`.tnode[data-nid="${CAND_META.n0.id}"]`));
 }
@@ -3227,8 +3280,11 @@ async function adoptCandidate(uid, btn){
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     CAND_META.list.splice(idx, 1);
     CAND_META.added += 1;
+    if (j.locked) CAND_META.list = [];   // 目标锁定：其余备选由服务端一并清掉
     paintCandChrome();
-    toast(`已加入子节点：${(j.child && j.child.title) || ''}`);
+    toast(j.locked
+      ? `已采纳构思：${(j.child && j.child.title) || ''}（其余候选已清空，一个目标只保留一个构思）`
+      : `已加入子节点：${(j.child && j.child.title) || ''}`);
     reloadProjects();   // 卡片上的「候选池 n」与新子节点一起刷新，不挡退场动画
     setTimeout(() => {
       row.dataset.leaving = '1';
