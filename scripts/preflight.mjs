@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * 提交前的完整自检（跨平台）：lint → client 契约 → 会话 mock → 样例校验 → 打包含内容
+ * 提交前的完整自检（跨平台）：
+ * lint → client 契约 → 会话 mock → 动作链路 mock（/plan → /goal → 提炼）→ 样例校验 → 打包含内容
  * 用临时 ROTATION_HOME / MOCK_WS 与随机端口，避免污染真实注册表。
  */
 import { spawn } from 'node:child_process';
@@ -30,6 +31,8 @@ try {
   await run(npm, ['run', 'mock:client']);
   console.log('── mock:session ──');
   await run('node', ['scripts/dev-session-mock.mjs'], { ROTATION_HOME: home, MOCK_WS: ws, PORT: port });
+  console.log('── mock:action ──');
+  await run(npm, ['run', 'mock:action'], { PORT: String(Number(port) + 1) });
   console.log('── validate:samples ──');
   await run(npm, ['run', 'validate:samples']);
   console.log('── verify:tarball ──');

@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 0.8.0 — 构思动作化：生成计划 / 执行计划，执行列改为会话记录
+
+- 构思卡移除「生成候选 / 候选池」，改为「生成计划 / 执行计划」两个手动动作；目标卡与闭环卡保留候选池
+- 生成计划：起普通 DSH 会话 → `/plan` → agent 调研后用 `exit_plan_mode` 交计划，落到
+  `idea.plan{goal,verify[],steps[],doc,at,session}`；面板计划书区只读展示目标 / 验证 / 步骤 + 全文弹窗
+- 执行计划：同一 `sessionId` 上先 `/plan off` 再 `/goal <objective>`；runner 按 `ctx.goals.get(agent).phase`
+  判定终态（active/paused 等 goal 续轮、complete → done、blocked → failed），另有 3s 轮询兜底
+- 反馈提炼：执行记录 done 后自动在同一会话追问一次，解析 JSON 写入 `loop.lessons[]`（按 text 去重、≤5 条）
+- 「执行 · 验证 · 反馈」列改名「执行验证反馈记录」：一次会话一条 exec 记录
+  （`action=plan|exec|reflect`，带会话状态徽标与失败错误摘要）；**已完成记录常驻显示，不参与「已关闭 n」折叠**
+- host：runner 支持同会话续跑、斜杠命令下发（`ctx.commands.execute`，服务缺失时退回提示词）、
+  `exit_plan_mode` 计划捕获、goal phase 轮询；新增 `POST /api/action/plan|exec|reflect`；记录回写落到记录节点
+- 校验：`rotation/v1` 新增可选 `idea.plan` / `loop.lessons` / `exec.action`；`action=plan|reflect` 的记录不强制 `verify`
+- 样例：新增 `samples/execution-records.rotation.json`；新增 `npm run mock:action`（假命令服务 + 假 agent
+  走通 计划 → 执行 → 提炼，13 项断言），并纳入 `npm run preflight`
+- 面板：构思详情加计划书；闭环详情与「信息 · 操作」栏加经验积累；统计 / 进度 / 自动闭环都排除记录节点
+- 版本 0.8.0；实测：`npm run preflight` 全绿；Edge headless 渲染 + 生成计划 / 执行失败点击链路通过
+
 ## 0.7.2 — 候选池：点完「添加」行内立刻变「已添加」，确认后自己退场
 
 - 点「添加」后该行立刻切成绿色 `✓ 已添加`、正文降透明度、按钮禁用（防连点重复提交），
