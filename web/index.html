@@ -2197,7 +2197,7 @@ async function collectServices(p){
     const draft = j && j.draft;
     if (draft && Array.isArray(draft.services) && draft.services.length){
       toast('已恢复上次未确认的收集结果');
-      return openServicesPreview(p, draft.services, draft);
+      return openCollectPreview(p, draft.services, draft);
     }
   } catch {}
   collecting.set(p.file, { status: 'running', at: Date.now() });
@@ -2233,7 +2233,7 @@ async function collectServices(p){
       collecting.delete(p.file);
       paintServiceBlocks();
       if (!list.length) return toast('服务信息收集失败：' + ((draft && draft.error) || '没有解析出 services'));
-      return openServicesPreview(p, list, draft);
+      return openCollectPreview(p, list, draft);
     }
     if (hit.status === 'failed' || hit.status === 'cancelled'){
       collecting.set(p.file, { status: 'failed', error: hit.error || hit.status });
@@ -2255,6 +2255,15 @@ function platformCommandsOf(start){
     mac: pick('mac', 'darwin', 'macos', 'osx', 'default'),
     windows: pick('windows', 'win32', 'win', 'default'),
   };
+}
+
+/** 并发收集时，别的项目先完成：不静默顶掉已打开的预览，提示用户回去点它 */
+function openCollectPreview(p, list, draft){
+  if (!$('#ask').hidden){
+    toast(`${p.name} 收集完成 · 点它的「服务信息收集」查看`);
+    return;
+  }
+  openServicesPreview(p, list, draft);
 }
 
 function openServicesPreview(p, services, draft){

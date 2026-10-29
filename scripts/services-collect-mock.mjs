@@ -24,6 +24,8 @@ const home = await mkdtemp(join(tmpdir(), 'rotation-svc-home-'));
 const ws = await mkdtemp(join(tmpdir(), 'rotation-svc-ws-'));
 process.env.ROTATION_HOME = home;
 process.env.DSH_HOME = home;
+// 全局上限调成 2，方便在 mock 里验证第 3 个请求拿到 429
+process.env.ROTATION_MAX_CONCURRENT = '2';
 
 const { apply } = await import('../lib/index.js');
 const { createServiceRunner, resolvePlatformValue } = await import('../lib/services.mjs');
@@ -73,8 +75,10 @@ const ctx = {
 };
 const routes = [];
 
-/* ── 种子：一个没有 services 的项目卡片 ── */
+/* ── 种子：三个没有 services 的项目卡片（验证并发按项目隔离） ── */
 const FILE = 'svc.rotation.json';
+const FILE_B = 'svcb.rotation.json';
+const FILE_C = 'svcc.rotation.json';
 const CARD = {
   schema: 'rotation/v1',
   project: { name: '服务收集 Mock', workspace: ws },
@@ -84,11 +88,21 @@ const CARD = {
     acceptance: 'mock 断言全绿', status: 'plan', closed_at: null, children: [],
   },
 };
-await mkdir(join(ws, '.dsh'), { recursive: true });
-await writeFile(join(ws, '.dsh', 'rotation.json'), JSON.stringify(CARD, null, 1) + '\n', 'utf8');
+const wsB = await mkdtemp(join(tmpdir(), 'rotation-svc-ws-b-'));
+const wsC = await mkdtemp(join(tmpdir(), 'rotation-svc-ws-c-'));
+async function seedProject(dir, file, name, loopId) {
+  const card = JSON.parse(JSON.stringify(CARD));
+  card.project = { name, workspace: dir };
+  card.loop.id = loopId;
+  await mkdir(join(dir, '.dsh'), { recursive: true });
+  await writeFile(join(dir, '.dsh', 'rotation.json'), JSON.stringify(card, null, 1) + '\n', 'utf8');
+  return { id: file.replace('.rotation.json', ''), name, workspace: dir, file };
+}
 await mkdir(home, { recursive: true });
 await writeFile(join(home, 'registry.json'), JSON.stringify([
-  { id: 'svc', name: '服务收集 Mock', workspace: ws, file: FILE },
+  await seedProject(ws, FILE, '服务收集 Mock', 'svc-loop'),
+  await seedProject(wsB, FILE_B, '服务收集 Mock B', 'svcb-loop'),
+  await seedProject(wsC, FILE_C, '服务收集 Mock C', 'svcc-loop'),
 ], null, 1) + '\n', 'utf8');
 
 apply(ctx, { basePath: BASE });
@@ -126,22 +140,33 @@ try {
       { id: 'bad', name: '坏地址', url: 'not-a-url', start: 'x' },
     ],
   });
-  replies.push(GOOD);
+  replies.push(GOOD, GOOD);   // A、B 各一次会话
 
-  /* 1. 起收集会话 */
+  /* 1. 并发：不同项目可同时收集；同项目串行；全局受上限约束 */
   const started = await sendJson('POST', '/api/services/collect', { file: FILE });
   check('收集会话已发起', started.status === 200 && started.body?.ok === true, JSON.stringify(started.body));
   check('返回 run.key', typeof started.body?.run?.key === 'string', JSON.stringify(started.body?.run?.key));
+  const startedB = await sendJson('POST', '/api/services/collect', { file: FILE_B });
+  check('另一个项目可同时收集（不再全局 409）', startedB.status === 200 && startedB.body?.ok === true, JSON.stringify(startedB.body));
+  const againA = await sendJson('POST', '/api/services/collect', { file: FILE });
+  check('同一项目第二次仍 409', againA.status === 409, JSON.stringify(againA.body));
+  const startedC = await sendJson('POST', '/api/services/collect', { file: FILE_C });
+  check('超过 ROTATION_MAX_CONCURRENT 返回 429', startedC.status === 429, JSON.stringify(startedC.body));
 
-  /* 2. 等草稿出现 */
-  let draft = null;
+  /* 2. 等两份草稿（A、B 各一份，互不覆盖） */
+  let draft = null, draftB = null;
   for (let i = 0; i < 40; i += 1) {
     await sleep(100);
-    const got = await getJson('/api/services/collect?file=' + encodeURIComponent(FILE));
-    draft = got.body?.draft;
-    if (draft && Array.isArray(draft.services) && draft.services.length) break;
+    if (!draft || !Array.isArray(draft.services) || !draft.services.length) {
+      draft = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE))).body?.draft || draft;
+    }
+    if (!draftB || !Array.isArray(draftB.services) || !draftB.services.length) {
+      draftB = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft || draftB;
+    }
+    if (draft?.services?.length && draftB?.services?.length) break;
   }
   check('草稿已落盘', !!draft && Array.isArray(draft.services), JSON.stringify(draft));
+  check('B 项目草稿独立落盘', !!draftB && draftB.file === FILE_B && draftB.services?.length === 2, JSON.stringify(draftB));
   check('只保留合法 url 的条目', draft?.services?.length === 2, `got ${draft?.services?.length}`);
   check('start 归一成 mac/windows', JSON.stringify(draft?.services?.[0]?.start) === JSON.stringify({ mac: 'pnpm dev', windows: 'pnpm.cmd dev' }),
     JSON.stringify(draft?.services?.[0]?.start));
