@@ -145,22 +145,49 @@ check('候选 count 进文案', candIdeaText.includes('给出 4 条'), '');
 check('构思候选带 strength 契约', candIdeaText.includes('"strength"') && candIdeaText.includes('不要用「最小 / 最强」'), '');
 check('执行候选不带 strength', !candText.includes('"strength"'), '');
 check('候选有示例块', candText.includes('\n示例\n'), '');
-// 场景 / 约束注入（样例卡没有这两个字段，用夹具）
+// 场景 / 阻碍注入（样例卡没有这两个字段，用夹具）
 const withCtxFields = JSON.parse(JSON.stringify(fx));
 withCtxFields.loop.scenario = '1) 打开面板\n2) 点「生成计划」看到预览\n3) 确认真实发出';
-withCtxFields.loop.constraints = '不改公开 API；单次操作 < 60 秒';
+withCtxFields.loop.blockers = '1)缺进度持久化（无 POST /api/progress）→ 挡在「练完可恢复」\n2)缺逐句对齐（无 timecode 解析）→ 挡在「逐句跟读」';
 const scPlan = composePlanPrompt({ ...fxArgs, card: withCtxFields });
-check('计划注入场景与约束', scPlan.includes('\n- 场景：\n') && scPlan.includes('- 约束：不改公开 API'), '');
+check('计划注入场景与阻碍', scPlan.includes('\n- 场景：\n') && scPlan.includes('- 阻碍：') && scPlan.includes('缺进度持久化'), '');
 const scCand = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
-check('候选注入场景与约束', scCand.includes('\n场景\n') && scCand.includes('- 约束：不改公开 API'), '');
+check('闭环候选注入阻碍', scCand.includes('\n场景\n') && scCand.includes('- 阻碍：'), '');
+const scCandGoal = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-g1' });
+check('目标候选注入闭环阻碍', scCandGoal.includes('- 闭环阻碍：') && scCandGoal.includes('缺进度持久化'), '');
+// 闭环阻碍项：补全 prompt 要「先核对项目再写缺什么」+ 格式约束 + JSON 契约
+const blockersFill = composeFillPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', fields: ['blockers'] });
+check('补全阻碍项要「证据要求」块', blockersFill.includes('\n证据要求\n'), '');
+check('补全阻碍项要 3–5 条', blockersFill.includes('阻碍项 3–5 条'), '');
+check('补全阻碍项格式：缺什么 → 挡在哪 → 模块', blockersFill.includes('缺什么 → 挡在场景流程第几步 → 涉及模块或文件'), '');
+check('补全阻碍项 JSON 契约', blockersFill.includes('{"blockers": "..."'), '');
+check('补全阻碍项 lint', lintPrompt(blockersFill).warnings.length === 0, JSON.stringify(lintPrompt(blockersFill).warnings.slice(0, 2)));
+// 拆目标：阻碍项 → 每条目标对应一条阻碍，blocker 字段照抄短名
+const splitBlockers = composeSplitPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
+check('拆目标注入已知阻碍', splitBlockers.includes('- 已知阻碍项：') && splitBlockers.includes('缺进度持久化'), '');
+check('拆目标要每条对应阻碍', splitBlockers.includes('每条目标对应一条阻碍项'), '');
+check('拆目标 blocker 契约', splitBlockers.includes('"blocker":"…"'), '');
+check('拆目标照抄阻碍短名', splitBlockers.includes('照抄阻碍项原文的短名'), '');
+check('拆目标 lint（带阻碍）', lintPrompt(splitBlockers).warnings.length === 0, JSON.stringify(lintPrompt(splitBlockers).warnings.slice(0, 2)));
+const noBlockerCard = JSON.parse(JSON.stringify(fx));
+delete noBlockerCard.loop.blockers;
+const splitNoBlockers = composeSplitPrompt({ ...fxArgs, card: noBlockerCard, nodeId: 'sw-loop' });
+check('无阻碍时拆目标不带 blocker 契约', !splitNoBlockers.includes('"blocker"'), '');
+// 目标仍有「约束」：补全与拆构思都按约束口径，不混成阻碍
+const goalConstraintsFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['constraints'] });
+check('目标补全仍是约束口径', goalConstraintsFill.includes('- 约束 3–5 条') && !goalConstraintsFill.includes('阻碍项'), '');
+const withGoalLimits = JSON.parse(JSON.stringify(fx));
+withGoalLimits.loop.children[0].constraints = '不改公开 API';
+const ideaLimited = composeIdeaPrompt({ ...fxArgs, card: withGoalLimits, nodeId: 'sw-g1' });
+check('拆构思仍注入目标约束', ideaLimited.includes('- 目标约束：不改公开 API'), '');
 const accIdea = JSON.parse(JSON.stringify(fx));
 accIdea.loop.children[0].children[0].acceptance = '章节与情节可双向查询';
 const accPlan = composePlanPrompt({ ...fxArgs, card: accIdea });
 check('构思自己的验收单独成块', accPlan.includes('\n验收\n- 章节与情节可双向查询'), '');
-// 长字段卡片（真实卡可能几百字场景/约束/验收）：裁剪预算必须兜住 1500 字 + 72 列
+// 长字段卡片（真实卡可能几百字场景/阻碍/验收）：裁剪预算必须兜住 1500 字 + 72 列
 const longCard = JSON.parse(JSON.stringify(fx));
 longCard.loop.scenario = Array.from({ length: 6 }, (_, i) => `${i + 1})操作：打开面板选择项目\n预期：看到预览\n体验：10 秒内完成`).join('\n');
-longCard.loop.constraints = Array.from({ length: 5 }, (_, i) => `${i + 1})仅本机单用户，不开放公网，也不做跨设备同步`).join('；');
+longCard.loop.blockers = Array.from({ length: 5 }, (_, i) => `${i + 1})缺第${i + 1}个模块（src/mod${i + 1}.ts 无实现）→ 挡在「练完可恢复」这一步`).join('\n');
 longCard.loop.children[0].acceptance = Array.from({ length: 5 }, (_, i) => `${i + 1})步骤${i + 1}：pnpm test:e2e 用例全绿且新增断言可复现`).join('；');
 const longPlan = composePlanPrompt({ ...fxArgs, card: longCard });
 const longWarn = lintPrompt(longPlan, { maxLength: 1500 }).warnings;

@@ -286,6 +286,10 @@
   .gsel-acc{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--b1);background:var(--l1);
     color:var(--tx3);font:inherit;font-size:11.5px;resize:vertical;min-height:34px}
   .gsel-acc:focus{outline:2px solid var(--brand);outline-offset:0}
+  /* 拆目标的「对应阻碍」：阻碍项短名，只占一行、可改 */
+  .gsel-blk{width:100%;padding:4px 7px;border-radius:6px;border:1px dashed var(--b2);background:transparent;
+    color:var(--tx2);font:inherit;font-size:11px}
+  .gsel-blk:focus{outline:2px solid var(--brand);outline-offset:0;border-style:solid}
   .gsel-str{font-size:11px;color:var(--tx3);line-height:1.5}
   .gsel-str b{color:var(--tx2);font-weight:500}
   /* 服务信息收集的预览行（ask 弹窗内）：勾选 → 探活 → 改 url / 平台命令 → 确认写回 */
@@ -448,6 +452,8 @@
   .editval:hover{background:var(--hover);color:var(--tx1)}
   .editval.empty{color:var(--tx4);border:1px dashed var(--b2);text-align:center;font-size:11px}
   .editval{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* 阻碍项一条一行（3–5 条），默认 2 行会只剩开头一半 → 单独放宽到 4 行 */
+  .editval[data-edit="blockers"]{-webkit-line-clamp:4}
   .detail-row .fielddd{display:flex;gap:6px;align-items:flex-start}
   .detail-row .fielddd .editval{flex:1;min-width:0}
   /* 标题/路径右侧的「生成」：按标题补齐缺失字段 */
@@ -1064,7 +1070,7 @@ function countExecItems(root){
 /** 历史快照只保留回看需要的字段：结构完整，不背 session / 计划全文 */
 function compactLoopSnapshot(node){
   if (!node || typeof node !== 'object') return null;
-  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','acceptance','verify','proof','action','lessons'];
+  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','acceptance','blockers','blocker','verify','proof','action','lessons'];
   const out = {};
   KEEP.forEach((k) => { if (node[k] != null) out[k] = node[k]; });
   if (Array.isArray(node.issues) && node.issues.length){
@@ -1269,9 +1275,20 @@ function nodeIssues(n){ return (n.raw && n.raw.issues) || n.issues || []; }
 function hasIssues(n){ return nodeIssues(n).length > 0; }
 function anyBlocked(n){ let h=false; walk(n, x=>{ if(hasIssues(x) && !x.closed) h=true; }); return h; }
 function blockCount(n){ let c=0; walk(n, x=>{ if(hasIssues(x) && !x.closed) c++; }); return c; }
+// 闭环的阻碍项：现在就实现这个闭环，哪一步跑不通、缺哪个模块/功能才跑通。
+// 非空时不允许「确认收敛」——阻碍项就是「现在通不过的地方」。
+function blockersOf(n){
+  return (n && n.kind === 'loop' && n.raw) ? String(n.raw.blockers || '').trim() : '';
+}
+function blockerCountOf(n){
+  const text = blockersOf(n);
+  return text ? text.split('\n').filter(line => line.trim()).length : 0;
+}
+function blockerGate(n){ return !!n && n.kind === 'loop' && !n.closed && !!blockersOf(n); }
+function blockerGateTip(n){ return `还有 ${blockerCountOf(n)} 条阻碍项：先在「阻碍项」里清空或消除后才能收敛`; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
 // 构思没有「方案」字段（2026-10-29 退役），所以这里也不再拿它判「有内容」
-const INFO_FIELDS = ['intent','scenario','constraints','acceptance','verify','proof'];
+const INFO_FIELDS = ['intent','scenario','blockers','constraints','acceptance','verify','proof'];
 // 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
 const PLACEHOLDER_RE = /^[（(]待补[）)]/;
 function isFilled(v){
@@ -1752,7 +1769,9 @@ function nodeMarkup(n, p){
   const upstream = p ? activeAncestorOf(p, n) : null;
   const foot = [
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
-    canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
+    canClose && blockerGate(n)
+      ? `<button class="tbtn is-locked" data-close="${n.id}" disabled title="${esc(blockerGateTip(n))}">${closeLabel}</button>`
+      : canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     candGen, candPool, ideaActs, viewSess,
   ].filter(Boolean).join('');
@@ -1932,19 +1951,22 @@ function laneMarkup(p){
   const pr = progressOf(p.root);
   const rootState = stateOf(p.root);
   const closed = !!p.root.closed;
+  const gated = blockerGate(p.root);      // 阻碍项没清：不能确认收敛
   const canConverge = !closed && rootState.key === 'review';
   const dotCls = closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
   const stateChip = `<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>`;
   const headerActs = closed
     ? `<button class="mini" data-act="history" data-id="${esc(p.id)}">闭环历史</button>
        <button class="mini" data-act="new-loop" data-id="${esc(p.id)}">开新闭环</button>`
-    : (canConverge ? `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认收敛</button>` : '');
+    : gated
+      ? `<button class="mini primary-converge is-locked" data-close="${esc(p.root.id)}" disabled title="${esc(blockerGateTip(p.root))}">确认收敛</button>`
+      : (canConverge ? `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认收敛</button>` : '');
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}">
     <div class="lane-head">
       <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}${stateChip}
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 闭环历史 / 开新闭环 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
-      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标${closed ? ' · 已闭环' : (canConverge ? ' · 待确认收敛' : '关闭')}</div>
+      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标${closed ? ' · 已闭环' : gated ? ` · 阻碍 ${blockerCountOf(p.root)} 条未清` : (canConverge ? ' · 待确认收敛' : '关闭')}</div>
       ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
       ${laneServices(p)}
       ${laneTime(p)}
@@ -2028,6 +2050,7 @@ function renderFocus(){
   const p = PROJECTS.find(x=>x.id===state.focusId) || PROJECTS[0];
   const pr = progressOf(p.root), st = stateOf(p.root), acts = nextAction(p);
   const rootState = stateOf(p.root);
+  const gated = blockerGate(p.root);
   const canConverge = !p.root.closed && rootState.key === 'review';
   const dotCls = p.root.closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
   wrap.innerHTML = `
@@ -2048,7 +2071,9 @@ function renderFocus(){
           ${(p.root.closed || canConverge) ? `<div class="lane-actions">
             ${p.root.closed
               ? `<button class="mini" data-act="history" data-id="${esc(p.id)}">闭环历史</button><button class="mini" data-act="new-loop" data-id="${esc(p.id)}">开新闭环</button>`
-              : `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认收敛</button>`}
+              : gated
+                ? `<button class="mini primary-converge is-locked" data-close="${esc(p.root.id)}" disabled title="${esc(blockerGateTip(p.root))}">确认收敛</button>`
+                : `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认收敛</button>`}
           </div>` : ''}
           ${laneServices(p)}
           ${laneTime(p)}
@@ -2165,6 +2190,7 @@ function doClose(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
   if (!n) return;
+  if (blockerGate(n)) return toast(blockerGateTip(n));
   const parent = findParent(p.root, id);
   const now = new Date().toISOString();
   n.closed = true;
@@ -2797,6 +2823,8 @@ function parseGoals(text){
   return arr.map(g => ({
     title: String((g && (g.title || g.name)) || '').trim(),
     acceptance: String((g && (g.acceptance || g.verify)) || '').trim(),
+    // 对应哪条阻碍项（短名）：拆目标强制对应阻碍，采纳时落盘到 goal.blocker
+    blocker: String((g && g.blocker) || '').trim().slice(0, 80),
   })).filter(g => g.title).slice(0, 3);
 }
 
@@ -2886,6 +2914,7 @@ function openGoalsPreview(pid, nid, goals, draft = null){
       <input type="checkbox" data-gpick="${i}" checked>
       <span class="gsel-main">
         <input class="gsel-title" data-gtitle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
+        ${g.blocker ? `<input class="gsel-blk" data-gblk="${i}" value="${esc(g.blocker)}" maxlength="80" spellcheck="false" title="这条目标消除哪条阻碍项（拆目标时写入，可改）">` : ''}
         <textarea class="gsel-acc" data-gacc="${i}" rows="2" spellcheck="false">${esc(g.acceptance)}</textarea>
       </span>
     </label>`).join('');
@@ -2900,8 +2929,10 @@ function openGoalsPreview(pid, nid, goals, draft = null){
       if (!box || !box.checked) return;
       const titleEl = document.querySelector(`#ask-body [data-gtitle="${i}"]`);
       const accEl = document.querySelector(`#ask-body [data-gacc="${i}"]`);
+      const blkEl = document.querySelector(`#ask-body [data-gblk="${i}"]`);
       const title = titleEl ? titleEl.value.trim() : '';
-      if (title) picked.push({ title, acceptance: accEl ? accEl.value.trim() : '' });
+      const blocker = blkEl ? blkEl.value.trim().slice(0, 80) : '';
+      if (title) picked.push({ title, acceptance: accEl ? accEl.value.trim() : '', blocker });
     });
     if (!picked.length) return toast('没有勾选任何目标');
     applyGoals(pid, nid, picked);
@@ -2930,6 +2961,8 @@ function applyGoals(pid, nid, goals){
       acceptance: g.acceptance || '（待补）验收方式',
       status: 'plan', closed_at: null,
     };
+    // 阻碍引用只在拆目标给出时写：目标的「为什么现在做」由它承载
+    if (g.blocker) rawChild.blocker = String(g.blocker).slice(0, 80);
     n.children.push({ id: rawChild.id, kind: 'goal', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
     n.raw.children.push(rawChild);
   });
@@ -2951,8 +2984,8 @@ const isBlankTitle = (t) => {
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
 /* 可点开直接改的字段：构思只留标题（「方案」2026-10-29 退役），不改描述类字段 */
-const EDIT_FIELDS = { loop:['intent','scenario','constraints','acceptance'], goal:['constraints','acceptance'], idea:[], exec:['verify','proof'] };
-const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
+const EDIT_FIELDS = { loop:['intent','scenario','blockers','acceptance'], goal:['constraints','acceptance'], idea:[], exec:['verify','proof'] };
+const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', blockers:'阻碍项', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
 
 /* ─────────── Prompt：查看 / 变更 / 发送 ───────────
  * 合成只有一份实现（host 的 lib/prompt.mjs），面板通过 GET /api/prompts 取；
@@ -3244,7 +3277,7 @@ function detailMarkup(p, n){
   const rec = isRecord(n);
   const fields = rec ? [] : (EDIT_FIELDS[n.kind] || []);
   // 「生成」：标题是唯一必需项；有标题就能把其余空字段一次补出来
-  const GEN_FIELDS = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: [], exec: ['verify'] };
+  const GEN_FIELDS = { loop: ['intent', 'scenario', 'blockers', 'acceptance'], goal: ['constraints', 'acceptance'], idea: [], exec: ['verify'] };
   const genFields = rec ? [] : (GEN_FIELDS[n.kind] || []);
   const genMissing = genFields.filter(f => !String(r[f] || '').trim());
   const hasTitle = !isBlankTitle(n.title);
@@ -3264,6 +3297,10 @@ function detailMarkup(p, n){
        <dd class="fielddd"><button class="editval${r[f] ? '' : ' empty'}" data-edit="${f}">${r[f] ? esc(r[f]) : '点击填写'}</button></dd>
      </div>`;
   }).join('');
+  // 目标的「对应阻碍」：拆目标时写入的阻碍项短名，只读（要改就重新拆目标）
+  const blockerRow = (n.kind === 'goal' && r.blocker)
+    ? `<div class="detail-row"><dt>对应阻碍</dt><dd>${esc(r.blocker)}</dd></div>`
+    : '';
   const timeRows = [];
   // 记录自己的时间行在「执行记录」区里给（开始 / 结束 / 耗时），这里不重复
   if (r.started_at && !isRecord(n)) timeRows.push(['开始', fmtTs(r.started_at), true]);
@@ -3318,7 +3355,9 @@ function detailMarkup(p, n){
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
   const acts = [
-    canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' || n.kind === 'goal' ? '确认收敛' : '完成'}</button>` : '',
+    canClose && blockerGate(n)
+      ? `<button class="tbtn primary is-locked" data-close="${n.id}" disabled title="${esc(blockerGateTip(n))}">确认收敛</button>`
+      : canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' || n.kind === 'goal' ? '确认收敛' : '完成'}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     ideaActs, candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
@@ -3342,6 +3381,7 @@ function detailMarkup(p, n){
           ${hasIssues(n) && !n.closed ? '<span class="mnote" style="margin-left:8px;color:var(--red)">· 有未处置问题</span>' : ''}
           <span class="mnote" style="margin-left:8px">自动流转：有内容→规划中，有子节点→进行中，子节点全闭环→已闭环</span></dd>
       </div>
+      ${blockerRow}
       ${editable}
       ${rows}
     </dl>
@@ -3558,7 +3598,7 @@ async function viewSession(sessionId){
 
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
     构思与执行记录没有可补的字段（方案已退役、记录只留只读信息），这里给空数组把入口关掉 */
-const GEN_FIELDS_CLIENT = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: [], exec: ['verify'] };
+const GEN_FIELDS_CLIENT = { loop: ['intent', 'scenario', 'blockers', 'acceptance'], goal: ['constraints', 'acceptance'], idea: [], exec: ['verify'] };
 /* ─────────── 候选池 ─────────── */
 const CAND_POOL = new Map();     // `${file}::${nodeId}` → 候选数组
 const CAND_COUNTS = new Map();   // `${file}::${nodeId}` → 候选条数（按项目批量拉，节点卡直接用）
@@ -4138,10 +4178,14 @@ function parseItems(text){
 /** 序列化：numbered 模式重排 1)2)3)；plain 模式用原分隔符拼回 */
 function serializeItems(parsed, items){
   if (!items.length) return parsed.preamble;
-  if (parsed.mode === 'plain') return items.map((it) => String(it.content || '').trim()).filter(Boolean).join(parsed.separator);
-  const kinds = items.map((x) => x.markerKind);
+  // 空条目直接丢掉：清空全部条目要能存成空串（否则编号模式会留下 "1)2)3)"，
+  // 阻碍项这类「非空即拦截」的字段就永远清不掉。
+  const kept = items.filter((it) => String(it.content || '').trim());
+  if (!kept.length) return parsed.preamble;
+  if (parsed.mode === 'plain') return kept.map((it) => String(it.content || '').trim()).join(parsed.separator);
+  const kinds = kept.map((x) => x.markerKind);
   const kind = kinds[0] === 'alpha' ? 'alpha' : kinds[0] === 'han' ? 'han' : kinds[0] === 'dash' ? 'dash' : 'num';
-  const body = items.map((it, i) => {
+  const body = kept.map((it, i) => {
     const marker = kind === 'alpha' ? `${String.fromCharCode(65 + (i % 26))}.`
       : kind === 'han' ? `${'一二三四五六七八九十'[i] || (i + 1)}、`
       : kind === 'dash' ? '- '
@@ -4515,6 +4559,7 @@ function hideModal(m){
 function openConfirm(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
+  if (blockerGate(n)) return toast(blockerGateTip(n));
   const pr = progressOf(n), parent = findParent(p.root, id);
   pendingClose = id;
   const isLoop = n.kind === 'loop';

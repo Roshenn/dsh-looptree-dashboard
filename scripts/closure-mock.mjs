@@ -81,10 +81,18 @@ const SOURCE = [
   grabFunction('stateOf'),
   grabFunction('autoCloseTree'),
   grabFunction('syncRawStatus'),
+  grabConst('ITEM_RE'),
+  grabConst('ORDINAL_PREFIX_RE'),
+  grabFunction('stripOrdinalPrefix'),
+  grabFunction('parseItems'),
+  grabFunction('serializeItems'),
+  grabFunction('blockersOf'),
+  grabFunction('blockerCountOf'),
+  grabFunction('blockerGate'),
 ].join('\n');
 
 const api = new Function(`${SOURCE}
-return { walk, workKids, ideaRecordsDone, deriveState, stateOf, autoCloseTree, syncRawStatus, STATE_DEF };`)();
+return { walk, workKids, ideaRecordsDone, deriveState, stateOf, autoCloseTree, syncRawStatus, STATE_DEF, parseItems, serializeItems, blockersOf, blockerCountOf, blockerGate };`)();
 
 /* ── 造节点（和面板 conv() 后的形状一致：记录靠 raw.action 识别） ── */
 const N = (id, kind, opts = {}) => ({
@@ -143,6 +151,20 @@ check('syncRawStatus：review 闭环写 doing', sysRoot.raw.status === 'doing', 
 /* 5. 状态文案 */
 check('review 文案是「待确认收敛」', api.STATE_DEF.review && api.STATE_DEF.review.label === '待确认收敛', JSON.stringify(api.STATE_DEF.review));
 check('stateOf 返回 review 与琥珀色', api.stateOf(reviewGoal).key === 'review' && api.stateOf(reviewGoal).tone.includes('amber'), JSON.stringify(api.stateOf(reviewGoal)));
+
+/* 6. 阻碍项：清空条目要存成空串（否则编号模式留 "1)2)"，闸门永远清不掉） */
+const itemsEmpty = api.serializeItems(api.parseItems('1) 缺 A\n2) 缺 B'), [{ content: ' ' }, { content: '' }]);
+check('清空全部条目 → 空串（阻碍项能清掉）', itemsEmpty === '', JSON.stringify(itemsEmpty));
+const itemsPartial = api.serializeItems(api.parseItems('1) 缺 A\n2) 缺 B'), [{ content: '缺 A' }, { content: '' }]);
+check('只留一条时按新序号重排', itemsPartial === '1)缺 A', JSON.stringify(itemsPartial));
+
+/* 7. 收敛闸门：阻碍项非空且未闭合 → 拦；清空 / 已闭环 → 放行 */
+const gateLoop = N('loop-gate', 'loop', { title: '闭环', raw: { acceptance: 'x', blockers: '1)缺 A\n2)缺 B' }, children: [] });
+check('阻碍项非空 → 拦截收敛', api.blockerGate(gateLoop) === true && api.blockerCountOf(gateLoop) === 2, JSON.stringify({ gate: api.blockerGate(gateLoop), n: api.blockerCountOf(gateLoop) }));
+check('阻碍项清空 → 放行', api.blockerGate(N('loop-clear', 'loop', { title: '闭环', raw: { acceptance: 'x', blockers: '' }, children: [] })) === false);
+const gateClosed = N('loop-done', 'loop', { title: '闭环', closed: true, raw: { acceptance: 'x', blockers: '1) 缺 A', closed_at: '2026-10-29T00:00:00Z' }, children: [] });
+check('已闭环的闭环不再拦（闸门只管未闭合）', api.blockerGate(gateClosed) === false);
+check('非闭环节点不拦（闸门只管闭环）', api.blockerGate(N('g1', 'goal', { title: '目标', raw: { acceptance: 'x', blockers: '1) 缺 A' }, children: [] })) === false);
 
 const failed = results.filter((r) => !r.pass).length;
 console.log(failed ? `\n${failed} 项失败` : '\n闭环规则全部通过');
