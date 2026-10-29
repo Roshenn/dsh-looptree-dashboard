@@ -3054,7 +3054,10 @@ async function generateCandidates(pid, nid, btn){
 
 /** 把候选条数刷到所有装着这两个按钮的地方（详情卡 + 节点卡），不重建 DOM */
 function paintCandButtons(count, node, ...boxes){
-  const locked = ideaLocked(node);
+  // 旧节点引用可能落在采纳之后：按 id 取当前树里的节点，锁定态才不会被旧状态抹掉
+  const owner = node ? findProjectByNode(node.id) : null;
+  const fresh = owner ? (findNode(owner.root, node.id) || node) : node;
+  const locked = ideaLocked(fresh);
   for (const box of boxes){
     if (!box) continue;
     const gen = box.querySelector('[data-cand-gen]');
@@ -3064,7 +3067,7 @@ function paintCandButtons(count, node, ...boxes){
       gen.classList.toggle('is-locked', locked);
       if (locked){
         gen.setAttribute('aria-disabled', 'true');
-        gen.title = ideaLockTip(node);
+        gen.title = ideaLockTip(fresh);
       } else {
         gen.removeAttribute('aria-disabled');
       }
@@ -3288,7 +3291,12 @@ async function adoptCandidate(uid, btn){
     reloadProjects();   // 卡片上的「候选池 n」与新子节点一起刷新，不挡退场动画
     setTimeout(() => {
       row.dataset.leaving = '1';
-      setTimeout(() => { row.remove(); syncCandEmpty(); paintPoolButtons(); }, 200);
+      setTimeout(() => {
+        row.remove();
+        if (j.locked) document.querySelectorAll('#ask-body .cand-row').forEach(r => r.remove());
+        syncCandEmpty();
+        paintPoolButtons();
+      }, 200);
     }, 480);
   } catch (error) {
     delete row.dataset.added;
