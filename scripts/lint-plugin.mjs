@@ -76,6 +76,19 @@ check('client 注册右栏插槽', client.includes('sidebar.right.pane.tab'));
 // ── 面板本体 ──
 check('web/index.html 存在', await exists(join(ROOT, 'web/index.html')));
 
+// ── prompt 唯一实现（防止 host / 面板各写一份又漂移）──
+const promptMod = await readFile(join(ROOT, 'lib/prompt.mjs'), 'utf8').catch(() => '');
+check('lib/prompt.mjs 存在', !!promptMod);
+check('prompt.mjs 导出 composeActionPrompt', /export\s+function\s+composeActionPrompt/.test(promptMod));
+check('prompt.mjs 导出 composeTaskPrompt', /export\s+function\s+composeTaskPrompt/.test(promptMod));
+check('prompt.mjs 导出 lintPrompt', /export\s+function\s+lintPrompt/.test(promptMod));
+check('host 引用 lib/prompt.mjs', /from\s+'\.\/prompt\.mjs'/.test(host));
+check('host 注册 /prompts 路由', host.includes('${api}/prompts'));
+check('host 不再自带动作 prompt 生成', !host.includes('function buildPlanTask') && !host.includes('function commandOfAction'));
+const panel = await readFile(join(ROOT, 'web/index.html'), 'utf8');
+check('面板不再自己拼 prompt', !panel.includes('function composePrompt') && !panel.includes('const PROMPT_TASKS'));
+check('面板走 /prompts 接口', panel.includes('/prompts?file='));
+
 const failed = results.filter((r) => !r.pass);
 console.log(failed.length ? `\n${failed.length} 项失败` : '\n打包自检全部通过');
 process.exit(failed.length ? 1 : 0);

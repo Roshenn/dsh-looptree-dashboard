@@ -122,20 +122,27 @@ const ctx = {
   commands: {
     async execute(agent, line) {
       const sess = sessions.get(agent.id);
-      const raw = String(line || '').trim();
       if (!sess) return undefined;
-      if (raw === '/plan' || raw.startsWith('/plan ')) {
-        const message = raw.slice('/plan'.length).trim();
+      // 真实语义（@deepseek-ai/dsh-commands#parseCommand）：只切命令名，rawInput 保留换行
+      const text = String(line || '');
+      const match = /^\/([a-z][a-z0-9_-]*)(?=$|[\t\n\r ])/.exec(text);
+      if (!match) return undefined;
+      const name = match[1];
+      const rawInput = text.slice(match[0].length).trim();
+      sess.commandLines.push(text);
+      if (name === 'plan') {
+        if (rawInput === 'off') {
+          sess.planMode = false;
+          return { kind: 'success', text: 'Plan mode off.' };
+        }
         sess.planMode = true;
-        if (message) runPlanTurn(agent.id);
+        sess.lastPlanPrompt = rawInput;
+        if (rawInput) runPlanTurn(agent.id);
         return { kind: 'success', text: 'Plan mode on.' };
       }
-      if (raw === '/plan off') {
-        sess.planMode = false;
-        return { kind: 'success', text: 'Plan mode off.' };
-      }
-      if (raw.startsWith('/goal ')) {
-        sess.goal = { objective: raw.slice('/goal'.length).trim(), phase: 'active', roundsStarted: 0, maxGoalRounds: 10, activation: 'armed' };
+      if (name === 'goal') {
+        sess.lastGoalObjective = rawInput;
+        sess.goal = { objective: rawInput, phase: 'active', roundsStarted: 0, maxGoalRounds: 10, activation: 'armed' };
         runGoalRounds(agent.id);
         return { kind: 'success', text: 'Goal created.' };
       }
@@ -148,11 +155,13 @@ const ctx = {
       const sess = {
         agent: null, planMode: false, goal: null,
         createCount: 0, createdWith: meta?.agentPreset || '', setupCalled: false, cancelCalls: 0,
+        commandLines: [], followups: [], lastPlanPrompt: '', lastGoalObjective: '',
       };
       const agent = {
         id: sessionId,
         async followup(message) {
           const text = textOf(message);
+          sess.followups.push(text);
           if (/lessons|复盘|经验/i.test(text)) {
             await runTurn(sessionId, REFLECT_JSON);
             return;
@@ -216,6 +225,19 @@ const waitRun = async (match, timeoutMs = 6000) => {
   return null;
 };
 
+/** 等指定的那条 run（同名 taskId 可能有多条，用 key 精确定位） */
+const waitRunKey = async (key, timeoutMs = 6000) => {
+  if (!key) return null;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const { body } = await api('/runs');
+    const run = (body?.runs || []).find((r) => r.key === key);
+    if (run && ['done', 'failed', 'cancelled'].includes(run.status)) return run;
+    await wait(80);
+  }
+  return null;
+};
+
 let ok = true;
 try {
   const project = await addProject({ id: 'actionmock', name: 'ActionMock', workspace: WS });
@@ -229,6 +251,9 @@ try {
     status: 'doing', closed_at: null,
     children: [{
       id: 'am-i1', kind: 'idea', title: '构思动作与记录列', approach: '面板动作交给 DSH 会话',
+      status: 'ready', closed_at: null, children: [],
+    }, {
+      id: 'am-i2', kind: 'idea', title: '回退路径', approach: '命令服务不可用时退回提示词',
       status: 'ready', closed_at: null, children: [],
     }],
   }];
@@ -247,6 +272,12 @@ try {
   check('preset setup 已执行', !!planSess?.setupCalled);
   // 计划拿到就收手：exit_plan_mode 的审批回合要中断，别让它批准后直接开跑
   check('计划拿到后中断审批回合', (planSess?.cancelCalls || 0) >= 1, String(planSess?.cancelCalls || 0));
+  // 回归：/plan 带的是多行结构化正文，不是被压成一行的糊墙
+  const planPrompt = planSess?.lastPlanPrompt || '';
+  check('/plan 带多行正文', planPrompt.split('\n').length > 8, String(planPrompt.split('\n').length));
+  check('/plan 正文首行是任务标题', /^生成计划 · 构思「/.test(planPrompt.split('\n')[0]), planPrompt.split('\n')[0]);
+  check('/plan 正文有空行分块', planPrompt.includes('\n\n背景\n'), '');
+  check('/plan 正文不含 markdown 粗体', !planPrompt.includes('**'), '');
 
   let after = await readCard(project);
   const idea = after.loop.children[0].children[0];
@@ -266,6 +297,14 @@ try {
   const execSess = sessions.get(execRun?.sessionId);
   check('执行复用已挂 preset 的 agent', execSess?.createCount === 1 && execSess?.createdWith === 'mock-preset',
     `create=${execSess?.createCount || 0} preset=${execSess?.createdWith || 'none'}`);
+  // 回归：/goal 只带单行目标，且先 /plan off 再 /goal（同一会话里会累积多条命令，取最后一次）
+  const execCmds = execSess?.commandLines || [];
+  const offIndex = execCmds.lastIndexOf('/plan off');
+  const goalIndex = execCmds.findIndex((line, i) => i > offIndex && line.startsWith('/goal '));
+  check('执行先关计划模式', offIndex >= 0 && goalIndex > offIndex, JSON.stringify(execCmds.slice(-2)));
+  const goalObjective = execSess?.lastGoalObjective || '';
+  check('执行发单行 /goal 目标', !!goalObjective && !goalObjective.includes('\n'), goalObjective.slice(0, 40));
+  check('/goal 目标以「执行构思」开头', goalObjective.startsWith('执行构思「'), goalObjective.slice(0, 20));
 
   // ── 3. 反馈提炼（自动） ──
   const reflectRun = await waitRun((r) => r.taskId === 'action-reflect');
@@ -278,6 +317,24 @@ try {
   check('执行记录已关闭', !!eRec && !!eRec.closed_at, eRec?.id || 'missing');
   check('反馈记录已关闭', !!rRec && !!rRec.closed_at, rRec?.id || 'missing');
   check('loop.lessons 写入', Array.isArray(after.loop.lessons) && after.loop.lessons.some((l) => /JSON/.test(l.text)), JSON.stringify(after.loop.lessons || []));
+
+  // ── 4. 发送预览里改过的正文：原样发出去 ──
+  const overrideText = '# 我改过的计划\n\n## 目标\n用改过的正文跑一次';
+  const overridden = await api('/action/plan', { file: project.file, nodeId: 'am-i1', prompt: overrideText });
+  check('POST /action/plan 接受 prompt 覆盖', overridden.status === 200, JSON.stringify(overridden.body?.error || ''));
+  const overrideRun = await waitRunKey(overridden.body?.run?.key);
+  check('覆盖的正文原样进 /plan', (sessions.get(overrideRun?.sessionId)?.lastPlanPrompt || '') === overrideText, '');
+
+  // ── 5. 命令服务不可用：退回同一份结构化正文 ──
+  const savedCommands = ctx.commands;
+  ctx.commands = undefined;
+  const fallbackRes = await api('/action/plan', { file: project.file, nodeId: 'am-i2' });
+  const fallbackRun = await waitRunKey(fallbackRes.body?.run?.key);
+  ctx.commands = savedCommands;
+  const fallbackText = (sessions.get(fallbackRun?.sessionId)?.followups || [])[0] || '';
+  check('命令不可用时退回正文', fallbackText.startsWith('生成计划 · 构思「回退路径」'), fallbackText.slice(0, 30));
+  check('退回正文同样分块', fallbackText.includes('\n\n背景\n'), '');
+  check('退回正文由会话完成', !!fallbackRun && fallbackRun.status === 'done', fallbackRun?.status || 'timeout');
 } catch (error) {
   ok = false;
   console.error('[action-mock] 异常：', error);
