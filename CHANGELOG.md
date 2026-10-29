@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 0.10.0 — prompt 第 2 阶段：生成计划补证据要求，`/goal` 改发计划指针，候选加差异轴
+
+- **根因**：`docs/prompt-audit/` 一直是方案态（`templates.md` 明写「不是已落地的代码」），
+  所以面板「发送预览」里看到的仍是旧模板；而且三个阶段瓶颈性质不同——计划缺证据通道、
+  执行缺信息通道（english-shadow 实测完整正文 4182 字 vs `/goal` 240 字，25 步被截到第 1 步）、
+  候选缺「几条合起来覆盖决策空间」这个目标。继续堆文案解决不了后两个
+- **生成计划**（`composePlanPrompt`）：加 `证据要求`（path:line / 命令输出 / 先复现 / 未决写假设）、
+  `任务` + 成功标准、`非目标`、闭环 `约束`、`场景`、`已有计划`、`引用`；
+  `验收` 与背景里的目标验收去重（同一事实只出现一次）；步骤要求「文件 / 命令 / 预期 / 验收项」
+- **执行**（`composeGoalObjective`）：常态改「计划指针」——读 `<ws>/.dsh/rotation.json` 中
+  `id=<构思 id>` 节点的 `plan`（goal/steps/verify），240 字花在「计划在哪、怎么执行、怎么收尾」；
+  没有 workspace 时退回 240 字内联压缩版（目标 + 前 4 步 + 前 2 条验证）
+- **候选**（`composeCandidatePrompt`）：补 `constraints` / `scenario` 注入；要求每条落在不同
+  差异轴（机制 / 数据流 / 复用资产 / 验证方式 / 范围边界）、标题能看出走哪条路；
+  构思候选 `strength` 必须显式对比另两条，禁用「最小 / 最强」这类没有对比对象的词；
+  修 `count ≠ 3` 时文案写死的问题；补 `示例` 块
+- **规范同步**：`BLOCK_LABELS` / `docs/prompts.md` / `web/index.html` 的 `PROMPT_BLOCKS`
+  三处新增 `场景` `证据要求` `非目标` `示例`（此前 `场景` 三方漂移）；
+  `/goal` 计划指针与「验收去重」写进 `docs/prompts.md` 的结构规则
+- **测试**：`scripts/prompt-mock.mjs` 新增 18 条断言（新块存在性、场景/约束夹具、
+  验收去重、指针通道与无 workspace 退回、候选契约分支）
+- 验证：`npm run preflight` 全绿（prompt 结构 / 动作链路 / 注册表 / 打包产物）；版本 0.10.0
+- 仍是方案态（未落地）：`exec` 退路正文的 `失败处理`、`reflect` 的已有经验注入、
+  `split` / `ideas` 模板改写——见 `docs/prompt-audit/templates.md`
+
 ## 0.9.2 — 项目菜单：服务信息收集自动填 services，start 按平台挑命令
 
 - **需求**：项目列右上角的 `✕` 只做「移除」，服务还得手写 `rotation.json`。改成项目名右侧 `⋯` 菜单：

@@ -1,13 +1,13 @@
 # 安装与验证
 
-插件包：`dsh-looptree-dashboard@0.9.2`（`npm pack` 产物：`dsh-looptree-dashboard-0.9.2.tgz`，约 150 KB）。
+插件包：`dsh-looptree-dashboard@0.10.0`（`npm pack` 产物：`dsh-looptree-dashboard-0.10.0.tgz`，约 150 KB）。
 
 ## 一、安装（二选一）
 
 ### A. 市场 UI 本地安装（推荐，符合本机规矩）
 
 1. 打开 DSH 桌面端 → 市场 / 插件页 → 找「本地安装 / 从文件安装」。
-2. 选本目录下的 `dsh-looptree-dashboard-0.9.2.tgz`。
+2. 选本目录下的 `dsh-looptree-dashboard-0.10.0.tgz`。
 3. 重启 DSH（`dsh web` 或桌面端重启，让 profile 重新合并 patch）。
 
 > 本机规矩：插件增删改默认只走市场 UI。用 CLI 前必须先核对
@@ -21,7 +21,7 @@ cd ~/.dsh/dsh-looptree-dashboard
 npm pack                                   # 生成 tgz
 pnpm store path                            # 记下这个路径
 grep storeDir ~/.dsh/profiles/web/node_modules/.modules.yaml   # 必须与上一行逐字一致
-dsh plugin --profile web add ./dsh-looptree-dashboard-0.9.2.tgz
+dsh plugin --profile web add ./dsh-looptree-dashboard-0.10.0.tgz
 ```
 
 ## 二、验证清单（按顺序做，任一步失败就停）
@@ -29,7 +29,7 @@ dsh plugin --profile web add ./dsh-looptree-dashboard-0.9.2.tgz
 ```bash
 # 1) 插件是否挂上（端口以你实际 DSH Web 端口为准）
 curl -s http://127.0.0.1:64517/rotation/api/health
-#    期望：{"ok":true,"name":"dsh-looptree-dashboard","version":"0.9.2",...}
+#    期望：{"ok":true,"name":"dsh-looptree-dashboard","version":"0.10.0",...}
 
 # 2) 面板是否可打开
 open http://127.0.0.1:64517/rotation/app/
@@ -100,7 +100,7 @@ DSH 默认的 `deepseek-official` 直连厂商（本机铁律要求走网关）�
 
 ```bash
 dsh plugin --profile <name> remove dsh-looptree-dashboard
-dsh plugin --profile <name> add ./dsh-looptree-dashboard-0.9.2.tgz
+dsh plugin --profile <name> add ./dsh-looptree-dashboard-0.10.0.tgz
 ```
 
 ## 六、回滚
