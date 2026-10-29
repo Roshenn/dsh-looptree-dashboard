@@ -3,14 +3,14 @@
  * scripts/migrate-single-idea.mjs — 把「一个目标下多个构思」的旧卡收敛成只留第一条构思。
  *
  *   node scripts/migrate-single-idea.mjs                  # 干跑：只打印每个目标会怎么改
- *   node scripts/migrate-single-idea.mjs --write          # 真正写盘（写前 .bak）
+ *   node scripts/migrate-single-idea.mjs --write          # 真正写盘（原子替换，回滚用 git）
  *   node scripts/migrate-single-idea.mjs --file <card>    # 只处理一张卡
  *   node scripts/migrate-single-idea.mjs --samples        # 处理仓库里的 samples/*.rotation.json
  *
  * 规则：每个 goal 只保留 children 里的第一条 idea（连同它的子树），其余整体移出、
  * 追加进 `<卡片>.single-idea-backup.json`，不删数据。迁移前先干跑看一眼。
  */
-import { readdir, readFile, writeFile, rename, copyFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateCard } from '../lib/core.mjs';
@@ -57,11 +57,10 @@ async function appendBackup(cardPath, moved) {
   return backupPath;
 }
 
-/** 不走注册表的卡片（--file / --samples）：校验 → .bak → 原子写 */
+/** 不走注册表的卡片（--file / --samples）：校验 → 原子写（不留 .bak，历史交给 git） */
 async function writeCardAtPath(cardPath, card) {
   const { errors } = validateCard(card);
   if (errors.length) throw new Error(`校验未通过：${errors[0]}${errors.length > 1 ? `（共 ${errors.length} 条）` : ''}`);
-  await copyFile(cardPath, cardPath + '.bak').catch(() => {});
   card.updated = new Date().toISOString();
   const tmp = join(dirname(cardPath), `.rotation.${process.pid}.${Date.now()}.tmp`);
   await writeFile(tmp, JSON.stringify(card, null, 1) + '\n', 'utf8');

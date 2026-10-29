@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 0.10.3 — 卡片写回不再留 `.bak`：`rotation.json` 是唯一事实来源，历史交给 git
+
+- **问题**：每次写卡片（`PUT /api/cards`、服务信息收集写回、迁移脚本）都先复制一份
+  `rotation.json.bak`，于是每个项目里多出一个没人维护的配置文件；项目本身有 git，
+  自建备份纯属重复，还容易误以为 `.bak` 才是可回滚的版本
+- **改法**：`lib/store.mjs` 的 `writeCard` 去掉写前 `copyFile(..., '.bak')`；同步去掉
+  `scripts/migrate-single-idea.mjs` 的 `writeCardAtPath`；原子写（tmp + rename）保持不动——
+  写失败不会留半截文件，回滚靠 `git checkout -- .dsh/rotation.json`
+- **文案**：面板「删除节点」确认框、README、`docs/architecture.md`、`lib/index.js` 注释同步，
+  不再承诺有 `.bak` 备份
+- **清理**：english-shadow / demand-collection / story-weft 三个 workspace 里已生成的
+  `rotation.json.bak` 删除（english-shadow 的那份原本被 git 跟踪，随删除一起提交）
+- 边界：`migrate-single-idea` 的 `<卡片>.single-idea-backup.json` 不动——那是被移出的构思数据，
+  不是配置文件备份
+- 验证：`npm run preflight` 全绿；版本 0.10.3
+
 ## 0.10.2 — 服务信息收集按项目并发：不同项目同时收集，不再全局 409
 
 - **现象**：english-shadow 正在收集时，点 demand-collection 的「服务信息收集」被 409

@@ -13,7 +13,7 @@ DSH 进程
 │   ├─ /rotation/app/*              面板静态资源（web/）
 │   ├─ /rotation/api/health         自检
 │   ├─ /rotation/api/projects       注册表读写
-│   ├─ /rotation/api/cards          卡片读写（PUT 走 validate → .bak → tmp+rename）
+│   ├─ /rotation/api/cards          卡片读写（PUT 走 validate → tmp+rename 原子写）
 │   ├─ /rotation/api/run*           节点会话（lib/runner.mjs → ctx.agents）
 ├─ /rotation/api/prompts        prompt 合成（lib/prompt.mjs，只读）
 └─ /rotation/api/service*       服务探活 / 拉起 / 停止（lib/services.mjs）
@@ -44,7 +44,7 @@ DSH 进程
    这样模型凭据/provider 路由沿用 GUI 配置（也满足「模型调用必须走网关」的本机铁律）。
 3. **不 spawn `dsh --profile headless`**：那条路依赖 headless profile 自己的凭据插件，且默认直连厂商，
    与网关规则冲突。
-4. **写入永远先校验**：`validateCard` → 422 拒绝 → 写前 `.bak` → tmp+rename 原子替换。
+4. **写入永远先校验**：`validateCard` → 422 拒绝 → tmp+rename 原子替换；不另留 `.bak`，历史版本由 git 负责。
 5. **折叠/状态都是渲染层**：收敛进度、健康度、节点统计用完整树计算，不受折叠影响。
 
 ## 五、事件与状态机

@@ -4717,7 +4717,7 @@ document.addEventListener('click', (e)=>{
     const p0 = PROJECTS.find(x => x.id === delNode.dataset.proj);
     const n0 = p0 && findNode(p0.root, delNode.dataset.nid);
     if (!p0 || !n0) return;
-    askConfirm('删除节点', `<div class="mnote">删除「${esc(n0.title)}」及其子节点？删除后不可撤销（卡片有 .bak 备份）。</div>`, '删除', async () => {
+    askConfirm('删除节点', `<div class="mnote">删除「${esc(n0.title)}」及其子节点？写回是原子替换、不留备份，要回滚请用 git。</div>`, '删除', async () => {
       const strip = (node) => {
         node.children = (node.children || []).filter(c => c.id !== n0.id).map((c) => { strip(c); return c; });
       };

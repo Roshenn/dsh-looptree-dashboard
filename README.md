@@ -10,7 +10,7 @@
 package.json          插件清单：dsh.bundle.patch + dsh.client
 cordis.patch.yml      安装后由 profile 自动挂载 host 半
 lib/index.js          host 半：/rotation/app/*（面板）、/rotation/api/*（数据/会话/服务）
-lib/store.mjs         注册表 + 卡片读写（validate → .bak → tmp+rename）
+lib/store.mjs         注册表 + 卡片读写（validate → tmp+rename 原子写）
 lib/runner.mjs        节点会话执行器（ctx.agents + session/event）
 lib/services.mjs      服务探活 / 一键拉起 / 停止
 lib/client.js         client 半：DSH Web 右栏「轮转」入口（__ModuleLoader__ 形态）
@@ -49,7 +49,7 @@ curl -s localhost:4180/rotation/api/health
 | POST | `/rotation/api/projects` | `{name, workspace}` 注册项目，自动建 `.dsh/rotation.json` 模板 |
 | GET | `/rotation/api/cards` | 所有项目的卡片 |
 | DELETE | `/rotation/api/projects/<id或文件名>` | 从注册表移除（不删项目里的卡片文件） |
-| PUT | `/rotation/api/cards/<id或文件名>` | 校验 → `.bak` → 原子写；校验不过 422 |
+| PUT | `/rotation/api/cards/<id或文件名>` | 校验 → 原子写（不留 `.bak`，历史交给 git）；校验不过 422 |
 
 面板变化：工具栏多了「+ 项目」、泳道悬停出现「✕」移除；数据源文案改成「项目 .dsh/rotation.json（可写回）」；
 所有请求走 `api()` 前缀，插件下是 `/rotation/api`，旧 `:4173` 服务下是 `/api`。
@@ -292,7 +292,7 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
    README 等，按 JSON 契约返回 `services`（id / name / url / health / start.mac / start.windows / 证据）。
 2. 结果落成**草稿**（`~/.dsh/rotation/services/<卡片>.json`），面板弹预览：逐条探活、url 与两端命令可改、
    默认勾选新服务；已有同 id 的默认不勾（勾了才覆盖）。关掉面板草稿也还在，再点一次可继续。
-3. 确认后才 `PUT` 写回 `rotation.json` 的 `services`（校验不过 422 拒绝，写前留 `.bak`），写回后清掉草稿。
+3. 确认后才 `PUT` 写回 `rotation.json` 的 `services`（校验不过 422 拒绝，原子写、不留 `.bak`），写回后清掉草稿。
 4. 会话失败 / 模型没给合法 JSON 时只标错误、不写卡片；模型编的端口要带「证据文件:行」，预览里能看到。
 5. **并发口径**（0.10.2）：不同项目可以**同时收集**（草稿按卡片文件分开、各写各的卡）；同一项目再点一次返回 409
    「正在收集，先等它结束」；全局仍受 `ROTATION_MAX_CONCURRENT`（默认 3，含其它会话）限制，超了返回 429。
