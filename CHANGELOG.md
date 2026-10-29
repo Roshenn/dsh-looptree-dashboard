@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 0.9.0 — prompt 结构统一：首行任务、空行分块、先看再发
+
+- **根因**：动作 prompt 被 `oneLine()` 压成一行塞进 `/plan`，人和模型都只看到一段糊墙；
+  host 的 `buildPlanTask / buildExecPrompt` 与面板的 `composePrompt` 各写一份格式、先后漂移
+- **唯一实现** `lib/prompt.mjs`：`composeTaskPrompt` / `composePlanPrompt` / `composeExecPrompt` /
+  `composeReflectPrompt` / `composeGoalObjective` / `composeSplitPrompt` / `composeIdeaPrompt` /
+  `composeCandidatePrompt` / `composeFillPrompt` / `actionCommand` / `lintPrompt`；
+  host 与面板不再各拼一份
+- **格式规范**（`docs/prompts.md`）：首行 `<动作> · <对象>`、空行分块（背景 / 当前节点 / 任务 /
+  验收 / 约束 / 输出 / 提交方式）、一行一个事实、单行 ≤72 列超宽自动折行；不用 `#` / `**`
+  （DSH 用户气泡是 `white-space:pre-wrap` 纯文本，不渲染 markdown）
+- **发送编排**：`/plan\n<多行正文>`（`parseCommand` 只切命令名，换行保留，气泡里就是分段的样子）；
+  `/goal` 仍单行；命令不可用或失败时退回同一份正文
+- **面板**：Prompt 段每行 = 标题 + 摘要；点标题展开结构视图，可切「编辑原文」；
+  「发起」「生成计划」「执行计划」都先开**发送预览**（结构视图 + 可编辑 + 会发出去的命令），
+  确认后才发送，取消不发任何东西；执行预览可改单行目标
+- **接口**：`GET /rotation/api/prompts?file=&nodeId=[&action=plan|exec]`（只读）；
+  `POST /api/run` 的 `prompt` 改为可选（缺省由 host 按 taskId 合成）；
+  `POST /api/action/plan|exec` 接受 `prompt` / `objective` 覆盖，原样发送
+- **测试**：新增 `scripts/prompt-mock.mjs`（样例卡 53 节点 / 139 模板 / 42 动作 prompt 的结构 lint、
+  `/plan` 多行与 `/goal` 单行、JSON 契约字面量、模板优先级、lint 反例），并入 `npm run preflight`；
+  `action-mock` 补多行正文、覆盖发送、命令退路断言
+- 验证：`npm run preflight` 全绿；dev-host + Playwright 走通 查看 / 编辑 / 计划预览 / 执行预览 /
+  发送，控制台零错误；版本 0.9.0
+
 ## 0.8.3 — 「查看会话」挪到节点卡下缘，点了直接切到 DSH 会话页
 
 - 详情卡的「查看会话」与「在 DSH 打开」合并成一个按钮，移到每张节点卡的下缘（`.tfootline`），

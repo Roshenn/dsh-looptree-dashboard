@@ -89,17 +89,21 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 
 | 动作 | 触发 | DSH 侧实际发生什么 | 落点 |
 |---|---|---|---|
-| 生成计划 | 构思卡「生成计划」 | 起一个普通 DSH 会话，`/plan` 进计划模式，agent 调研仓库后用 `exit_plan_mode` 交计划 | `idea.plan`（目标 / 验证命令 / 步骤 / 全文） |
-| 执行计划 | 构思卡「执行计划」 | **同一会话**先 `/plan off`，再 `/goal <objective>`，由 goal 轮次驱动执行 | 执行记录卡 + 会话结果 |
+| 生成计划 | 构思卡「生成计划」→ **发送预览**确认 | 起一个普通 DSH 会话，`/plan` 进计划模式，正文是分段的结构化 prompt；agent 调研仓库后用 `exit_plan_mode` 交计划 | `idea.plan`（目标 / 验证命令 / 步骤 / 全文） |
+| 执行计划 | 构思卡「执行计划」→ **发送预览**（可改单行目标） | **同一会话**先 `/plan off`，再 `/goal <objective>`，由 goal 轮次驱动执行 | 执行记录卡 + 会话结果 |
 | 反馈提炼 | 执行记录 done 后自动 | 同一会话追问「复盘踩坑，只输出 JSON」 | `loop.lessons[]` |
 
 - 数据只新增三个可选字段：`idea.plan`、`loop.lessons`、`exec.action`（plan / exec / reflect），老卡不用迁
 - 记录列：一次会话一条记录（id 如 `<ideaId>-p1`），带实时状态（启动中 / 运行中 / 完成 / 失败 / 已取消）；
   **已完成的记录常驻显示，不参与「已关闭 n」折叠**，一眼能看出哪些还在跑、哪些跑完了
 - 面板用 run 的 `nodeId`（构思 id）与 `recordId` 认领同一个会话；运行中按钮禁用，轮询到终态再刷新卡片
-- 接口：`POST /rotation/api/action/plan|exec|reflect`，body `{file,nodeId}`（构思 id）
+- 接口：`POST /rotation/api/action/plan|exec|reflect`，body `{file,nodeId}`；
+  预览里改过时 plan 带 `prompt`、exec 带 `objective`，原样发送
+- 发送编排：plan 用 `/plan\n<多行正文>`（换行保留，气泡里就是分段的样子）；exec 用单行 `/goal` 目标，
+  完整正文只当命令不可用时的退回内容；命令失败/缺失时自动退回同一份正文
 - 目标卡 / 闭环卡仍保留「生成候选 / 候选池」（拆目标、拆构思不变）
 - 不自建编排器：波次、重试、验证都由 DSH 的 `/plan`、`/goal` 与会话本身承担，面板只管记录与回写
+- 格式规范与四类 prompt 的统一实现见 [docs/prompts.md](docs/prompts.md)；结构自检 `npm run mock:prompt`
 
 验证：`npm run mock:action`（假命令服务 + 假 agent 走通 计划 → 执行 → 提炼），已并入 `npm run preflight`；
 样例见 `samples/execution-records.rotation.json`。
@@ -327,17 +331,20 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 - 关闭方式：点卡片外的任意位置（空白、泳道、工具栏）、按 Esc、或点右上角 ✕
 - 点另一个节点会直接切到那个节点的详情（不关闭再开，是一次切换）
 - 点别的节点上的操作按钮（完成/重开/+目标）会先关掉详情，再弹对应确认
-### Prompt 模板（复制即用）
+### Prompt 模板（统一结构 · 先看再发）
 
-详情卡底部按节点类型给出可复制的结构化 prompt，点「复制」直接拿走，不必自己组织上下文。
+详情卡底部按节点类型给出结构化 prompt；**合成只有一份实现**（`lib/prompt.mjs`），
+面板与 host 动作会话共用同一份文本。格式规范见 [docs/prompts.md](docs/prompts.md)。
 
-固定结构：
+固定结构（纯文本，气泡不渲染 markdown）：
 
 ```
-# 上下文            ← 自动填充：项目 / 当前待闭环（意图+验收）/ 当前目标（验收）/ 当前构思（方案）
-# 当前节点          ← 类型、id、标题、状态；goal 附验收与已有子节点；exec 附验证/证据/未处置反馈
-# 任务              ← 选中的那条任务指令
-# 输出要求          ← 统一：Markdown、小节标题固定、不复述上下文
+<动作> · <对象>      ← 首行就说明这条 prompt 干什么
+
+背景                ← 项目 / 闭环（意图+验收）/ 目标（验收）/ 构思
+当前节点            ← 类型、id、状态；goal 附验收与子节点；exec 附验证/证据/未处置反馈
+任务                ← 选中的那条任务指令，一行一个要求
+输出                ← 明确要什么格式、几节、标题固定成什么
 ```
 
 按节点类型提供的任务：
@@ -349,11 +356,14 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 | 构思 | 重新生成构思 / 梳理执行计划 / 预演失败点 |
 | 执行 | 给出执行步骤 / 补齐证据 / 定位阻塞 |
 
+- **查看**：每行 = 标题 + 一行摘要；点标题展开结构视图（块标签加粗、空行分块）。
+- **变更**：结构视图下点「编辑原文」改；改动只在内存里，带进「发起」；「重置」回默认。
+- **发送**：「发起」先开**发送预览**（结构视图 + 可编辑原文 + 会发出去的命令），确认才起会话。
 - 模板可写进 `rotation.json`：卡根 `prompts.<类型>` 或节点上 `prompts` 数组，**节点级 > 卡片级 > 内置**；详情卡标注来源。
 - 上下文段可配：`prompt_context.fields` 决定带哪些行（可加 `siblings` 带同级兄弟节点），`siblings` 控制条数。
 - `prompt_context.refs` 可按 id 引用树里任意节点（跨目标/跨层），自动拼出「引用·类型「标题」(id)：状态 + 要点」。
-- 点模板名 = 展开完整 prompt 预览；点「复制」= 写入剪贴板。
-- 剪贴板被拒（无用户激活 / 无权限）时自动展开并选中原文，提示按 ⌘C。
+- 单行超过 72 列会按标点/空格自动折行；剪贴板被拒时自动展开并选中原文，提示按 Ctrl/⌘+C。
+- 接口：`GET /rotation/api/prompts?file=&nodeId=[&action=plan|exec]`（只读，返回 prompt + summary + lint 警告）。
 
 ### 字段就地编辑
 
@@ -382,6 +392,7 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 | `rotation-core.mjs` | 校验与树工具，CLI 与 server 共用同一份规则 |
 | `validate-rotation.mjs` | 命令行校验：`node validate-rotation.mjs <file>` |
 | `rotation-card-spec.md` | 数据规范 `rotation/v1`：字段、不变量、与面板映射 |
+| `docs/prompts.md` | prompt 结构规范（查看 / 变更 / 发送）与唯一实现说明 |
 | `samples/` | 5 张示例卡（竞品知识图谱那张是已收敛状态） |
 | `templates/card.rotation.json` | 新项目模板（已验证可过校验） |
 | `bundle-data.mjs` | 可选：把 samples 打包成 `cards.js`，供不启服务时只读查看 |

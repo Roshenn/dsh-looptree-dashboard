@@ -15,7 +15,8 @@ DSH 进程
 │   ├─ /rotation/api/projects       注册表读写
 │   ├─ /rotation/api/cards          卡片读写（PUT 走 validate → .bak → tmp+rename）
 │   ├─ /rotation/api/run*           节点会话（lib/runner.mjs → ctx.agents）
-│   └─ /rotation/api/service*       服务探活 / 拉起 / 停止（lib/services.mjs）
+├─ /rotation/api/prompts        prompt 合成（lib/prompt.mjs，只读）
+└─ /rotation/api/service*       服务探活 / 拉起 / 停止（lib/services.mjs）
 └─ client 半 lib/client.js          （__ModuleLoader__ 模块）
     └─ sidebar.right.pane.tab       右栏「轮转」入口 → 打开 /rotation/app/
 ```
@@ -62,6 +63,7 @@ POST /api/run
 
 ```
 lib/index.js      宿主插件入口（路由 + 装配）
+lib/prompt.mjs    prompt 唯一实现（结构规范 / 合成 / lint，host 与测试共用）
 lib/store.mjs     注册表 / 卡片读写
 lib/runner.mjs    会话执行器
 lib/services.mjs  服务探活与拉起
