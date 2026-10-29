@@ -482,6 +482,12 @@
   html[data-theme="dark"] .fp-item[data-hue="5"]{--p-bg:#2b1c22}
   .fp-count{margin-left:auto;font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums;white-space:nowrap}
   .fp-count[data-over="1"]{color:var(--red)}
+  .cand-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+  .cand-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;
+    border:1px solid color-mix(in srgb,var(--b2) 70%,transparent);background:color-mix(in srgb,#fff 18%,transparent)}
+  .cand-main{flex:1;min-width:0}
+  .cand-title{font-size:12px;color:var(--tx1);font-weight:500}
+  .cand-acc{font-size:10.5px;color:var(--tx4);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -1452,9 +1458,6 @@ function nodeMarkup(n, p){
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose ? `<button class="tbtn ${n.kind==='loop'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    addKind ? ((n.kind === 'loop' || n.kind === 'goal')
-      ? `<button class="tbtn ghost" data-addmenu="${n.id}" aria-haspopup="menu" aria-expanded="false" title="${n.kind === 'goal' ? 'AI 拆构思 / 手动添加' : 'AI 拆目标 / 手动添加'}">+ ${KIND[addKind]}</button>`
-      : `<button class="tbtn ghost" data-add="${n.id}">+ ${KIND[addKind]}</button>`) : '',
   ].filter(Boolean).join('');
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
@@ -2518,21 +2521,31 @@ function detailMarkup(p, n){
       </div></div>`
     : '';
   const canClose = !n.closed && !kids.length;   // 父节点由子节点自动闭环，叶子才手动完成
+  const childKind = { loop: 'goal', goal: 'idea', idea: 'exec' }[n.kind];
+  const poolCount = candidateCount(p, n);
+  const addBtn = childKind
+    ? `<button class="tbtn ghost" data-manual-add="1" data-nid="${n.id}" data-proj="${p.id}">手动添加${KIND[childKind]}</button>`
+    : '';
+  const candBtn = childKind
+    ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
+         title="${poolCount ? '候选池还有未处理的候选' : '让会话给出若干候选' + KIND[childKind] + '，挑完再写入卡片'}">生成候选</button>`
+    : '';
+  const poolBtn = childKind
+    ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
+         title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">候选池${poolCount ? ' ' + poolCount : ''}</button>`
+    : '';
   const acts = [
     canClose ? `<button class="tbtn primary" data-close="${n.id}">${n.kind === 'loop' ? '确认收敛' : '完成'}</button>` : '',
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
+    candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
+    n.kind === 'loop' ? '' : `<button class="tbtn danger" data-del-node="1" data-nid="${n.id}" data-proj="${p.id}">删除节点</button>`,
   ].filter(Boolean).join('');
 
   return `<div class="detail-head">
       <span class="kind" style="--tone:${tone}">${KIND[n.kind]}</span>
       <span class="nid mono">${n.id}</span>
       <span class="st" style="--st-tone:${st.tone}">${st.label}</span>
-      ${(!kids.length && n.kind !== 'loop')
-        ? `<button class="detail-del hold" data-del="${n.id}" data-proj="${p.id}" title="长按 0.8 秒删除" aria-label="长按删除">
-             <span class="holdfill"></span><span class="holdlabel">🗑</span>
-           </button>`
-        : ''}
       <button class="detail-close" id="detail-x" aria-label="关闭详情">✕</button>
     </div>
     <h3 class="detail-title" data-nid="${n.id}" data-proj="${p.id}" title="点击编辑标题">${esc(n.title)}</h3>
@@ -2616,6 +2629,7 @@ function _openDetail(id, origin){
   if (!anchor) return;
   const d = $('#detail'), card = d.querySelector('.detail-card');
   card.innerHTML = detailMarkup(p, n);
+  refreshPoolCount(p, n);
   d.hidden = false;
   document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
   anchor.classList.add('is-active');
@@ -2738,6 +2752,155 @@ async function viewSession(sessionId){
 
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片） */
 const GEN_FIELDS_CLIENT = { loop: ['intent', 'scenario', 'constraints', 'acceptance'], goal: ['constraints', 'acceptance'], idea: ['approach'], exec: ['verify'] };
+/* ─────────── 候选池 ─────────── */
+const CAND_POOL = new Map();   // `${file}::${nodeId}` → 候选数组
+const candKeyOf = (p, n) => `${p && p.file ? p.file : (p && p.id) || ''}::${n ? n.id : ''}`;
+function candidateCount(p, n){ return (CAND_POOL.get(candKeyOf(p, n)) || []).length; }
+
+async function loadCandidates(p, n){
+  if (!p || !n || !p.file) return [];
+  try {
+    const r = await fetch(api(`/candidates?file=${encodeURIComponent(p.file)}&nodeId=${encodeURIComponent(n.id)}`));
+    const j = await r.json();
+    const list = (j.candidates || []);
+    CAND_POOL.set(candKeyOf(p, n), list);
+    return list;
+  } catch { return CAND_POOL.get(candKeyOf(p, n)) || []; }
+}
+
+async function generateCandidates(pid, nid, btn){
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return toast('节点已不在当前卡片里');
+  const oldText = btn && btn.textContent;
+  if (btn){ btn.disabled = true; btn.textContent = '生成中…'; }
+  try {
+    const res = await fetch(api('/candidates/generate'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p0.file, nodeId: n0.id }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    toast('已发起候选生成，完成后候选池会出现待选节点');
+    const key = (j.run && j.run.key) || `${p0.file}::${n0.id}`;
+    const deadline = Date.now() + 180000;
+    while (Date.now() < deadline){
+      await new Promise(r => setTimeout(r, 1500));
+      const runs = await fetch(api('/runs')).then(r => r.json()).catch(() => ({}));
+      const run = (runs.runs || []).find(x => x.key === key);
+      if (!run) continue;
+      if (['failed','cancelled'].includes(run.status)){ toast('候选生成失败：' + (run.error || run.status)); break; }
+      if (run.status === 'done' && run.candidatesError){ toast('候选生成失败：' + run.candidatesError); break; }
+      if (run.status === 'done' && run.candidatesAdded){
+        await loadCandidates(p0, n0);
+        if (detailNode === n0.id) openDetail(n0.id);
+        toast(`候选池已就绪：${run.candidatesAdded} 条，点「候选池」挑一个`);
+        break;
+      }
+    }
+  } catch (error) {
+    toast('生成候选失败：' + error.message);
+  } finally {
+    if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = oldText; }
+  }
+}
+
+/** 载入候选数量并原地更新「生成候选 / 候选池」按钮，避免整卡重绘 */
+async function refreshPoolCount(p, n){
+  if (!p || !n || !p.file) return;
+  const list = await loadCandidates(p, n);
+  if (detailNode !== n.id) return;
+  const gen = document.querySelector('#detail [data-cand-gen]');
+  const pool = document.querySelector('#detail [data-cand-pool]');
+  const count = list.length;
+  if (gen){ gen.disabled = count > 0; }
+  if (pool){
+    pool.disabled = count === 0;
+    pool.textContent = count ? `候选池 ${count}` : '候选池';
+    pool.title = count ? `候选池：${count} 条待选` : '候选池为空';
+  }
+}
+
+async function openCandidatePool(pid, nid){
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return;
+  const list = await loadCandidates(p0, n0);
+  const rows = list.map((c, i) => `
+    <div class="cand-row">
+      <div class="cand-main">
+        <div class="cand-title">${esc(c.title || '（未命名）')}</div>
+        ${c.acceptance ? `<div class="cand-acc">${esc(c.acceptance)}</div>` : ''}
+      </div>
+      <button class="tbtn primary" data-cand-adopt="${i}" data-nid="${n0.id}" data-proj="${p0.id}">添加</button>
+      <button class="tbtn" data-cand-del="${i}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
+    </div>`).join('');
+  askConfirm(`候选池 · ${list.length} 条`,
+    `<div class="cand-list">${rows || '<div class="mnote">候选池是空的：先点「生成候选」。</div>'}</div>
+     <div class="mnote">加入后即成为真实的子节点；也可以逐条删除或清空。</div>`,
+    list.length ? '清空候选池' : '关闭',
+    list.length ? async () => {
+      await fetch(api('/candidates/delete'), {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ file: p0.file, nodeId: n0.id, all: true }),
+      });
+      await loadCandidates(p0, n0);
+      if (detailNode === n0.id) openDetail(n0.id);
+      toast('候选池已清空');
+    } : null);
+}
+
+async function adoptCandidate(pid, nid, index){
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return;
+  try {
+    const res = await fetch(api('/candidates/adopt'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p0.file, nodeId: n0.id, index: Number(index) }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    toast(`已加入子节点：${j.child && j.child.title}`);
+    await reloadProjects();
+    if (detailNode) openDetail(detailNode);
+  } catch (error) { toast('加入失败：' + error.message); }
+}
+
+async function deleteCandidate(pid, nid, index){
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return;
+  await fetch(api('/candidates/delete'), {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ file: p0.file, nodeId: n0.id, index: Number(index) }),
+  }).catch(() => {});
+  await loadCandidates(p0, n0);
+  await openCandidatePool(pid, nid);
+}
+
+/** 手动添加子节点：只问标题，其余字段进详情再填 */
+async function manualAddChild(pid, nid){
+  const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
+  if (!p0 || !n0) return;
+  const childKind = { loop: 'goal', goal: 'idea', idea: 'exec' }[n0.kind];
+  if (!childKind) return toast('执行项不能再往下加');
+  askConfirm(`手动添加${KIND[childKind]}`,
+    `<div class="detail-row"><dt>标题</dt><dd><input class="dfield" id="mc-title" style="width:100%" placeholder="8–16 字，说清做到什么"></dd></div>
+     <div class="mnote">加完会在详情卡里继续填约束 / 验收。</div>`,
+    '添加', async () => {
+      const title = ($('#mc-title') || {}).value || '';
+      if (!title.trim()) return toast('标题不能为空');
+      const taken = new Set(); const collect = (x) => { taken.add(x.id); (x.children || []).forEach(collect); };
+      collect(p0.card.loop);
+      let base = String(n0.id + '-n').toLowerCase(); let id = base, i = 1;
+      while (taken.has(id)) id = `${base}${i++}`;
+      n0.raw.children = n0.raw.children || [];
+      n0.raw.children.push({ id, kind: childKind, title: title.trim(), status: 'plan', closed_at: null, children: [] });
+      const res = await persist(p0);
+      if (!res.ok) return toast('添加失败：' + res.error);
+      render();
+      openDetail(n0.id);
+      toast(`已添加${KIND[childKind]}`);
+    });
+}
+
 async function generateMissing(pid, nid, btn){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
@@ -3640,6 +3803,32 @@ document.addEventListener('click', (e)=>{
   if (openSess){ openInDsh(openSess.dataset.openSession); return; }
   const viewSess = e.target.closest('[data-view-session]');
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
+  const candGen = e.target.closest('[data-cand-gen]');
+  if (candGen){ generateCandidates(candGen.dataset.proj, candGen.dataset.nid, candGen); return; }
+  const candPool = e.target.closest('[data-cand-pool]');
+  if (candPool){ openCandidatePool(candPool.dataset.proj, candPool.dataset.nid); return; }
+  const candAdopt = e.target.closest('[data-cand-adopt]');
+  if (candAdopt){ adoptCandidate(candAdopt.dataset.proj, candAdopt.dataset.nid, candAdopt.dataset.candAdopt); return; }
+  const candDel = e.target.closest('[data-cand-del]');
+  if (candDel){ deleteCandidate(candDel.dataset.proj, candDel.dataset.nid, candDel.dataset.candDel); return; }
+  const manualAdd = e.target.closest('[data-manual-add]');
+  if (manualAdd){ manualAddChild(manualAdd.dataset.proj, manualAdd.dataset.nid); return; }
+  const delNode = e.target.closest('[data-del-node]');
+  if (delNode){
+    const p0 = PROJECTS.find(x => x.id === delNode.dataset.proj);
+    const n0 = p0 && findNode(p0.root, delNode.dataset.nid);
+    if (!p0 || !n0) return;
+    askConfirm('删除节点', `<div class="mnote">删除「${esc(n0.title)}」及其子节点？删除后不可撤销（卡片有 .bak 备份）。</div>`, '删除', async () => {
+      const strip = (node) => {
+        node.children = (node.children || []).filter(c => c.id !== n0.id).map((c) => { strip(c); return c; });
+      };
+      strip(p0.card.loop);
+      const res = await persist(p0);
+      if (!res.ok) return toast('删除失败：' + res.error);
+      closeDetail(); await reloadProjects(); toast('已删除节点');
+    });
+    return;
+  }
   const genBtn = e.target.closest('[data-gen]');
   if (genBtn){
     e.stopPropagation();
