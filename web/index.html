@@ -1029,17 +1029,26 @@ const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)'
 const promptEdits = new Map();      // `${nodeId}::<taskId>` -> 手改后的 prompt
 let pgenOpen = null;                // 展开中的内联编辑：{ nid, task }
 const promptKey = (nid, tid) => `${nid}::${tid}`;
+/**
+ * 卡片随 git 同步到另一台机器，里面落盘的 session 只是「启动那台机器的历史快照」。
+ * 本机 runMap 里没有对应 run（runFor 已经查过）时，starting / running 不可能是真的在跑，
+ * 一律降级成 stale——否则另一台机器会显示一个永远在涨的「运行中 · 329m43s」，
+ * 还会按 busy 把「执行计划」「生成计划」永久锁灰。
+ */
 function staticRun(n){
   const sess = n.raw && n.raw.session;
   if (!sess) return null;
   const started = sess.started_at ? Date.parse(sess.started_at) : null;
   const ended = sess.ended_at ? Date.parse(sess.ended_at) : null;
+  const persisted = sess.status || 'done';
   return {
     key: '', file: '', nodeId: n.id, sessionId: sess.id, cwd: sess.cwd || '',
-    taskId: sess.task_id || '', status: sess.status || 'done',
+    taskId: sess.task_id || '',
+    status: (persisted === 'running' || persisted === 'starting') ? 'stale' : persisted,
     startedAt: sess.started_at || '', endedAt: sess.ended_at || '',
     exitCode: sess.exit_code, result: sess.result || '', error: sess.error || '',
-    elapsedMs: started ? (ended || Date.now()) - started : 0,
+    // 没有 ended 就没有「耗时」可报：它不是本机这次的会话，按 Date.now() 算只会越涨越大
+    elapsedMs: started && ended ? ended - started : 0,
     lastEventAt: '', tail: [],
   };
 }
@@ -2972,8 +2981,9 @@ function detailMarkup(p, n){
   // 记录自己的时间行在「执行记录」区里给（开始 / 结束 / 耗时），这里不重复
   if (r.started_at && !isRecord(n)) timeRows.push(['开始', fmtTs(r.started_at), true]);
   if (r.closed_at && !isRecord(n))  timeRows.push(['关闭', fmtTs(r.closed_at), true]);
-  // 记录的在途只算会话真的在跑；失败/结束但没写 closed_at 的不算
-  const openRun = !isRecord(n) || !!(r.session && ['running', 'starting'].includes(r.session.status));
+  // 记录的在途只算本机会话真的在跑；卡片里残留的 running 是别的机器 / 上次的旧快照，不算
+  const liveRun = p ? runFor(p, n) : null;
+  const openRun = !isRecord(n) || !!(liveRun && ['running', 'starting'].includes(liveRun.status));
   const inFlight = (!r.closed_at && r.started_at && openRun)
     ? ((Date.now() - Date.parse(r.started_at)) / 86400000) : null;
   if (inFlight != null) timeRows.push(['在途', fmtDays(inFlight), true]);
