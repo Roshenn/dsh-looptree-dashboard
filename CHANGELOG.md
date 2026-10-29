@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 0.10.4 — 卡片里残留的 `running` 不再画成「运行中」：跨机旧快照降级为「进程已不在」
+
+- **现象**：用 git 同步了 `.dsh/rotation.json` 之后，另一台机器的面板把执行卡画成
+  「运行中 · 329m43s」且计时一直涨，构思卡的「执行计划」永久锁灰；卡片本身却已经是「已闭环」
+- **根因**：`session.status` 是**启动那台机器的运行时快照**——`makeRecord` 建记录就落 `starting`、
+  运行中回写 `running`，这些瞬间都会随卡片进 git。另一台机器上没有对应的 run（`runMap` 为空），
+  面板只能退回读卡片快照：`staticRun()` 把 `running` 当真，`elapsedMs` 还按
+  `Date.now() - started_at` 现算。会话被中断（DSH 关掉 / 机器休眠 / 正好在中途 commit）时，
+  卡片永远停在 `running`；再点一次「完成」只写 `closed_at` 不动 `session.status`，
+  于是「已闭环 + 运行中」同时出现
+- **改法**（只动读取端，`web/index.html`）：
+  - `staticRun()`：卡片快照里的 `starting` / `running` 一律降级成 `stale`（现成文案「进程已不在」），
+    `elapsedMs` 只在有 `ended_at` 时算，不再按现在回算
+  - 详情卡「在途 X 天」改成只看本机活动 run，不再信卡片里的 `session.status`
+  - 覆盖 `runBadge` / `sessionMarkup` / `recordMarkup` 与所有按钮锁定判断
+- **测试**：新增 `scripts/stale-run-mock.mjs`（10 项）并挂进 `npm run preflight`：
+  从 `web/index.html` 抠出 `staticRun()`，断言 running/starting → stale、耗时不再涨、终态不变
+- **边界**：卡片里的 `running` 字面量不清、宿主写端不改——host 侧没有任何代码读这个字段，
+  清文件只会把「两台机器同时写同一个 JSON」的 git 冲突风险引进来。要跨机显示
+  「另一台机器真的在跑」需要 `session.machine` + `heartbeat_at`，另开一轮
+- 验证：`npm run preflight` 全绿（含新 mock 10 项）；headless Chrome 实测一张带
+  `session.status: "running"` 的卡片渲染成「进程已不在」、「执行计划」按钮可用；
+  旧版同样的卡片会渲染成一直涨的「运行中」
+
 ## 0.10.3 — 卡片写回不再留 `.bak`：`rotation.json` 是唯一事实来源，历史交给 git
 
 - **问题**：每次写卡片（`PUT /api/cards`、服务信息收集写回、迁移脚本）都先复制一份
