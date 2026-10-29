@@ -28,6 +28,7 @@ DSH 进程
 |---|---|---|
 | 项目注册表 | `~/.dsh/rotation/registry.json` | host（POST /api/projects、迁移脚本） |
 | 卡片真身 | `<workspace>/.dsh/rotation.json` | host（PUT /api/cards）、可手改 |
+| 闭环历史 | 同一卡片的 `closed_loops[]`（压缩快照，≤10） | 面板「确认收敛」时随整卡写回 |
 | 运行状态 | 进程内（内存） | runner；结束写回卡片的 `session` 字段 |
 | 服务进程 | 进程内（内存） | services；插件 dispose 时兜底杀掉 |
 
