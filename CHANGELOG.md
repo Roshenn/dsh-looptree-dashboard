@@ -19,8 +19,12 @@
 - **规范同步**：`BLOCK_LABELS` / `docs/prompts.md` / `web/index.html` 的 `PROMPT_BLOCKS`
   三处新增 `场景` `证据要求` `非目标` `示例`（此前 `场景` 三方漂移）；
   `/goal` 计划指针与「验收去重」写进 `docs/prompts.md` 的结构规则
-- **测试**：`scripts/prompt-mock.mjs` 新增 18 条断言（新块存在性、场景/约束夹具、
-  验收去重、指针通道与无 workspace 退回、候选契约分支）
+- **测试**：`scripts/prompt-mock.mjs` 新增 22 条断言（新块存在性、场景/约束夹具、
+  验收去重、指针通道与无 workspace 退回、候选契约分支、长字段卡片仍 ≤1500 字且零 lint 警告）
+- **顺手修的真 bug**：`wrapLine` 的续行前缀没算进 72 列预算，续行稳定超宽 2–4 列；
+  真实卡（english-shadow）一注入长约束/场景就冒出 4 条 `line-too-long`。续行改按
+  `max - width(pad)` 计算窗口；同时给场景/约束/目标验收加裁剪预算（截断标「…（全文见卡片）」），
+  实测该卡的生成计划从 1683 字收到 1433 字
 - 验证：`npm run preflight` 全绿（prompt 结构 / 动作链路 / 注册表 / 打包产物）；版本 0.10.0
 - 仍是方案态（未落地）：`exec` 退路正文的 `失败处理`、`reflect` 的已有经验注入、
   `split` / `ideas` 模板改写——见 `docs/prompt-audit/templates.md`
