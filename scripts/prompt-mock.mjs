@@ -129,6 +129,46 @@ const fillText = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['accep
 check('补全要 JSON 对象', fillText.includes('{"acceptance": "..."'));
 check('补全带字段上限', fillText.includes('≤300 字'));
 
+/* ── 3.5 新块与两个信息通道（docs/prompt-audit §3.3 / §3.4 / §3.6） ── */
+// 生成计划：证据先行 + 文件级步骤 + 验收追溯 + 非目标
+check('计划要「证据要求」块', planText.includes('\n证据要求\n'), '');
+check('计划要 path:line 证据', planText.includes('path:line'), '');
+check('计划要「非目标」块', planText.includes('\n非目标\n'), '');
+check('计划步骤要文件+命令+预期+验收项', planText.includes('改哪些文件 / 做什么 / 验证命令 / 预期结果 / 对应验收项'), '');
+check('计划要求验收可追溯', planText.includes('每个验收项都能追溯到某一步'), '');
+// 验收去重：样例卡的构思没有自己的 acceptance，背景已有目标验收，不再重复出块
+check('计划不重复目标验收', !planText.includes('\n验收\n'), planText.split('\n').filter((x) => x.trim() === '验收').join('|'));
+// 候选：差异轴 + count 文案 + 契约分支
+const candIdeaText = composeCandidatePrompt({ ...fxArgs, nodeId: 'sw-g1', count: 4 });
+check('候选要差异轴要求', candText.includes('不同的差异轴'), '');
+check('候选 count 进文案', candIdeaText.includes('给出 4 条'), '');
+check('构思候选带 strength 契约', candIdeaText.includes('"strength"') && candIdeaText.includes('不要用「最小 / 最强」'), '');
+check('执行候选不带 strength', !candText.includes('"strength"'), '');
+check('候选有示例块', candText.includes('\n示例\n'), '');
+// 场景 / 约束注入（样例卡没有这两个字段，用夹具）
+const withCtxFields = JSON.parse(JSON.stringify(fx));
+withCtxFields.loop.scenario = '1) 打开面板\n2) 点「生成计划」看到预览\n3) 确认真实发出';
+withCtxFields.loop.constraints = '不改公开 API；单次操作 < 60 秒';
+const scPlan = composePlanPrompt({ ...fxArgs, card: withCtxFields });
+check('计划注入场景与约束', scPlan.includes('\n- 场景：\n') && scPlan.includes('- 约束：不改公开 API'), '');
+const scCand = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
+check('候选注入场景与约束', scCand.includes('\n场景\n') && scCand.includes('- 约束：不改公开 API'), '');
+const accIdea = JSON.parse(JSON.stringify(fx));
+accIdea.loop.children[0].children[0].acceptance = '章节与情节可双向查询';
+const accPlan = composePlanPrompt({ ...fxArgs, card: accIdea });
+check('构思自己的验收单独成块', accPlan.includes('\n验收\n- 章节与情节可双向查询'), '');
+// /goal 计划指针：240 字用来写「计划在哪」，不内联步骤
+const pointerXr = composeGoalObjective({ ...fxArgs, card: readCard('execution-records.rotation.json'), nodeId: 'xr-i1' });
+check('/goal 指向卡片文件', pointerXr.includes('/.dsh/rotation.json'), pointerXr.slice(0, 60));
+check('/goal 带构思 id 与 plan 字段', pointerXr.includes('id=xr-i1') && pointerXr.includes('plan'), pointerXr.slice(0, 60));
+check('/goal 指针单行 ≤240 字', !pointerXr.includes('\n') && [...pointerXr].length <= 240, String([...pointerXr].length));
+check('/goal 指针不出现 markdown 粗体', !pointerXr.includes('**'), '');
+const noWsCard = JSON.parse(JSON.stringify(fx));
+noWsCard.project.workspace = '';
+const inline = composeGoalObjective({ projectName: 'X', card: noWsCard, nodeId: 'sw-i1' });
+check('/goal 无 workspace 退回内联目标', !inline.includes('rotation.json') && inline.startsWith('执行构思「'), inline.slice(0, 40));
+check('/goal 内联目标仍 ≤240 字', [...inline].length <= 240, String([...inline].length));
+
 /* 服务信息收集：项目级 prompt，要求平台化 start + JSON 契约 */
 const collectText = composeCollectServicesPrompt({
   projectName: 'X', workspace: '/w', platform: 'darwin',

@@ -2654,7 +2654,7 @@ const FIELD_LABEL = { 'title':'标题', intent:'闭环目标', constraints:'约�
  * 这里只负责：列表摘要、结构视图、原文编辑、发送预览。
  */
 const promptCache = new Map();          // `${file}::${nodeId}` → { from, list, error }
-const PROMPT_BLOCKS = ['背景','当前节点','任务','要做什么','验收','约束','输出','验证命令','步骤','提交方式','收尾','质量要求'];
+const PROMPT_BLOCKS = ['背景','当前节点','场景','任务','要做什么','证据要求','非目标','验收','约束','输出','验证命令','步骤','提交方式','收尾','质量要求','示例'];
 const pkeyOf = (file, nid) => `${file}::${nid}`;
 
 /** 拉一次某个节点的模板列表（from + list[{id,title,summary,prompt,warnings}]） */

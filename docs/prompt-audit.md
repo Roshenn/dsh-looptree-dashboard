@@ -1,6 +1,7 @@
 # Prompt 审计：18 个模板的现状、要点与改写方案
 
-> 状态：审计 + 改写方案（**不改生产代码**）。
+> 状态：审计 + 改写方案。第 2 阶段已落地 3 条：生成计划（§3.3）、`/goal` 计划指针（§3.4）、
+> 候选生成（§3.6）；其余条目仍是方案态，见 [templates.md](prompt-audit/templates.md) 顶部的落地状态。
 > 日期：2026-10-29。
 > 范围：`lib/prompt.mjs` 的 18 个模板；`lib/index.js` 的发送链；`docs/prompts.md` 的结构规范；`scripts/prompt-mock.mjs` / `scripts/action-mock.mjs` 的现有断言。
 > 配套：完整「现状 / 改后」文本见 [templates.md](prompt-audit/templates.md)。
