@@ -2387,8 +2387,10 @@ async function fetchPromptList(p, n){
   if (!API_BASE) return { from:'', list:[], error:'只读模式：提示词由服务生成，双击打开的页面看不了' };
   try {
     const res = await fetch(api(`/prompts?file=${encodeURIComponent(p.file)}&nodeId=${encodeURIComponent(n.id)}`));
-    if (res.status === 404) return { from:'', list:[], error:'宿主进程还是旧版：重启 DSH 后这里才有预览（面板文件已更新）' };
     const j = await res.json().catch(() => ({}));
+    if (res.status === 404 || res.status === 501 || /not implemented yet/i.test(String(j.error || ''))) {
+      return { from:'', list:[], error:'宿主进程还是旧版：重启 DSH 后这里才有预览（面板文件已更新）' };
+    }
     if (!res.ok || !j.ok) return { from:'', list:[], error:j.error || ('HTTP ' + res.status) };
     return { from: j.from || '', list: j.list || [], error:'' };
   } catch (error) {
