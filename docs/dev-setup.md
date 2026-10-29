@@ -16,9 +16,9 @@
 关键事实：
 
 - 插件**不需要构建**：没有打包步骤，`web/` 是原生 HTML/JS，改了就是改了。
-- 装进 profile 的方式决定「改动是否实时生效」：
-  - `link:`（本地目录）→ 直接指到源码目录，**改完重启 DSH 即生效**，不用重装；
-  - `file:`（.tgz）→ 是拷贝，改完必须 `remove` + `add` 重装。
+- 装进 profile 的方式是 **`link:`（本地目录软链）**：直接指到源码目录，
+  **改完刷新面板即生效**（`web/`），改了 `lib/` 才重启 DSH；不用重装、不用打包。
+- 本项目**不再产出 `.tgz`**：打包产物是拷贝，装了就得每版重装，正是 link 安装要避免的。
 - 当前桌面端装的是 `link:`：`~/.dsh/profiles/desktop/package.json` →
   `"dsh-looptree-dashboard": "link:/Users/julian/.dsh/dsh-looptree-dashboard"`。
 
@@ -137,9 +137,10 @@ DSH_URL=http://127.0.0.1:<端口> npm run check
 
 1. **不要**在 profile 目录里手工 `pnpm add / npm install`：桌面端与终端用的是两份不同 pnpm，
    `node_modules/.modules.yaml` 会被互相覆盖，之后两边都报 `ERR_PNPM_UNEXPECTED_STORE`。
-2. **不要**用 `.tgz` 路径去市场里装（会被判为不合法地址）；要目录，或远程仓库，或包名。
-3. 同版本 `file:` 包重装是空操作（pnpm 缓存）：升级必须 `remove` → `add`。
-4. 提交前 `npm run preflight` 必须绿；host/client 的加载契约坏了是「整个 web 起不来」级别的故障。
+2. **不要**为了更新去打 `.tgz`（本项目已停产打包产物）：link 安装改目录即生效，装包只会把
+   `link:` 换成复制品，之后每版都得重装。市场里也**不要**填 `.tgz` 文件路径（会被判为不合法地址）；
+   要本地目录，或将来的 GitHub 仓库地址。
+3. 提交前 `npm run preflight` 必须绿；host/client 的加载契约坏了是「整个 web 起不来」级别的故障。
 
 ---
 
@@ -155,21 +156,19 @@ $EDITOR CHANGELOG.md                        # 写清「新增/修复/影响面�
 # 2) 全量自检
 npm run preflight
 
-# 3) 打产物（包内只含 lib/ web/ cordis.patch.yml）
-npm pack                                    # → dsh-looptree-dashboard-x.y.z.tgz
-
-# 4) 提交与推送
+# 3) 提交与推送（不打 .tgz；装进 profile 的内容由 files 白名单决定，preflight 会验）
 git add -A && git commit -m "release: vX.Y.Z" && git push origin main
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-### 6.2 三种分发方式
+### 6.2 分发方式
 
 | 方式 | 对方怎么装 | 前提 |
 |---|---|---|
-| **本地目录** | 市场里填目录绝对路径 | 对方能拿到源码目录（团队内最省事） |
+| **本地目录（link）** | 市场里填目录绝对路径 | 对方能拿到源码目录（团队内最省事，改完即生效） |
 | **Git 仓库** | 市场里填仓库地址 | 仓库公开可访问（GitHub 最稳；私有 Gitee 需要凭据） |
-| **npm 包** | 市场里填包名 | `npm publish` 到对方能访问的 registry（默认官方源，或指定国内镜像） |
+
+`.tgz` 打包分发已停用；将来要装到没有仓库副本的机器，就走 Git 仓库（暂不设计）。
 
 ### 6.3 发布前检查清单
 
@@ -177,5 +176,5 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 - [ ] `cordis.patch.yml` 里的 `id` 与包名一致（不一致 → 整个 web 起不来）
 - [ ] `lib/client.js` 的 `__ModuleLoader__.load({ id })` 等于 package name，`exports.inject` 含 `slots`
 - [ ] host `inject` 声明齐全（`webServer` / `agents` / `agentDefaultModel` / `workspaceRegistry`）
-- [ ] `npm run preflight` 绿；`npm pack` 内容里没有 `.git`、`node_modules`、`.tgz`
-- [ ] `CHANGELOG.md` 有本次条目，`INSTALL.md` 里的版本号与文件名已同步
+- [ ] `npm run preflight` 绿（含 `verify:package`：files 白名单里没有 `.git`、`node_modules`、`.tgz`）
+- [ ] 仓库里没有 `.tgz` 产物；`CHANGELOG.md` 有本次条目，`INSTALL.md` 的命令与版本口径已同步

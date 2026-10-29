@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 0.10.5 — 停用 tgz：更新只走 link（本机）与 Git 仓库（将来）
+
+- **问题**：仓库根目录攒了 21 个 `.tgz`（0.6.4 → 0.10.4，共 2.4 MB），每次发版都 `npm pack` 一份，
+  再让用户去市场 UI 装文件。但本机 profile 是 `link:` 指向仓库——装 tgz 反而会把软链换成复制品，
+  之后每版都得重装，和「改仓库即生效」的更新方式正面冲突
+- **改法**：
+  - 删除仓库根目录全部 `.tgz`；`.gitignore` 的 `*.tgz` 保留，注释改成「已停用，防误提交」
+  - `INSTALL.md` 重写：新增 **§一 link 安装的本机更新法** —— 改代码 / `git pull` → 刷新面板即生效，
+    改了 `lib/` 才重启 DSH；health 的 `version` 是模块加载时缓存，重启才变；并写明
+    「不要再 `npm pack`、不要往市场装 `.tgz`，那会把 `link:` 换成复制品」
+  - 删除 tgz 安装、升级、回滚三节；换机器 / 新 profile 改为装仓库目录（link），
+    将来要装到没有仓库副本的机器就走 GitHub 仓库（暂不设计）
+  - `scripts/real-plugin-check.sh`：一次性 profile 改为 `dsh plugin add <仓库目录>`（link），不再打包
+  - `scripts/verify-tarball.mjs` → `scripts/verify-package.mjs`：按 `package.json` 的 `files` 白名单
+    复制到临时目录再验 host/client 契约，**不再 `npm pack`**；`preflight` 的段名与 npm script 同步改名
+  - `README.md` / `docs/dev-setup.md` 安装口径同步：分发方式只剩「本地目录（link）」与「Git 仓库」
+- **边界**：npm 包分发（`npm publish`）本次不考虑；要装到没有仓库副本的机器时直接从 GitHub 仓库装，另开一轮
+- 验证：`npm run preflight` 全绿（`verify:package` 白名单校验 + host/client 契约）；仓库根目录 `.tgz` 归零
+
 ## 0.10.4 — 卡片里残留的 `running` 不再画成「运行中」：跨机旧快照降级为「进程已不在」
 
 - **现象**：用 git 同步了 `.dsh/rotation.json` 之后，另一台机器的面板把执行卡画成

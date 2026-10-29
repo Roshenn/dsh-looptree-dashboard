@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 /**
- * scripts/verify-tarball.mjs — 验证「真正会被安装的那个包」，而不是仓库目录。
+ * scripts/verify-package.mjs — 验证「真正会被安装的那份文件集」，且不产出 tgz。
  *
- *   node scripts/verify-tarball.mjs                     # 自动 npm pack 后验证
- *   node scripts/verify-tarball.mjs path/to/pkg.tgz
+ *   node scripts/verify-package.mjs
  *
- * 做的事：
- *   1) 把 tgz 解到临时目录，模拟 node_modules/dsh-looptree-dashboard
- *   2) 从解出来的 package.json 读 main / exports / dsh 清单
- *   3) 动态 import host 半，用假 ctx 挂路由，跑 health / panel / registry 三个请求
- *   4) 用假 window 加载 client 半，断言 __ModuleLoader__ 契约与插槽注册
+ * 做法：按 package.json 的 files 白名单把文件复制到临时目录的
+ * `node_modules/dsh-looptree-dashboard`（等价于 npm / 市场安装拿到的内容），然后：
+ *   1) 读 package.json 的 main / exports / dsh 清单
+ *   2) 动态 import host 半，用假 ctx 挂路由，跑 health / panel / registry 三个请求
+ *   3) 用假 window 加载 client 半，断言 __ModuleLoader__ 契约与插槽注册
  *
- * 这一步能抓到「仓库里能跑、装进去缺文件」的典型事故（files 白名单漏项、相对路径错位、ESM 互操作）。
+ * 为什么不 `npm pack`：仓库不再产出 tgz（安装/更新走 link 或 GitHub 仓库），
+ * 但「仓库里能跑、装进去缺文件」这类事故仍然要拦（files 白名单漏项、相对路径错位、ESM 互操作）。
+ *
+ * 这一步能抓到 files 白名单漏项的典型事故，和 npm 安装读的是同一份白名单。
  */
-import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, mkdir, cp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -26,28 +27,26 @@ const check = (label, pass, detail = '') => {
   console.log(`${pass ? '✓' : '✗'} ${label}${detail ? ' — ' + detail : ''}`);
 };
 
-const tgz = process.argv[2] || (() => {
-  // Windows 上 npm 是 .cmd：execFileSync 既不能直接 spawn 也不能省略 shell
-  const win = process.platform === 'win32';
-  const out = execFileSync(win ? 'npm.cmd' : 'npm', ['pack'], { cwd: ROOT, encoding: 'utf8', shell: win })
-    .trim().split(/\r?\n/).pop();
-  return join(ROOT, out);
-})();
+const pkgSrc = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
+const files = Array.isArray(pkgSrc.files) ? pkgSrc.files : [];
+check('package.json 声明了 files 白名单', files.length > 0, files.join(','));
+check('files 白名单里没有 tgz / .git / node_modules',
+  !files.some((f) => /\.tgz$|^\.git|node_modules/.test(f)), files.join(','));
 
 const work = await mkdtemp(join(tmpdir(), 'rotation-pkg-'));
-const unpack = join(work, 'unpack');
-await mkdir(unpack, { recursive: true });
-execFileSync('tar', ['-xzf', tgz, '-C', unpack]);
 const pkgDir = join(work, 'node_modules', 'dsh-looptree-dashboard');
-await mkdir(dirname(pkgDir), { recursive: true });
-await cp(join(unpack, 'package'), pkgDir, { recursive: true });
+await mkdir(pkgDir, { recursive: true });
+for (const entry of files) {
+  await cp(join(ROOT, entry), join(pkgDir, entry), { recursive: true, force: true });
+}
+await cp(join(ROOT, 'package.json'), join(pkgDir, 'package.json'));   // npm 总是会带上它
 
 const pkg = JSON.parse(await readFile(join(pkgDir, 'package.json'), 'utf8'));
 check('包名正确', pkg.name === 'dsh-looptree-dashboard', pkg.name);
 check('main 指向 lib/index.js', pkg.main === 'lib/index.js', pkg.main);
 check('dsh.bundle.patch 存在', Boolean(pkg.dsh?.bundle?.patch), pkg.dsh?.bundle?.patch);
 
-// ── host 半：用真实包路径 import ──
+// ── host 半：用「装进去的那份路径」import ──
 const host = await import(pathToFileURL(join(pkgDir, pkg.main)).href);
 check('host 导出 apply', typeof host.apply === 'function');
 check('host 导出 name', typeof host.name === 'string', host.name);
@@ -106,5 +105,5 @@ check('client 注册右栏插槽', registered.includes('sidebar.right.pane.tab')
 
 await rm(work, { recursive: true, force: true });
 const failed = results.filter((r) => !r.pass);
-console.log(failed.length ? `\n${failed.length} 项失败` : '\n打包产物验证通过（这份就是会被安装的包）');
+console.log(failed.length ? `\n${failed.length} 项失败` : '\n安装文件集验证通过（files 白名单就是会装进去的内容）');
 process.exit(failed.length ? 1 : 0);

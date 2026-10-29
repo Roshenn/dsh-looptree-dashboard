@@ -28,8 +28,9 @@ npm run dev            # http://127.0.0.1:4180/rotation/app/
 curl -s localhost:4180/rotation/api/health
 ```
 
-装进 DSH（M0 之后）：市场 UI 安装本目录打包产物；按本机规则插件只走市场 UI，
-用 CLI 前先核对 `node_modules/.modules.yaml` 的 `storeDir` 与 `pnpm store path` 一致。
+装进 DSH：本机是 **link 安装**（profile 里软链指向本仓库），更新 = 改仓库 / `git pull` → 刷新面板，
+改了 `lib/` 才重启 DSH。仓库不再产出 `.tgz`；换机器时装仓库目录，或将来的 GitHub 仓库地址。
+详细步骤见 `INSTALL.md` §一。
 
 ## M1 数据层（已完成）
 

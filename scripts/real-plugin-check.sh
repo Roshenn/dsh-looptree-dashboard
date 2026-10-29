@@ -2,7 +2,8 @@
 # scripts/real-plugin-check.sh — 在真实 DSH 进程里验证插件（不进你的 web profile）。
 #
 # 做法：把 web profile **整目录复制**成一次性的 rotationtest（拿到与当前 dsh 版本匹配的
-# 基础 bundle），再把本仓库的 tgz 装进去 —— 这样既不碰你的日常 profile，又能在真宿主里跑。
+# 基础 bundle），再把本仓库目录以 link 方式装进去 —— 这样既不碰你的日常 profile，
+# 又能在真宿主里跑；改了仓库代码，重启这个一次性 profile 就生效（不用重打包）。
 #
 #   ./scripts/real-plugin-check.sh install     # 复制 profile + 安装本插件
 #   ./scripts/real-plugin-check.sh boot        # 起在 64600 端口（后台）
@@ -15,11 +16,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE="${PROFILE:-rotationtest}"
 PORT="${PORT:-64600}"
 PROFILES="$HOME/.dsh/profiles"
-TGZ="$ROOT/dsh-looptree-dashboard-0.6.4.tgz"
 
 case "${1:-}" in
   install)
-    [ -f "$TGZ" ] || (cd "$ROOT" && npm pack)
     rm -rf "$PROFILES/$PROFILE"
     echo "== 复制 web profile → $PROFILE（约 400MB）"
     cp -R "$PROFILES/web" "$PROFILES/$PROFILE"
@@ -31,8 +30,8 @@ d['name'] = 'dsh-profile-rotationtest'
 json.dump(d, open(p, 'w'), ensure_ascii=False, indent=2)
 open(p, 'a').write('\n')
 PY
-    echo "== 安装插件（用 app 自带 pnpm，store 与 profile 一致）"
-    dsh plugin --profile "$PROFILE" add "$TGZ"
+    echo "== 安装插件（link 本仓库，用 app 自带 pnpm，store 与 profile 一致）"
+    dsh plugin --profile "$PROFILE" add "$ROOT"
     ;;
   boot)
     echo "== 启动 $PROFILE :$PORT"
