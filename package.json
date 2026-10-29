@@ -40,6 +40,7 @@
     "validate:samples": "node scripts/validate-samples.mjs",
     "migrate": "node scripts/migrate-samples.mjs",
     "migrate:single-idea": "node scripts/migrate-single-idea.mjs",
+    "migrate:blockers": "node scripts/migrate-blockers.mjs",
     "check": "node scripts/check-install.mjs",
     "mock:session": "node scripts/dev-session-mock.mjs",
     "mock:action": "node scripts/action-mock.mjs",
