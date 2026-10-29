@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 0.10.1 — 模板会话挂 preset；记录节点的 session 位不再被普通会话覆盖
+
+- **现象**（2026-10-29 english-shadow 实测）：计划记录卡上显示「计划 · 会话交回计划」，
+  但点进去那条会话从没发过 `/plan`——会话头没有 `agentPreset`，工具集只有 15 个团队/记忆工具
+  （没有 `bash` / `read` / `write` / `exit_plan_mode`），首条消息是 `给出执行步骤` 模板、
+  `task_id: "steps"`，模型自己在 reasoning 里写 "No bash tool available. So I cannot inspect files."，
+  那份 6652 字「执行步骤」是凭记忆编的
+- **根因 1**：面板「prompt 模板 → 发起」与记录卡「再跑一轮」都走 `POST /api/run`，
+  而 `/api/run` 调 `runner.start({project,nodeId,prompt,taskId})` 不传 `mode`，
+  `mountPreset` 因此默认 `false`——会话创建时不挂 agent preset，`/plan`、`bash/read/write`
+  全都不在（生成计划走的是 `/api/action/plan`，那条路一直是对的：同 host 的 exec 会话
+  带 `agentPreset: standard` 且有 `/plan off`、`/goal` 两条 `command/run`）
+- **根因 2**：普通会话跑完 `onFinish` 会 `persistSession`，把整条 snapshot 盖到目标节点的
+  `session` 上；目标节点正好是「计划」记录节点，于是计划记录显示成了那条普通模板会话
+- **修 1**：`/api/run` 显式传 `mountPreset: true`，模板会话与动作会话一样拿到
+  `bash / read / write / plan-mode`
+- **修 2**：`persistSession` 遇到带 `action` 的记录节点直接返回；记录节点的 `session` 位只由
+  `applyActionResult` 写
+- **测试**：`scripts/action-mock.mjs` 新增 5 条断言（`POST /run` 起会话、模板会话挂 preset 且
+  真的 `mount()`、记录节点 `session` 不被覆盖、记录节点结论不变），并入 `npm run preflight`
+- 验证：`npm run preflight` 全绿；版本 0.10.1
+- **未做（同一类问题，另行决定）**：`candidates` / `fill` / `services-collect` 三个模板端点仍按
+  轻量工具集跑；`dispatch` 在命令不可用时仍只写日志静默退回提示词，卡片上看不出「没进计划模式」
+
 ## 0.10.0 — prompt 第 2 阶段：生成计划补证据要求，`/goal` 改发计划指针，候选加差异轴
 
 - **根因**：`docs/prompt-audit/` 一直是方案态（`templates.md` 明写「不是已落地的代码」），

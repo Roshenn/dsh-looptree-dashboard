@@ -23,7 +23,7 @@ const HOME = await mkdtemp(join(tmpdir(), 'rotation-action-home-'));
 const WS = await mkdtemp(join(tmpdir(), 'rotation-action-ws-'));
 process.env.ROTATION_HOME = HOME;
 const { apply } = await import('../lib/index.js');
-const { addProject, readCard, writeCard } = await import('../lib/store.mjs');
+const { addProject, readCard, writeCard, findNode } = await import('../lib/store.mjs');
 
 const PORT = Number(process.env.PORT || 4191);
 const BASE = '/rotation';
@@ -335,6 +335,28 @@ try {
   check('命令不可用时退回正文', fallbackText.startsWith('生成计划 · 构思「回退路径」'), fallbackText.slice(0, 30));
   check('退回正文同样分块', fallbackText.includes('\n\n背景\n'), '');
   check('退回正文由会话完成', !!fallbackRun && fallbackRun.status === 'done', fallbackRun?.status || 'timeout');
+
+  // ── 6. prompt 模板发起（POST /run）：要挂 preset，且不能覆盖记录节点的动作会话 ──
+  const beforeRun = await readCard(project);
+  const planRec2 = (findNode(beforeRun.loop, 'am-i2')?.children || []).find((n) => n.action === 'plan');
+  const planRecSession = planRec2?.session?.id || '';
+  const mountedBefore = mountedPresets;
+  const plainRes = await api('/run', {
+    file: project.file, nodeId: planRec2?.id, prompt: '给出执行步骤 · 刷新回原句且不写重复进度', taskId: 'steps',
+  });
+  check('POST /run 接受模板发起', plainRes.status === 200, JSON.stringify(plainRes.body?.error || ''));
+  const plainRun = await waitRunKey(plainRes.body?.run?.key);
+  check('模板会话跑完', !!plainRun && plainRun.status === 'done', plainRun?.status || 'timeout');
+  // 回归：模板会话也要能读仓库（bash / read / write 都在 preset 里，不挂就只剩记忆）
+  check('模板会话挂了 agent preset', sessions.get(plainRun?.sessionId)?.createdWith === 'mock-preset',
+    sessions.get(plainRun?.sessionId)?.createdWith || 'none');
+  check('模板会话真的 mount 了 preset', mountedPresets > mountedBefore, `${mountedBefore} → ${mountedPresets}`);
+  // 回归：普通会话不覆盖记录节点的 session 位（否则计划记录会显示一条从没发过 /plan 的会话）
+  const afterRun = await readCard(project);
+  const planRec2b = findNode(afterRun.loop, planRec2?.id);
+  check('记录节点 session 不被普通会话覆盖', (planRec2b?.session?.id || '') === planRecSession,
+    `${planRecSession || 'none'} vs ${planRec2b?.session?.id || 'none'}`);
+  check('记录节点保持动作会话的结论', planRec2b?.status === 'done' && !!planRec2b?.closed_at, planRec2b?.status || '?');
 } catch (error) {
   ok = false;
   console.error('[action-mock] 异常：', error);

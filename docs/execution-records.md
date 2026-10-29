@@ -32,8 +32,17 @@ plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取�
 `undefined`，于是静默退回提示词——表现就是「会话开头没有 `/plan`、没有 plan 徽标、
 模型说工具集里没有 exit_plan_mode」。
 
-补全 / 候选 / 拆目标 / 反馈提炼这几类提示词会话不挂 preset（保持轻量工具集）；同一个
-`sessionId` 的计划 → 执行 → 反馈复用同一个 agent，preset 只在建 agent 时挂一次。
+补全 / 候选 / 拆目标 / 反馈提炼这类提示词会话：走 `POST /api/run` 的（给出执行步骤、
+补齐证据、定位阻塞、拆目标）现在**也挂 preset**——它们要读仓库，不挂就只有记忆可用；
+`candidates` / `fill` / `services-collect` 三个端点仍按轻量工具集跑。
+同一个 `sessionId` 的计划 → 执行 → 反馈复用同一个 agent，preset 只在建 agent 时挂一次。
+
+### 记录节点的 `session` 位归动作会话独占
+
+记录节点（带 `action` 的 `kind:"exec"`）上的 `session` 只能由动作回写
+（`applyActionResult`）写。普通会话结束时的 `persistSession` 遇到记录节点直接返回，
+否则卡片上会出现「计划 · 会话交回计划」配一条 `task_id: "steps"`、从没发过 `/plan`
+的普通会话（2026-10-29 实测：p1 的 `proof` 时间 19:59:08，被指向的会话 19:59:17 才开始）。
 
 ## 三、数据形状
 
