@@ -1,4 +1,4 @@
-/* 由 bundle-data.mjs 生成，勿手改。源：samples/ */
+/* 由 build-cards.mjs 生成，勿手改。源：samples/ */
 window.ROTATION_CARDS = [
  {
   "schema": "rotation/v1",
@@ -83,6 +83,203 @@ window.ROTATION_CARDS = [
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00"
+  },
+  "prompt_context": {
+   "fields": [
+    "project",
+    "loop",
+    "goal",
+    "node"
+   ],
+   "siblings": 0
+  }
+ },
+ {
+  "schema": "rotation/v1",
+  "project": {
+   "name": "练习卡面板",
+   "workspace": "/Users/julian/agentic/projects/english-shadow-loop"
+  },
+  "updated": "2026-10-29T12:45:00.000Z",
+  "loop": {
+   "id": "xr-loop",
+   "kind": "loop",
+   "title": "外部链接生成逐句练习卡",
+   "intent": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
+   "acceptance": "三步走通：生成卡 → 跟读计数 → 刷新不丢",
+   "status": "doing",
+   "closed_at": null,
+   "started_at": "2026-10-29T12:00:00+08:00",
+   "lessons": [
+    {
+     "text": "面板与 host 先定记录 JSON 形状再写两侧，否则字段对不上要返工两次",
+     "from": "xr-i1",
+     "at": "2026-10-29T12:30:00+08:00"
+    },
+    {
+     "text": "会话续跑要复用同一个 sessionId，新建会话就丢了计划上下文",
+     "from": "xr-i1",
+     "at": "2026-10-29T12:30:00+08:00"
+    }
+   ],
+   "children": [
+    {
+     "id": "xr-g1",
+     "kind": "goal",
+     "title": "链接到练习卡可一键生成",
+     "acceptance": "粘贴链接后 60 秒内出现练习卡",
+     "status": "doing",
+     "closed_at": null,
+     "started_at": "2026-10-29T12:05:00+08:00",
+     "children": [
+      {
+       "id": "xr-i1",
+       "kind": "idea",
+       "title": "外部链接自动补全卡片元信息",
+       "approach": "先解析视频标题与时长，缺什么补什么，再写进练习卡",
+       "status": "doing",
+       "closed_at": null,
+       "plan": {
+        "goal": "粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡",
+        "verify": [
+         "npm run preflight",
+         "npx playwright test tests/e2e/journey.spec.ts"
+        ],
+        "steps": [
+         "解析链接拿到 videoId，用 oEmbed 取标题与作者",
+         "字幕可用性探测失败时降级为手动上传字幕",
+         "把元信息写进练习卡首屏，并加「重新解析」入口"
+        ],
+        "doc": "# 外部链接自动补全卡片元信息\n\n## 目标\n粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡。\n\n## 验证命令\n```bash\nnpm run preflight\nnpx playwright test tests/e2e/journey.spec.ts\n```\n\n## 步骤\n1. 解析链接拿到 videoId，用 oEmbed 取标题与作者\n2. 字幕可用性探测失败时降级为手动上传字幕\n3. 把元信息写进练习卡首屏，并加「重新解析」入口\n",
+        "at": "2026-10-29T12:20:00+08:00",
+        "session": "session-aaaa1111-2222-3333-4444-555566667777"
+       },
+       "started_at": "2026-10-29T12:10:00+08:00",
+       "children": [
+        {
+         "id": "xr-i1-p1",
+         "kind": "exec",
+         "action": "plan",
+         "title": "计划 · 外部链接自动补全卡片元信息",
+         "status": "done",
+         "started_at": "2026-10-29T12:18:30+08:00",
+         "closed_at": "2026-10-29T12:20:00+08:00",
+         "proof": "计划已提交：3 个步骤、2 条验证命令",
+         "session": {
+          "id": "session-aaaa1111-2222-3333-4444-555566667777",
+          "status": "done",
+          "started_at": "2026-10-29T12:18:30+08:00",
+          "ended_at": "2026-10-29T12:20:00+08:00",
+          "result": "计划已提交，等待确认。"
+         }
+        },
+        {
+         "id": "xr-i1-e1",
+         "kind": "exec",
+         "action": "exec",
+         "title": "执行 · 外部链接自动补全卡片元信息",
+         "verify": "npm run preflight",
+         "status": "done",
+         "started_at": "2026-10-29T12:21:00+08:00",
+         "closed_at": "2026-10-29T12:29:00+08:00",
+         "proof": "preflight 绿；e2e 8 条通过；字幕缺失走降级分支",
+         "session": {
+          "id": "session-aaaa1111-2222-3333-4444-555566667777",
+          "status": "done",
+          "started_at": "2026-10-29T12:21:00+08:00",
+          "ended_at": "2026-10-29T12:29:00+08:00",
+          "result": "改完 3 处，验证命令全绿；oEmbed 429 时缓存 10 分钟。"
+         }
+        },
+        {
+         "id": "xr-i1-r1",
+         "kind": "exec",
+         "action": "reflect",
+         "title": "反馈 · 外部链接自动补全卡片元信息",
+         "status": "done",
+         "started_at": "2026-10-29T12:29:05+08:00",
+         "closed_at": "2026-10-29T12:30:00+08:00",
+         "proof": "提炼 2 条经验，写入闭环经验积累",
+         "session": {
+          "id": "session-aaaa1111-2222-3333-4444-555566667777",
+          "status": "done",
+          "started_at": "2026-10-29T12:29:05+08:00",
+          "ended_at": "2026-10-29T12:30:00+08:00",
+          "result": "{\"lessons\":[\"面板与 host 先定记录 JSON 形状再写两侧\"]}"
+         }
+        },
+        {
+         "id": "xr-i1-e2",
+         "kind": "exec",
+         "action": "exec",
+         "title": "执行 · 字幕缺失时的降级分支",
+         "verify": "npm run preflight",
+         "status": "blocked",
+         "started_at": "2026-10-29T12:31:00+08:00",
+         "closed_at": null,
+         "issues": [
+          {
+           "text": "e2e 断言失败：字幕缺失时应显示手动上传入口，实际空白",
+           "at": "2026-10-29T12:36:00+08:00"
+          }
+         ],
+         "session": {
+          "id": "session-bbbb1111-2222-3333-4444-555566667777",
+          "status": "failed",
+          "started_at": "2026-10-29T12:31:00+08:00",
+          "ended_at": "2026-10-29T12:36:00+08:00",
+          "result": "已改 UI，但 e2e 仍红。",
+          "error": "turn 结束原因：error"
+         }
+        }
+       ]
+      },
+      {
+       "id": "xr-i2",
+       "kind": "idea",
+       "title": "单句循环跟读与计数",
+       "approach": "一句一卡，Enter 记一次，localStorage 持久化",
+       "status": "plan",
+       "closed_at": null,
+       "plan": {
+        "goal": "同一句可反复跟读，次数可靠累计并能清零",
+        "verify": [
+         "npm run preflight",
+         "npx playwright test tests/e2e/count.spec.ts"
+        ],
+        "steps": [
+         "抽出计数模块，读写 localStorage 带版本号",
+         "Enter / 点击「本句已练」都记一次，避免重复绑定",
+         "刷新后按版本号迁移旧数据"
+        ],
+        "doc": "# 单句循环跟读与计数\n\n## 目标\n同一句可反复跟读，次数可靠累计并能清零。\n\n## 验证命令\n```bash\nnpm run preflight\nnpx playwright test tests/e2e/count.spec.ts\n```\n\n## 步骤\n1. 抽出计数模块，读写 localStorage 带版本号\n2. Enter / 点击「本句已练」都记一次，避免重复绑定\n3. 刷新后按版本号迁移旧数据\n",
+        "at": "2026-10-29T12:40:00+08:00",
+        "session": "session-cccc1111-2222-3333-4444-555566667777"
+       },
+       "started_at": "2026-10-29T12:38:00+08:00",
+       "children": [
+        {
+         "id": "xr-i2-p1",
+         "kind": "exec",
+         "action": "plan",
+         "title": "计划 · 单句循环跟读与计数",
+         "status": "done",
+         "started_at": "2026-10-29T12:38:30+08:00",
+         "closed_at": "2026-10-29T12:40:00+08:00",
+         "proof": "计划已提交：3 个步骤、2 条验证命令",
+         "session": {
+          "id": "session-cccc1111-2222-3333-4444-555566667777",
+          "status": "done",
+          "started_at": "2026-10-29T12:38:30+08:00",
+          "ended_at": "2026-10-29T12:40:00+08:00",
+          "result": "计划已提交，等待确认。"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
   }
  },
  {
@@ -354,7 +551,7 @@ window.ROTATION_CARDS = [
    "name": "StoryWeft",
    "workspace": "/Users/julian/agentic/projects/storyweft"
   },
-  "updated": "2026-10-26T16:03:14.664Z",
+  "updated": "2026-10-27T01:36:13.555Z",
   "loop": {
    "id": "sw-loop",
    "kind": "loop",
@@ -409,13 +606,24 @@ window.ROTATION_CARDS = [
          "proof": "实测 210ms",
          "status": "done",
          "closed_at": "2026-10-26T16:03:15.932Z",
-         "issues": []
+         "issues": [],
+         "session": {
+          "id": "session-11111111-2222-3333-4444-555555555555",
+          "status": "done",
+          "cwd": "/Users/julian/agentic/projects/storyweft",
+          "task_id": "steps",
+          "started_at": "2026-10-25T10:02:00+08:00",
+          "ended_at": "2026-10-25T10:09:31+08:00",
+          "exit_code": 0,
+          "result": "已给单层渲染拆出 3 步：先建 layer 容器，再复用节点缓存，最后接通 hover。bench 210ms → 96ms。"
+         }
         }
        ],
        "started_at": "2026-10-21T21:00:00+08:00"
       }
      ],
-     "started_at": "2026-10-23T09:00:00+08:00"
+     "started_at": "2026-10-23T09:00:00+08:00",
+     "blocker": "缺章节→情节索引"
     },
     {
      "id": "sw-g2",
@@ -478,7 +686,15 @@ window.ROTATION_CARDS = [
            "at": "2026-10-26T22:12:00+08:00"
           }
          ],
-         "started_at": "2026-10-18T00:30:00+08:00"
+         "started_at": "2026-10-18T00:30:00+08:00",
+         "proof": "录屏 3 次切换，残影出现在 2/3 帧",
+         "prompts": [
+          {
+           "id": "repro",
+           "title": "给我最小复现步骤",
+           "ask": "列出复现「章节切换残影」的最小步骤，并写出期望结果与实际结果。"
+          }
+         ]
         }
        ],
        "started_at": "2026-10-21T21:00:00+08:00"
@@ -517,7 +733,65 @@ window.ROTATION_CARDS = [
      ]
     }
    ],
-   "started_at": "2026-10-24T21:00:00+08:00"
-  }
+   "started_at": "2026-10-24T21:00:00+08:00",
+   "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步"
+  },
+  "prompts": {
+   "idea": [
+    {
+     "id": "regen",
+     "title": "重新生成构思（保留验收）",
+     "ask": "保留闭环意图与目标验收，重新给出 2 个替代构思；每个写清与现方案的差异、代价、以及对验收方式的影响。"
+    },
+    {
+     "id": "split3",
+     "title": "拆成 3 个执行动作",
+     "ask": "把这个构思拆成恰好 3 个执行动作，每个动作一条可直接运行的验证命令。"
+    },
+    {
+     "id": "contract",
+     "title": "写成接口契约",
+     "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码、以及谁调用它。"
+    }
+   ]
+  },
+  "prompt_context": {
+   "fields": [
+    "project",
+    "loop",
+    "loop.intent",
+    "loop.acceptance",
+    "goal",
+    "goal.acceptance",
+    "idea",
+    "idea.approach",
+    "siblings",
+    "node",
+    "node.approach",
+    "exec.verify",
+    "exec.proof",
+    "exec.issues",
+    "children"
+   ],
+   "siblings": 3,
+   "refs": [
+    "sw-e4"
+   ]
+  },
+  "services": [
+   {
+    "id": "panel",
+    "name": "轮转面板 4173",
+    "url": "http://127.0.0.1:4173",
+    "health": "/api/run-config"
+   },
+   {
+    "id": "web5800",
+    "name": "本地预览 5800",
+    "url": "http://127.0.0.1:5800",
+    "start": "python3 -m http.server 5800",
+    "cwd": "/tmp/rt-workspace"
+   }
+  ]
  }
 ];
