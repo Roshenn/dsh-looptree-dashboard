@@ -294,6 +294,9 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
    默认勾选新服务；已有同 id 的默认不勾（勾了才覆盖）。关掉面板草稿也还在，再点一次可继续。
 3. 确认后才 `PUT` 写回 `rotation.json` 的 `services`（校验不过 422 拒绝，写前留 `.bak`），写回后清掉草稿。
 4. 会话失败 / 模型没给合法 JSON 时只标错误、不写卡片；模型编的端口要带「证据文件:行」，预览里能看到。
+5. **并发口径**（0.10.2）：不同项目可以**同时收集**（草稿按卡片文件分开、各写各的卡）；同一项目再点一次返回 409
+   「正在收集，先等它结束」；全局仍受 `ROTATION_MAX_CONCURRENT`（默认 3，含其它会话）限制，超了返回 429。
+   两个项目几乎同时完成时只弹一个预览，另一个给 toast 提示，点它自己的「服务信息收集」可从草稿恢复。
 
 接口：`GET /api/services?file=`、`POST /api/service/start`、`POST /api/service/stop`、
 `POST /api/services/collect`、`GET /api/services/collect?file=`、`POST /api/services/probe`、`PUT /api/services`。

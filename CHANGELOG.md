@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 0.10.2 — 服务信息收集按项目并发：不同项目同时收集，不再全局 409
+
+- **现象**：english-shadow 正在收集时，点 demand-collection 的「服务信息收集」被 409
+  「有一个项目正在收集服务信息，先等它结束」。面板本身是按项目隔离的（`collecting` 以卡片文件为 key），
+  但 host 的闸门是全局的：`runner.list().find(... PENDING_SERVICES.has(r.key))` 只看「有没有任意收集在跑」
+- **修复**（`lib/index.js` 的 `POST /api/services/collect`）：闸门收窄成「同一项目串行」——
+  不同项目的草稿 / 卡片互不相干，可以同时跑；全局仍按 `/api/run` 同一口径受
+  `ROTATION_MAX_CONCURRENT`（默认 3，含其它会话）限制，超了返回 429 并说明原因
+- **面板**：两个项目几乎同时完成时，第二个结果不再静默顶掉已打开的预览，改为 toast
+  「X 收集完成 · 点它的「服务信息收集」查看」；草稿已落盘，点回去能恢复
+- **测试**：`scripts/services-collect-mock.mjs` 扩到 27 项，新增「A、B 同时收集 200」「同项目第二次 409」
+  「超过 ROTATION_MAX_CONCURRENT 返回 429」「B 草稿独立落盘」；已并入 `npm run preflight`
+- 验证：`npm run preflight` 全绿；临时 dev-host + 假 agent 浏览器实测两个项目同时收集，
+  两份草稿独立、预览只弹一个、另一个可恢复；版本 0.10.2
+
 ## 0.10.1 — 模板会话挂 preset；记录节点的 session 位不再被普通会话覆盖
 
 - **现象**（2026-10-29 english-shadow 实测）：计划记录卡上显示「计划 · 会话交回计划」，
