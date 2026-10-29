@@ -66,9 +66,11 @@
 
 ```json
 "services": [
-  { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config" },
+  { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config",
+    "start": { "mac": "node serve.mjs", "windows": "node serve.mjs" } },
   { "id": "web5800", "name": "本地预览 5800", "url": "http://127.0.0.1:5800",
-    "start": "python3 -m http.server 5800", "cwd": "/tmp/rt-workspace" }
+    "start": { "mac": "python3 -m http.server 5800", "windows": "python -m http.server 5800" },
+    "cwd": "/tmp/rt-workspace", "confidence": "high", "evidence": "README.md:18" }
 ]
 ```
 
@@ -78,15 +80,22 @@
 | `name` | ✅ | 信息栏里显示的名字 |
 | `url` | ✅ | `http(s)://host:port/...`，**就是访问方式**；信息栏里点一下即在浏览器打开 |
 | `health` | ➖ | 相对路径，探活用（拼在 url 后），缺省直接探测 url 本身 |
-| `start` | ➖ | 一键拉起的命令（shell），在 `cwd` 或 `project.workspace` 下执行 |
-| `cwd` | ➖ | 启动目录，缺省用 `project.workspace` |
+| `start` | ➖ | 一键拉起的命令（shell），在 `cwd` 或 `project.workspace` 下执行。字符串＝全平台共用；也可写成 `{ "mac", "windows", "linux", "default" }`，host 按 `process.platform` 选一条，缺当前平台就不出「一键拉起」 |
+| `stop` | ➖ | 停止命令（预留），形状同 `start` |
+| `cwd` | ➖ | 启动目录，缺省用 `project.workspace`；相对路径按项目根拼，也支持平台映射 |
+| `confidence` | ➖ | 仅「服务信息收集」写的出处置信度（`high` / `low`），面板展示用 |
+| `evidence` | ➖ | 仅「服务信息收集」写的证据（`文件:行`），面板展示用 |
+
+平台映射的键大小写、分隔符都收：`mac` / `darwin` / `macos`、`windows` / `win32` / `win`、`linux`、`default`。
 
 面板侧的语义（服务块与统计都在**第一列项目列**：服务在项目名下方靠上，统计贴底；右侧列只放过程指标与操作）：
 
 - **状态**：每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒。
 - **打开**：直接用浏览器打开 `url`（有 `health` 时打开 `url + health`）。
-- **一键拉起**：弹窗确认命令与工作目录后 `spawn(shell)`，进程组独立，可「停止」。
+- **一键拉起**：弹窗确认**平台、命令与工作目录**后 `spawn(shell)`，进程组独立，可「停止」。
 - **复制地址**：复制 `url`，方便贴到别处验证。
+- **项目菜单（`⋯`）**：项目名右侧两项——**服务信息收集**（AI 会话读项目 → 预览探活 → 确认后写回 `services`；
+  草稿在 `~/.dsh/rotation/services/`，关面板不丢）与**移除项目**（只取消注册表登记，保留 `rotation.json`）。
 
 ## 节点会话（可选，面板写入）
 

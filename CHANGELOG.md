@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## 0.9.2 — 项目菜单：服务信息收集自动填 services，start 按平台挑命令
+
+- **需求**：项目列右上角的 `✕` 只做「移除」，服务还得手写 `rotation.json`。改成项目名右侧 `⋯` 菜单：
+  **服务信息收集**（AI 会话读项目 → 预览探活 → 确认后写回 `services`）与 **移除项目**
+  （沿用原语义：只取消注册表登记、保留 `rotation.json`，仍要二次确认）
+- **平台化 start**（用户要求 mac / windows 各存一条，不同平台点 start 跑对应命令）：
+  `lib/services.mjs` 新增 `resolvePlatformValue` / `platformKeysOf` / `resolveCwd` / `normalizeServices`；
+  `start` / `stop` / `cwd` 支持字符串或 `{ mac, windows, linux, default }` 映射；
+  `GET /api/services` 每个服务多返回 `startCommand`（当前平台真正会执行的命令）、`startPlatforms`、`cwd`；
+  缺当前平台命令时 `一键拉起` 不出现，服务块提示缺哪一端（不会拿另一平台的命令硬跑）
+- **收集链路**：`lib/prompt.mjs` 新增 `composeCollectServicesPrompt`（JSON 契约、要求 mac + windows 两条命令与证据）；
+  host 新增 `POST /api/services/collect`、`GET /api/services/collect`、`POST /api/services/probe`、`PUT /api/services`；
+  结果落草稿 `~/.dsh/rotation/services/<卡片>.json`（关面板不丢），确认后才写回；
+  `PUT` 走 `enqueueCardWrite` + `writeCard`（校验 / `.bak` / 原子写），写回后清草稿
+- **面板**：两处项目头（矩阵泳道 + 聚焦视图）把 `✕` 换成 `⋯`（`aria-haspopup` / `aria-expanded`，
+  Esc 与点外部关闭）；收集时服务块显示进度；预览弹窗逐条探活（在线 / 离线 / 超时）、
+  url 与 mac / windows 命令可改、新服务默认勾选、已有同 id 默认不勾（勾了才覆盖）；
+  写回后服务块多一行「启动（mac）…」；`一键拉起` 确认弹窗显示平台 + 命令 + 工作目录
+- **兼容**：旧宿主（服务没有 `startCommand`）由面板按字符串 `start` 兜底；旧卡片里的字符串 `start` 继续有效；
+  `rotation/v1` 校验放宽为「字符串或平台映射」，旧的字符串写法不会被 422 拒掉
+- **测试**：新增 `scripts/services-collect-mock.mjs`（23 项：会话 → 草稿 → 平台解析 → 探活 → 写回 → 清草稿 →
+  非 JSON 不写卡片 → 缺平台命令拒绝启动），并入 `npm run preflight`；
+  `scripts/prompt-mock.mjs` 补 6 项收集 prompt 断言（首行 / 两端命令 / JSON 契约 / lint / 已有服务参考）
+- 验证：`npm run preflight` 全绿；临时 dev-host（真实 `lib/index.js` + 假 agent）在浏览器里走通
+  「⋯ → 服务信息收集 → 预览探活 → 写回 / 移除项目确认」；矩阵泳道与聚焦视图截图核对，无 `✕`、菜单两处都有；
+  宿主（DSH）重启后新接口才生效——只刷新面板会看到新 UI、但收集会命中旧路由；版本 0.9.2
+
 ## 0.9.1 — 注册表按「本机可见」解析：另一台机器登记的项目不再挡住添加
 
 - **根因**：`~/.dsh` 走 git 同步，`rotation/registry.json` 是共享文件，但 `workspace` 是各机器的绝对路径。

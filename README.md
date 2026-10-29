@@ -81,7 +81,13 @@ ctx.on('session/event', …)                    → turn/start · assistant/mess
 `lib/services.mjs`：探活（1.2s 超时，HTTP <500 算在线）、一键拉起（shell + 独立进程组）、
 停止（SIGTERM → 3s 后 SIGKILL）。`health` 以 `/` 开头时按「相对卡片 url 的路径」拼接。
 
-接口：`GET /rotation/api/services?file=<id>`、`POST /rotation/api/service/start`、`POST /rotation/api/service/stop`。
+0.9.2 起 `start` / `stop` / `cwd` 支持**平台映射**：同一份 `rotation.json` 在多台机器间同步，
+点「一键拉起」时按当前宿主平台（`process.platform` → mac / windows / linux）挑对应那条，
+不会把 mac 的写法拿到 Windows 上执行。项目名右侧的 `⋯` 菜单可让 AI 读项目自动收集服务。
+
+接口：`GET /rotation/api/services?file=<id>`、`POST /rotation/api/service/start`、`POST /rotation/api/service/stop`、
+`POST /rotation/api/services/collect`、`GET /rotation/api/services/collect?file=<id>`、
+`POST /rotation/api/services/probe`、`PUT /rotation/api/services`。
 
 实测：`host` 探活 200·9ms；`web` 从 down → 拉起后 up·200ms（pid 8444）→ 停止后 down 且端口释放。
 
@@ -234,19 +240,21 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 ```
 刷新页面即出现新泳道。文件名必须以 `.rotation.json` 结尾。
 
-## 服务：访问方式 + 一键拉起
+## 服务：访问方式 + 一键拉起 + 自动收集
 
-**第一列（项目/阶段）**自上而下分两段：
+**第一列（项目/阶段）**自上而下分两段，项目名右侧是 `⋯` 菜单（服务信息收集 / 移除项目）：
 
 ```
-项目名 / 路径 / 收敛进度        ← 靠上
+项目名 / 路径 / 收敛进度     ⋯   ← 靠上（⋯：服务信息收集 / 移除项目）
 ────────────────
 服务                          ← 项目名下方
 ● 轮转面板 4173  运行中 · 0ms
   127.0.0.1:4173
+  启动（mac）node serve.mjs
   [打开][复制地址]
 ○ 本地预览 5800  未启动
   127.0.0.1:5800
+  启动（mac）pnpm dev
   [打开][一键拉起][复制地址]
         ⋮（行高撑开，中间留白）
 时间                          ← 贴底（margin-top:auto）
@@ -254,25 +262,43 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 ```
 
 「怎么用」（服务地址、拉起）在上，「跑了多久 / 还要多久」（时间维度）在下。
+`⋯` 菜单只有两项：**服务信息收集**（AI 读项目 → 预览 → 确认后写回 `services`）和
+**移除项目**（只取消注册表登记，保留项目里的 `rotation.json`，仍要二次确认）。
 
 **右侧「信息 · 操作」列**以**收敛健康度 + 节点构成**开头，后面接 收敛趋势 → 下一步 → 风险 → 操作按钮。
 
-配置写在 `rotation.json` 的 `services`：
+配置写在 `rotation.json` 的 `services`（`start` / `stop` / `cwd` 可以是字符串，也可以是平台映射）：
 
 ```json
 "services": [
-  { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config" },
+  { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config",
+    "start": { "mac": "node serve.mjs", "windows": "node serve.mjs" } },
   { "id": "web5800", "name": "本地预览 5800", "url": "http://127.0.0.1:5800",
-    "start": "python3 -m http.server 5800", "cwd": "/tmp/rt-workspace" }
+    "start": { "mac": "python3 -m http.server 5800", "windows": "python -m http.server 5800" },
+    "cwd": "/tmp/rt-workspace" }
 ]
 ```
 
+- 平台映射的键：`mac`（也认 `darwin` / `macos`）/ `windows`（也认 `win32` / `win`）/ `linux` / `default`；
+  当前平台没有对应命令时，`一键拉起` 不出现，服务块显示「没有 mac 的启动命令（只有 windows）」。
 - 状态由服务端每 5s 探活（首次 1.2s 超时），显示 `运行中 · 2ms / 未启动 / 启动中 / 启动失败`。
-- 「一键拉起」会先弹窗显示**将执行的命令与工作目录**，确认后才 `spawn`；进程独立成组，可「停止」。
+- 「一键拉起」会先弹窗显示**平台、将执行的命令与工作目录**，确认后才 `spawn`；进程独立成组，可「停止」。
 - 「打开」直接新开标签；「复制地址」复制 `url`。
-- 没配 `services` 的卡会显示提示，不影响其它功能。
+- 没配 `services` 的卡会显示提示：点项目名右侧 `⋯` →「服务信息收集」。
 
-接口：`GET /api/services?file=`、`POST /api/service/start`、`POST /api/service/stop`。
+**服务信息收集（AI 会话，0.9.2）**：
+
+1. 点 `⋯` →「服务信息收集」，host 起一次会话，让模型读 `package.json` / vite 配置 / docker-compose /
+   README 等，按 JSON 契约返回 `services`（id / name / url / health / start.mac / start.windows / 证据）。
+2. 结果落成**草稿**（`~/.dsh/rotation/services/<卡片>.json`），面板弹预览：逐条探活、url 与两端命令可改、
+   默认勾选新服务；已有同 id 的默认不勾（勾了才覆盖）。关掉面板草稿也还在，再点一次可继续。
+3. 确认后才 `PUT` 写回 `rotation.json` 的 `services`（校验不过 422 拒绝，写前留 `.bak`），写回后清掉草稿。
+4. 会话失败 / 模型没给合法 JSON 时只标错误、不写卡片；模型编的端口要带「证据文件:行」，预览里能看到。
+
+接口：`GET /api/services?file=`、`POST /api/service/start`、`POST /api/service/stop`、
+`POST /api/services/collect`、`GET /api/services/collect?file=`、`POST /api/services/probe`、`PUT /api/services`。
+
+![服务信息收集预览](preview-services-collect.png)
 
 ## 节点 ↔ 会话（发起 / 等待 / 处理结果）
 

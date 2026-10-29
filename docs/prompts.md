@@ -25,6 +25,7 @@
 | `actionCommand` | 动作 → 真正发出的斜杠命令 |
 | `composeSplitPrompt` / `composeIdeaPrompt` | 「AI 拆出目标 / 拆出构思」 |
 | `composeCandidatePrompt` / `composeFillPrompt` | 生成候选 / 按标题补全 |
+| `composeCollectServicesPrompt` | 项目级「服务信息收集」（`POST /api/services/collect`，JSON 契约见下） |
 | `lintPrompt` | 结构自检（测试与面板提示共用） |
 
 面板不再自己拼 prompt：查看、复制、发起、动作预览都走 `GET /rotation/api/prompts`。

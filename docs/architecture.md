@@ -17,6 +17,7 @@ DSH 进程
 │   ├─ /rotation/api/run*           节点会话（lib/runner.mjs → ctx.agents）
 ├─ /rotation/api/prompts        prompt 合成（lib/prompt.mjs，只读）
 └─ /rotation/api/service*       服务探活 / 拉起 / 停止（lib/services.mjs）
+    └─ /rotation/api/services*  服务收集（AI 会话 → 草稿 → 预览探活 → 写回）
 └─ client 半 lib/client.js          （__ModuleLoader__ 模块）
     └─ sidebar.right.pane.tab       右栏「轮转」入口 → 打开 /rotation/app/
 ```
