@@ -753,6 +753,7 @@
       <button class="chip" data-filter="open" aria-pressed="false">未关闭</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="density" aria-pressed="true">紧凑</button>
+      <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的目标 / 构思（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="back-to-dsh" hidden title="返回到 DSH">← 返回</button>
       <button class="chip" id="add-project">+ 项目</button>
@@ -1421,13 +1422,30 @@ let PROJECTS = CARDS.length ? CARDS.map(cardToProject) : MOCK_PROJECTS;
 const USING_REAL = CARDS.length > 0;
 
 /* ─────────── 状态 ─────────── */
-const state = { view:'matrix', filter:'all', focusId:'', theme:'dark', stamp:'' };
+const state = { view:'matrix', filter:'all', focusId:'', theme:'dark', stamp:'', hideClosed:false };
 state.focusId = (PROJECTS[0] && PROJECTS[0].id) || '';
 state.stamp = (CARDS[0] && CARDS[0].updated)
   ? new Date(CARDS[0].updated).toLocaleString('sv-SE').slice(0,16)
   : '2026-10-26 23:20';
 const collapsed = new Set();
 const $ = (s,r=document)=>r.querySelector(s);
+
+/* ─────────── 显示风格偏好（跨刷新保留） ───────────
+   紧凑 / 隐藏已闭环 属于「看得见什么」，不该每次进来重设；写 localStorage，
+   隐私模式下写不进去就静默降级成「本次有效」。 */
+const PREFS_KEY = 'rotation.display';
+function loadPrefs(){
+  try { const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); return raw && typeof raw === 'object' ? raw : {}; }
+  catch { return {}; }
+}
+function savePrefs(patch){
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch })); } catch {}
+}
+const PREFS = loadPrefs();
+state.hideClosed = !!PREFS.hideClosed;
+document.documentElement.dataset.density = PREFS.density === 'comfort' ? 'comfort' : 'compact';
+if ($('#density')) $('#density').setAttribute('aria-pressed', PREFS.density === 'comfort' ? 'false' : 'true');
+if ($('#hide-closed')) $('#hide-closed').setAttribute('aria-pressed', state.hideClosed ? 'true' : 'false');
 
 /* ─────────── 树工具 ─────────── */
 function walk(n, fn, depth=0){ fn(n, depth); (n.children||[]).forEach(c=>walk(c, fn, depth+1)); }
@@ -1947,8 +1965,22 @@ function sessionIdOf(p, n){
     || (typeof planSess === 'string' ? planSess : (planSess && planSess.id)) || '';
 }
 
+/**
+ * 卡片 chips：基础 chips 来自卡片字段；「隐藏已闭环」打开时把被藏掉的数量上提成一条
+ * （折叠行已经不出，用户仍要知道关了几个——详情卡里能看到它们）。
+ */
+function cardChips(n){
+  const out = (n.chips || []).slice();
+  if (!state.hideClosed) return out;
+  const src = n.src || n;
+  const closed = (src.children || []).filter(k => k.closed && !isRecord(k)).length;
+  if (closed) out.push(`已闭环 ${closed}`);
+  return out;
+}
+
 function nodeMarkup(n, p){
   const st = stateOf(n), tone = nodeTone(n), pr = progressOf(n);
+  const chips = cardChips(n);   // 隐藏已闭环时，被藏掉的数量作为一条 chip 上提
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
   const isIdea = n.kind === 'idea';
@@ -2014,7 +2046,7 @@ function nodeMarkup(n, p){
     </div>
     <div class="tnode-title" title="${n.title}">${n.title}</div>
     ${n.meta ? `<div class="tnode-meta one" title="${esc(n.metaFull || n.meta)}">${esc(n.meta)}</div>` : ''}
-    ${(n.chips && n.chips.length) ? `<div class="tnode-chips">${n.chips.map(c => `<span class="tchip">${esc(c)}</span>`).join('')}</div>` : ''}
+    ${chips.length ? `<div class="tnode-chips">${chips.map(c => `<span class="tchip">${esc(c)}</span>`).join('')}</div>` : ''}
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
     ${lateBadge(n)}
     ${p ? runBadge(p, n) : ''}
@@ -2030,20 +2062,34 @@ function nodeMarkup(n, p){
 
 /* ─────────── 布局与连线 ─────────── */
 const foldedClosed = new Set();   // 展开「已关闭子节点」的父节点 id
+// 「隐藏已闭环」打开时，跳转过去的那一颗闭环节点临时放行（否则点了没反应，像坏掉）
+const revealedClosed = new Set();
+/**
+ * 画布可见树。已闭合的非记录子节点有两层开关：
+ *   1) 「隐藏已闭环」打开 → 整颗不渲染，也不再出「▸ 已闭环 N」折叠行；数量上提到卡片 chips
+ *   2) 开关关闭 → 保持原来的折叠行为（默认收起成「▸ 已闭环 N」，点 chip 展开）
+ * 执行记录是「执行验证反馈记录」列的内容，已完成的也常驻显示，不参与折叠。
+ */
 function visibleRoot(root){
   const clone = (n) => {
     const kids = [];
     let hidden = 0, shown = 0;
     for (const k of (n.children || [])){
-      // 执行记录就是「执行验证反馈记录」列的内容：已完成的也常驻显示，不参与「已关闭 n」折叠；
-      // 其余节点保持原来的折叠行为（默认收起已闭环，点 chip 展开）
       if (k.closed && !isRecord(k)){
-        if (!foldedClosed.has(n.id)){ hidden++; continue; }
+        const forced = revealedClosed.has(k.id);   // 跳转目标：即使在隐藏态也让这一颗露出来
+        if (!forced && state.hideClosed){ hidden++; continue; }
+        if (!forced && !foldedClosed.has(n.id)){ hidden++; continue; }
         shown++;
       }
       kids.push(clone(k));
     }
-    return Object.assign({}, n, { children: kids, hiddenClosed: hidden, closedShown: shown, src: n.src || n });
+    return Object.assign({}, n, {
+      children: kids,
+      // 隐藏态不出折叠行（数量改在 chips 上），否则 chip 与开关语义打架
+      hiddenClosed: state.hideClosed ? 0 : hidden,
+      closedShown: shown,
+      src: n.src || n,
+    });
   };
   return clone(root);
 }
@@ -2055,6 +2101,7 @@ function ensureVisible(nid){
     for (const k of (n.children || [])){
       if (k.id === nid){
         ancestors.forEach(a => foldedClosed.add(a));
+        if (state.hideClosed && k.closed && !isRecord(k)) revealedClosed.add(nid);
         found = true; return true;
       }
       if (walk(k, ancestors.concat([n.id]))) return true;
@@ -2599,9 +2646,13 @@ function doClose(id){
     pushClosedMilestone(p, n, now);          // 收进项目里程碑历史
     toast(`「${n.title}」已达成 · 项目留在泳道，可从 ⋯ 查看里程碑历史或开新里程碑`);
   } else if (n.kind === 'goal'){
-    toast(`「${n.title}」已闭环 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`);
+    toast(state.hideClosed
+      ? `「${n.title}」已闭环 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
+      : `「${n.title}」已闭环 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`);
   } else {
-    toast(`「${n.title}」已完成 · 已折叠进上级的「已闭环 N」`);
+    toast(state.hideClosed
+      ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
+      : `「${n.title}」已完成 · 已折叠进上级的「已闭环 N」`);
   }
   render();
   pulseFoldChip(parent && parent.id);
@@ -5589,6 +5640,15 @@ $('#density').addEventListener('click', (e)=>{
   const on = document.documentElement.dataset.density !== 'compact';
   document.documentElement.dataset.density = on ? 'compact' : 'comfort';
   e.currentTarget.setAttribute('aria-pressed', on);
+  savePrefs({ density: on ? 'compact' : 'comfort' });   // 显示风格跨刷新保留
+  render();
+});
+// 「隐藏已闭环」：画布上不留已闭环的目标 / 构思；已达成里程碑仍留主管，数量上提到卡片 chips
+$('#hide-closed').addEventListener('click', (e)=>{
+  state.hideClosed = !state.hideClosed;
+  e.currentTarget.setAttribute('aria-pressed', state.hideClosed ? 'true' : 'false');
+  savePrefs({ hideClosed: state.hideClosed });
+  if (!state.hideClosed) revealedClosed.clear();   // 关掉开关就没有「临时放行」的意义了
   render();
 });
 

@@ -50,7 +50,8 @@ The panel is the view; DSH is the engine.
 
 - **One swimlane per project.** Read every project in a workspace at a glance: milestone lane,
   goal lane, idea lane, execution-record lane. Closed subtrees fold into a `▸ closed N` chip
-  instead of taking up space; execution records never fold, so you always see what just ran.
+  instead of taking up space, and the **Hide closed** display-style toggle removes even that chip
+  (the count moves onto the card's chips); execution records never fold, so you always see what just ran.
 - **Vision first, blockers second.** A milestone starts with a 3–6 sentence vision (≤ 1000 chars) of
   what the project should *become*, then 3–5 blockers: what is missing, which vision step it blocks,
   which module it touches. While blockers exist, **Confirm reached** is disabled in every view —
