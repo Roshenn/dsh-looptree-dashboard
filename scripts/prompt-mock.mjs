@@ -263,6 +263,14 @@ check('prompt_context.refs 生效', ctxText.includes('- 引用：') && ctxText.i
 withCtx.prompt_context = { fields: ['node', 'siblings'], siblings: 1 };
 const sibText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
 check('siblings 条数生效', sibText.includes('- 同级构思：分层 SVG 绘制'), sibText.split('\n').find((l) => l.includes('同级')) || '');
+// 里程碑愿景 / 核心指标是可注入的上下文字段（旧键 milestone.acceptance 保留但不输出幽灵验收）
+withCtx.prompt_context = { fields: ['milestone', 'milestone.vision', 'milestone.metrics'] };
+const msCtxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
+check('里程碑愿景进上下文', msCtxText.includes('- 里程碑愿景：'), '');
+check('核心指标进上下文', msCtxText.includes('- 核心指标：') && msCtxText.includes('三层图各 ≥8 节点'), '');
+withCtx.prompt_context = { fields: ['milestone.acceptance'] };
+const legacyCtxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
+check('旧 milestone.acceptance 不再注入达成判据', !legacyCtxText.includes('达成判据'), '');
 
 /* ── 5. lint 能抓到反例 ── */
 const bad = [
