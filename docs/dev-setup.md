@@ -59,13 +59,13 @@ dir $env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-looptree-dashboard
 # 期望是目录联接/符号链接指回源码
 ```
 
-4. 重启 DSH，左栏应出现「轮转闭环树」。
+4. 重启 DSH，左栏应出现「轮转里程碑树」。
 
 ### 2.4 日常开发回路
 
 ```
 改 lib/*.mjs / lib/*.js   → 重启 DSH（host 模块在启动时加载）
-改 web/index.html、web/*  → 只刷新面板（切走再切回「轮转闭环树」）
+改 web/index.html、web/*  → 只刷新面板（切走再切回「轮转里程碑树」）
 改 lib/client.js          → 重启 DSH（client bundle 启动时加载）
 ```
 

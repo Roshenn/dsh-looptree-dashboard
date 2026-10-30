@@ -63,7 +63,7 @@ curl -s http://127.0.0.1:<端口>/rotation/api/health
 # 2) 面板是否可打开
 open http://127.0.0.1:<端口>/rotation/app/
 
-# 3) 入口：左栏应出现「轮转闭环树」（在「插件 / 自动化任务」之后）
+# 3) 入口：左栏应出现「轮转里程碑树」（在「插件 / 自动化任务」之后）
 #    点它 → 主区打开面板；也可以直接访问上面的 URL
 #    右栏「轮转」标签在 0.2.1-rc.3 实测没有渲染出来（见 README「入口结论」），
 #    以 URL 为准；client 半是否激活可看 document.documentElement.dataset.dshRotation

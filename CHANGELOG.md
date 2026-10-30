@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## 0.12.0 — 闭环改「里程碑」：愿景第一，场景流程下沉目标
+
+- **需求**（2026-10-30）：闭环这个叫法不够宏大、也容易混；里程碑里除了阻碍点更重要的是**愿景描述**。
+  要求：闭环列改「里程碑」、新增愿景字段放在靠前位置、原本的落地场景流程挪到目标里；
+  AI 先基于愿景排查阻碍项，再据阻碍项拆目标——第一层抽象抬高了，后面拆出来的工作才不被限制在功能点上。
+- **数据改名（破坏性，带迁移）**：根字段 `loop` → `milestone`、`kind: "loop"` → `"milestone"`、
+  `closed_loops` → `closed_milestones`（含快照 `kind`）、`prompt_context` 的 `loop.*` → `milestone.*`。
+  **id 永不复用，不重命名**（新项目根 id 用 `-milestone` 后缀，旧 id 保持原样）。
+- **愿景取代意图**：`milestone.intent` → `milestone.vision`（旧文本原样迁移当草稿），
+  口径改为 3–6 句宏大叙事、≤500 字（字段级上限，其余字段仍 300 字），不写功能清单与手段；
+  面板卡片摘要显示愿景首句、详情卡第一行是愿景。
+- **场景流程下沉目标**：`milestone.scenario` → `goal.scenario`，旧的**不复制**——旧文本描述「整个项目走一遍」，
+  落到单个目标会错位；迁移脚本把它写进 `<卡片>.milestone-backup.json` 后删除，由目标详情「生成」按目标 + 对应阻碍重写。
+  目标卡片新增「场景 N 步」chip，里程碑卡片改为「阻碍 N 条」chip。
+- **阻碍项依据愿景**：`composeFillPrompt` 拆成两套口径——里程碑补愿景/阻碍项/达成判据（阻碍项回答「离愿景还差哪一步、
+  缺什么才能跑通」，带「证据要求」块），目标补场景流程/约束/验收。阻碍项非空仍硬拦「确认达成」（三处按钮 + 兜底）。
+- **状态词分两套**：里程碑「待确认达成 / 已达成 / 确认达成」，目标与构思保持「待确认收敛 / 已闭环 / 确认收敛」；
+  KPI 与筛选改中性「已关闭 / 未关闭」；历史弹窗、项目菜单、泳道头文案同步（里程碑历史 / 开新里程碑 / 重开里程碑）。
+- **Prompt 链路**：愿景 →（AI 对照项目现状）阻碍项 → 拆目标（依据愿景 + 阻碍项，**不再有场景块**，每条目标对应一条阻碍、
+  写 `goal.blocker`）→ 目标「生成」落地场景流程 → 目标验收。计划 / 候选 / 拆构思的场景来源从里程碑改为**所属目标**；
+  上下文 keys 增 `milestone.vision` / `milestone.blockers` / `goal.scenario`，旧 `loop.*` 键仍被识别。
+- **兼容与迁移**：`lib/core.mjs` 新增 `normalizeLegacyCard`（读卡即改名，写盘落新结构）——
+  未迁移的旧卡也能正常打开；`npm run migrate:milestone`（默认干跑，`--write` 才写）负责备份旧场景、清旧字段，
+  幂等跳过已迁移卡。3 张真卡已迁移并备份；`goal.constraints`（约束，目标级）保持不动。
+- **面板**：列头「里程碑 / MILESTONE」、页面标题与副标题、`KIND`/`FIELD_LABEL`/`EDIT_FIELDS`/`GEN_FIELDS`/`INFO_FIELDS`
+  全部换名；里程碑详情卡「愿景 → 阻碍项 → 验收」，目标详情卡「落地场景流程 → 对应阻碍（只读）→ 约束 → 验收」；
+  闭环历史快照保留 `vision`/`blockers`/`scenario`/`blocker`。
+- **测试**：`closure-mock` 增 12 项（两套状态词 / 按钮文案 / `normalizeLegacyCard` 六例 / 闸门边界）；
+  `prompt-mock` 断言按新链路重写（里程碑补全的愿景与 500 字上限、阻碍项基于愿景、目标补全场景流程、拆目标无场景块）；
+  session / action / idea-lock / registry mock 的 `loop` 引用全部改 `milestone`。
+- 验证：`npm run preflight` 全绿；`node scripts/migrate-milestone.mjs` 干跑 + `--write` 在 3 张真卡核对
+  （愿景=原 intent、场景进备份、目标场景为空、`closed_milestones` 改名）；dev-host 浏览器核对列头、
+  里程碑详情字段顺序、目标「场景 N 步」与「对应阻碍」、里程碑「确认达成」被阻碍项拦住、目标仍「确认收敛」；版本 0.12.0
+
 ## 0.11.1 — 闭环「约束」改为「阻碍项」：有阻碍不能确认收敛
 
 - **需求**（2026-10-29 english-shadow）：闭环卡片上的「约束」发挥效用不大——它记的是边界与前提，
