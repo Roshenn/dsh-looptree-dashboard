@@ -9,7 +9,7 @@
  *                          → 卡片写入 idea.plan，记录 p1 关闭
  *   POST /api/action/exec  → 同一 session 走 /goal，goal phase 由 active → complete
  *                          → 执行记录关闭，并自动起一次反馈提炼
- *   反馈提炼               → 假 agent 返回 JSON lessons → 写入 loop.lessons，记录 r1 关闭
+ *   反馈提炼               → 假 agent 返回 JSON lessons → 写入 milestone.lessons，记录 r1 关闭
  *
  * 临时 ROTATION_HOME / 工作区，跑完清理；退出码 0 = 全链路通过。
  */
@@ -243,10 +243,10 @@ try {
   const project = await addProject({ id: 'actionmock', name: 'ActionMock', workspace: WS });
   const card = await readCard(project);
   card.project = { ...(card.project || {}), name: 'ActionMock', workspace: WS };
-  card.loop.title = '动作链路烟测';
-  card.loop.intent = '验证生成计划 → 执行计划 → 反馈提炼';
-  card.loop.acceptance = '三条记录关闭、idea.plan 与 loop.lessons 写入';
-  card.loop.children = [{
+  card.milestone.title = '动作链路烟测';
+  card.milestone.vision = '验证生成计划 → 执行计划 → 反馈提炼';
+  card.milestone.acceptance = '三条记录关闭、idea.plan 与 loop.lessons 写入';
+  card.milestone.children = [{
     id: 'am-g1', kind: 'goal', title: '动作链路可跑通', acceptance: '链路断言全绿',
     status: 'doing', closed_at: null,
     children: [{
@@ -280,7 +280,7 @@ try {
   check('/plan 正文不含 markdown 粗体', !planPrompt.includes('**'), '');
 
   let after = await readCard(project);
-  const idea = after.loop.children[0].children[0];
+  const idea = after.milestone.children[0].children[0];
   check('idea.plan 写入目标', !!idea?.plan && /执行列/.test(idea.plan.goal || ''), JSON.stringify(idea?.plan?.goal || null));
   check('idea.plan 有验证命令', Array.isArray(idea?.plan?.verify) && idea.plan.verify.includes('npm run preflight'), JSON.stringify(idea?.plan?.verify || []));
   check('idea.plan 有步骤', Array.isArray(idea?.plan?.steps) && idea.plan.steps.length >= 2, JSON.stringify(idea?.plan?.steps || []));
@@ -312,14 +312,14 @@ try {
   check('执行完成自动触发提炼', !!reflectRun && reflectRun.status === 'done', reflectRun?.status || 'timeout');
 
   after = await readCard(project);
-  const idea2 = after.loop.children[0].children[0];
+  const idea2 = after.milestone.children[0].children[0];
   const eRec = (idea2.children || []).find((n) => n.action === 'exec');
   const rRec = (idea2.children || []).find((n) => n.action === 'reflect');
   check('执行记录已关闭', !!eRec && !!eRec.closed_at, eRec?.id || 'missing');
   check('反馈记录已关闭', !!rRec && !!rRec.closed_at, rRec?.id || 'missing');
   check('记录全闭环后构思自动闭环', !!idea2?.closed_at && idea2.status === 'done', JSON.stringify({ closed_at: idea2?.closed_at || null, status: idea2?.status }));
-  check('同级构思未完成，目标不提前闭环', !after.loop.children[0].closed_at, JSON.stringify(after.loop.children[0].closed_at || null));
-  check('loop.lessons 写入', Array.isArray(after.loop.lessons) && after.loop.lessons.some((l) => /JSON/.test(l.text)), JSON.stringify(after.loop.lessons || []));
+  check('同级构思未完成，目标不提前闭环', !after.milestone.children[0].closed_at, JSON.stringify(after.milestone.children[0].closed_at || null));
+  check('loop.lessons 写入', Array.isArray(after.milestone.lessons) && after.milestone.lessons.some((l) => /JSON/.test(l.text)), JSON.stringify(after.milestone.lessons || []));
 
   // ── 4. 发送预览里改过的正文：原样发出去 ──
   const overrideText = '# 我改过的计划\n\n## 目标\n用改过的正文跑一次';
@@ -341,7 +341,7 @@ try {
 
   // ── 6. prompt 模板发起（POST /run）：要挂 preset，且不能覆盖记录节点的动作会话 ──
   const beforeRun = await readCard(project);
-  const planRec2 = (findNode(beforeRun.loop, 'am-i2')?.children || []).find((n) => n.action === 'plan');
+  const planRec2 = (findNode(beforeRun.milestone, 'am-i2')?.children || []).find((n) => n.action === 'plan');
   const planRecSession = planRec2?.session?.id || '';
   const mountedBefore = mountedPresets;
   const plainRes = await api('/run', {
@@ -356,7 +356,7 @@ try {
   check('模板会话真的 mount 了 preset', mountedPresets > mountedBefore, `${mountedBefore} → ${mountedPresets}`);
   // 回归：普通会话不覆盖记录节点的 session 位（否则计划记录会显示一条从没发过 /plan 的会话）
   const afterRun = await readCard(project);
-  const planRec2b = findNode(afterRun.loop, planRec2?.id);
+  const planRec2b = findNode(afterRun.milestone, planRec2?.id);
   check('记录节点 session 不被普通会话覆盖', (planRec2b?.session?.id || '') === planRecSession,
     `${planRecSession || 'none'} vs ${planRec2b?.session?.id || 'none'}`);
   check('记录节点保持动作会话的结论', planRec2b?.status === 'done' && !!planRec2b?.closed_at, planRec2b?.status || '?');
@@ -364,7 +364,7 @@ try {
   // ── 7. host 不级联：目标 / 闭环必须由面板手动「确认收敛」 ──
   // 把同级构思补成已关闭，让目标满足「子项全闭环」，再跑一次动作确认 host 不会顺手关目标
   const cascadeSeed = await readCard(project);
-  const goalSeed = cascadeSeed.loop.children[0];
+  const goalSeed = cascadeSeed.milestone.children[0];
   const sibling = (goalSeed.children || []).find((k) => k.id === 'am-i2');
   sibling.closed_at = new Date().toISOString();
   sibling.status = 'done';
@@ -373,12 +373,12 @@ try {
   check('级联验证：动作可再次发起', cascadeRes.status === 200, JSON.stringify(cascadeRes.body?.error || ''));
   await waitRunKey(cascadeRes.body?.run?.key);
   const cascadeAfter = await readCard(project);
-  const cascadeIdea = findNode(cascadeAfter.loop, 'am-i1');
+  const cascadeIdea = findNode(cascadeAfter.milestone, 'am-i1');
   check('级联验证：构思仍自动闭环', !!cascadeIdea?.closed_at, JSON.stringify(cascadeIdea?.closed_at || null));
-  check('级联验证：目标不被 host 自动闭环', !cascadeAfter.loop.children[0].closed_at,
-    JSON.stringify(cascadeAfter.loop.children[0].closed_at || null));
-  check('级联验证：闭环不被 host 自动闭环', !cascadeAfter.loop.closed_at,
-    JSON.stringify(cascadeAfter.loop.closed_at || null));
+  check('级联验证：目标不被 host 自动闭环', !cascadeAfter.milestone.children[0].closed_at,
+    JSON.stringify(cascadeAfter.milestone.children[0].closed_at || null));
+  check('级联验证：闭环不被 host 自动闭环', !cascadeAfter.milestone.closed_at,
+    JSON.stringify(cascadeAfter.milestone.closed_at || null));
 } catch (error) {
   ok = false;
   console.error('[action-mock] 异常：', error);

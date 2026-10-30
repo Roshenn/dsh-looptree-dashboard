@@ -83,8 +83,8 @@ const CARD = {
   schema: 'rotation/v1',
   project: { name: '服务收集 Mock', workspace: ws },
   updated: null,
-  loop: {
-    id: 'svc-loop', kind: 'loop', title: '服务信息收集', intent: '自动补齐项目服务',
+  milestone: {
+    id: 'svc-ms', kind: 'milestone', title: '服务信息收集', vision: '自动补齐项目服务',
     acceptance: 'mock 断言全绿', status: 'plan', closed_at: null, children: [],
   },
 };
@@ -93,7 +93,7 @@ const wsC = await mkdtemp(join(tmpdir(), 'rotation-svc-ws-c-'));
 async function seedProject(dir, file, name, loopId) {
   const card = JSON.parse(JSON.stringify(CARD));
   card.project = { name, workspace: dir };
-  card.loop.id = loopId;
+  card.milestone.id = loopId;
   await mkdir(join(dir, '.dsh'), { recursive: true });
   await writeFile(join(dir, '.dsh', 'rotation.json'), JSON.stringify(card, null, 1) + '\n', 'utf8');
   return { id: file.replace('.rotation.json', ''), name, workspace: dir, file };

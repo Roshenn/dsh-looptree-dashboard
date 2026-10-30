@@ -62,9 +62,9 @@ const baseCard = () => ({
   schema: 'rotation/v1',
   project: { name: 'IdeaMock', workspace: ws },
   updated: null,
-  loop: {
-    id: 'im-loop', kind: 'loop', title: '验证一个目标一个构思',
-    intent: '一个目标只能有一个构思', acceptance: 'CLI 断言全绿',
+  milestone: {
+    id: 'im-ms', kind: 'milestone', title: '验证一个目标一个构思',
+    vision: '一个目标只能有一个构思', acceptance: 'CLI 断言全绿',
     status: 'plan', closed_at: null,
     children: [{
       id: 'im-g1', kind: 'goal', title: '目标一', acceptance: '命令通过',
@@ -117,7 +117,7 @@ server.listen(PORT, '127.0.0.1', async () => {
     check('采纳第一条返回 200 + locked', adopted.status === 200 && adopted.body?.locked === true, JSON.stringify(adopted.body));
     check('采纳后 candidate 池清空（remaining=0）', adopted.body?.remaining === 0);
     const after = JSON.parse(await readFile(cardPathOf(project), 'utf8'));
-    const goal = after.loop.children[0];
+    const goal = after.milestone.children[0];
     check('目标下只有 1 个构思', (goal.children || []).filter((k) => k.kind === 'idea').length === 1, JSON.stringify(goal.children?.map((k) => k.kind)));
     const poolAfter = JSON.parse(await readFile(candidatePath(file, 'im-g1'), 'utf8'));
     check('候选文件清空', Array.isArray(poolAfter) && poolAfter.length === 0);
@@ -137,12 +137,12 @@ server.listen(PORT, '127.0.0.1', async () => {
 
     // 4) PUT 加第二个构思 → 422；旧卡原地保存不拦
     const withSecond = JSON.parse(await readFile(cardPathOf(project), 'utf8'));
-    withSecond.loop.children[0].children.push(ideaOf('im-g1-i2', '路线 B'));
+    withSecond.milestone.children[0].children.push(ideaOf('im-g1-i2', '路线 B'));
     const putSecond = await putCard(project, withSecond);
     check('PUT 加第二个构思 → 422 IDEA_EXISTS', putSecond.status === 422 && putSecond.body?.code === 'IDEA_EXISTS', JSON.stringify(putSecond.body));
 
     const legacy = JSON.parse(await readFile(cardPathOf(project), 'utf8'));
-    legacy.loop.children[0].children.push(ideaOf('im-g1-l1', '旧构思一'), ideaOf('im-g1-l2', '旧构思二'));
+    legacy.milestone.children[0].children.push(ideaOf('im-g1-l1', '旧构思一'), ideaOf('im-g1-l2', '旧构思二'));
     await store.writeCard(project, legacy, { lenient: true });
     const putLegacy = await putCard(project, JSON.parse(await readFile(cardPathOf(project), 'utf8')));
     check('旧卡（已有多条构思）原地保存不拦', putLegacy.status === 200, JSON.stringify(putLegacy.body));
@@ -161,7 +161,7 @@ server.listen(PORT, '127.0.0.1', async () => {
       child.on('close', (code) => resolve({ code, out }));
     });
     const migrated = JSON.parse(await readFile(cardPathOf(project), 'utf8'));
-    const ideasNow = (migrated.loop.children[0].children || []).filter((k) => k.kind === 'idea');
+    const ideasNow = (migrated.milestone.children[0].children || []).filter((k) => k.kind === 'idea');
     check('迁移脚本退出码 0', migrate.code === 0, migrate.out.trim().slice(0, 300));
     check('迁移后目标只剩 1 个构思', ideasNow.length === 1, ideasNow.map((k) => k.title).join(','));
     const backup = JSON.parse(await readFile(cardPathOf(project) + '.single-idea-backup.json', 'utf8'));

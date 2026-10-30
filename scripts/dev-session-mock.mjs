@@ -94,7 +94,7 @@ server.listen(PORT, '127.0.0.1', async () => {
   const started = await fetchJson('/run', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ file: project.id, nodeId: project.id + '-loop', prompt: '给我 2 个替代构思', taskId: 'plan' }),
+    body: JSON.stringify({ file: project.id, nodeId: project.id + '-milestone', prompt: '给我 2 个替代构思', taskId: 'plan' }),
   });
   console.log('[mock] POST /run →', started.status, started.body?.run?.status, started.body?.run?.sessionId);
 
@@ -105,7 +105,7 @@ server.listen(PORT, '127.0.0.1', async () => {
 
   await new Promise((r) => setTimeout(r, 120));
   const card = JSON.parse(await readFile(cardPathOf(project), 'utf8'));
-  const node = card.loop.id === project.id + '-loop' ? card.loop : null;
+  const node = card.milestone.id === project.id + '-milestone' ? card.milestone : null;
   console.log('[mock] card session →', JSON.stringify(node?.session || null));
 
   let ok;
@@ -114,7 +114,7 @@ server.listen(PORT, '127.0.0.1', async () => {
   } else if (MODE === 'hang') {
     const cancelled = await fetchJson('/run/cancel', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file: project.id, nodeId: project.id + '-loop' }),
+      body: JSON.stringify({ file: project.id, nodeId: project.id + '-milestone' }),
     });
     ok = cancelled.body?.run?.status === 'cancelled';
   } else {

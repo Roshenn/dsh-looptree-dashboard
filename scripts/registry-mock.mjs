@@ -51,7 +51,7 @@ await mkdir(join(ws, '.dsh'), { recursive: true });
 await writeFile(join(ws, '.dsh', 'rotation.json'), JSON.stringify({
   schema: 'rotation/v1',
   project: { name: '本机 english-shadow', workspace: ws },
-  loop: { id: 'local-loop', kind: 'loop', title: '本机卡片', children: [] },
+  milestone: { id: 'local-milestone', kind: 'milestone', title: '本机卡片', children: [] },
 }, null, 1));
 
 await writeFile(REGISTRY, JSON.stringify([FOREIGN], null, 1));
@@ -67,7 +67,7 @@ check(reg.some((p) => p.workspace === FOREIGN.workspace), '写回时保留别的
 check(reg.some((p) => p.workspace === ws), '本机条目已写入');
 
 const card = JSON.parse(await readFile(join(ws, '.dsh', 'rotation.json'), 'utf8'));
-check(card.loop.id === 'local-loop', '已有卡片没有被模板覆盖');
+check(card.milestone.id === 'local-milestone', '已有卡片没有被模板覆盖');
 
 const local = await store.listProjects();
 check(local.length === 1 && local[0].workspace === ws, '本机项目列表只留本机条目');

@@ -42,7 +42,7 @@ const walk = (node, out = []) => {
   return out;
 };
 const lineOf = (text, index) => String(text).split('\n')[index] || '';
-const titleOk = (text) => /^.{2,40} · (闭环|目标|构思|执行)「.+」$/.test(lineOf(text, 0));
+const titleOk = (text) => /^.{2,40} · (里程碑|目标|构思|执行)「.+」$/.test(lineOf(text, 0));
 const blocksOk = (text) => {
   const lines = String(text).split('\n');
   return lines[1] === '' && lines.filter((line, i) => i > 1 && line.trim() === '').length > 0;
@@ -58,7 +58,7 @@ let nodeCount = 0;
 for (const { f, card } of cards) {
   const name = card.project && card.project.name;
   const workspace = card.project && card.project.workspace;
-  for (const node of walk(card.loop)) {
+  for (const node of walk(card.milestone)) {
     nodeCount += 1;
     let list;
     try {
@@ -145,55 +145,70 @@ check('候选 count 进文案', candIdeaText.includes('给出 4 条'), '');
 check('构思候选带 strength 契约', candIdeaText.includes('"strength"') && candIdeaText.includes('不要用「最小 / 最强」'), '');
 check('执行候选不带 strength', !candText.includes('"strength"'), '');
 check('候选有示例块', candText.includes('\n示例\n'), '');
-// 场景 / 阻碍注入（样例卡没有这两个字段，用夹具）
+// 场景 / 阻碍注入：样例卡里有里程碑阻碍项 + 目标的落地场景流程
 const withCtxFields = JSON.parse(JSON.stringify(fx));
-withCtxFields.loop.scenario = '1) 打开面板\n2) 点「生成计划」看到预览\n3) 确认真实发出';
-withCtxFields.loop.blockers = '1)缺进度持久化（无 POST /api/progress）→ 挡在「练完可恢复」\n2)缺逐句对齐（无 timecode 解析）→ 挡在「逐句跟读」';
+withCtxFields.milestone.blockers = '1)缺进度持久化（无 POST /api/progress）→ 挡在「练完可恢复」\n2)缺逐句对齐（无 timecode 解析）→ 挡在「逐句跟读」';
 const scPlan = composePlanPrompt({ ...fxArgs, card: withCtxFields });
-check('计划注入场景与阻碍', scPlan.includes('\n- 场景：\n') && scPlan.includes('- 阻碍：') && scPlan.includes('缺进度持久化'), '');
-const scCand = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
-check('闭环候选注入阻碍', scCand.includes('\n场景\n') && scCand.includes('- 阻碍：'), '');
+check('计划注入里程碑阻碍', scPlan.includes('- 阻碍：') && scPlan.includes('缺进度持久化'), '');
+check('计划注入目标场景流程', scPlan.includes('- 落地场景流程：') && scPlan.includes('章节编辑区'), '');
+const scCand = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-i1' });
+check('执行候选注入目标场景', scCand.includes('\n场景\n') && scCand.includes('候选不能越出'), '');
 const scCandGoal = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-g1' });
-check('目标候选注入闭环阻碍', scCandGoal.includes('- 闭环阻碍：') && scCandGoal.includes('缺进度持久化'), '');
-// 闭环阻碍项：补全 prompt 要「先核对项目再写缺什么」+ 格式约束 + JSON 契约
-const blockersFill = composeFillPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', fields: ['blockers'] });
-check('补全阻碍项要「证据要求」块', blockersFill.includes('\n证据要求\n'), '');
-check('补全阻碍项要 3–5 条', blockersFill.includes('阻碍项 3–5 条'), '');
-check('补全阻碍项格式：缺什么 → 挡在哪 → 模块', blockersFill.includes('缺什么 → 挡在场景流程第几步 → 涉及模块或文件'), '');
-check('补全阻碍项 JSON 契约', blockersFill.includes('{"blockers": "..."'), '');
-check('补全阻碍项 lint', lintPrompt(blockersFill).warnings.length === 0, JSON.stringify(lintPrompt(blockersFill).warnings.slice(0, 2)));
-// 拆目标：阻碍项 → 每条目标对应一条阻碍，blocker 字段照抄短名
+check('构思候选注入里程碑阻碍', scCandGoal.includes('- 里程碑阻碍：') && scCandGoal.includes('缺进度持久化'), '');
+const ideaVision = composeIdeaPrompt({ ...fxArgs, nodeId: 'sw-g1' });
+check('拆构思注入里程碑愿景', ideaVision.includes('- 所属里程碑愿景：'), '');
+check('拆构思注入目标场景', ideaVision.includes('目标已定的落地场景流程'), '');
+// 里程碑补全：愿景（宏大叙事 / ≤500 字）+ 阻碍项（基于愿景）+ 证据要求 + JSON 契约
+const msFill = composeFillPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', fields: ['vision', 'blockers', 'acceptance'] });
+check('里程碑补全带愿景规则', msFill.includes('愿景 3–6 句'), '');
+check('里程碑补全愿景上限 500', msFill.includes('愿景 ≤500 字'), '');
+check('里程碑补全愿景要宏大叙事', msFill.includes('宏大叙事') && msFill.includes('不写功能清单'), '');
+check('里程碑阻碍项要「证据要求」块', msFill.includes('\n证据要求\n'), '');
+check('里程碑阻碍项格式：缺什么 → 挡在愿景哪一步 → 模块', msFill.includes('缺什么 → 挡在愿景的哪一步 → 涉及模块或文件'), '');
+check('里程碑阻碍项要 3–5 条', msFill.includes('阻碍项 3–5 条'), '');
+check('里程碑补全 JSON 契约', msFill.includes('{"vision": "..."') && msFill.includes('"blockers": "..."'), '');
+check('里程碑补全 lint', lintPrompt(msFill).warnings.length === 0, JSON.stringify(lintPrompt(msFill).warnings.slice(0, 2)));
+// 目标补全：场景流程（操作 / 预期 / 体验 3–5 步），不出现愿景
+const goalFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['scenario', 'constraints', 'acceptance'] });
+check('目标补全带场景流程', goalFill.includes('落地场景流程 3–5 步') && goalFill.includes('操作 / 预期 / 体验'), '');
+check('目标补全不出现愿景', !goalFill.includes('愿景 ≤500'), '');
+check('目标补全 lint', lintPrompt(goalFill).warnings.length === 0, JSON.stringify(lintPrompt(goalFill).warnings.slice(0, 2)));
+// 拆目标：愿景 + 阻碍项（不再有场景块），blocker 契约
 const splitBlockers = composeSplitPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
+check('拆目标注入愿景', splitBlockers.includes('- 愿景：'), '');
 check('拆目标注入已知阻碍', splitBlockers.includes('- 已知阻碍项：') && splitBlockers.includes('缺进度持久化'), '');
+check('拆目标不再出场景块', !splitBlockers.includes('\n场景\n'), '');
 check('拆目标要每条对应阻碍', splitBlockers.includes('每条目标对应一条阻碍项'), '');
 check('拆目标 blocker 契约', splitBlockers.includes('"blocker":"…"'), '');
 check('拆目标照抄阻碍短名', splitBlockers.includes('照抄阻碍项原文的短名'), '');
 check('拆目标 lint（带阻碍）', lintPrompt(splitBlockers).warnings.length === 0, JSON.stringify(lintPrompt(splitBlockers).warnings.slice(0, 2)));
 const noBlockerCard = JSON.parse(JSON.stringify(fx));
-delete noBlockerCard.loop.blockers;
+delete noBlockerCard.milestone.blockers;
 const splitNoBlockers = composeSplitPrompt({ ...fxArgs, card: noBlockerCard, nodeId: 'sw-loop' });
 check('无阻碍时拆目标不带 blocker 契约', !splitNoBlockers.includes('"blocker"'), '');
+check('无阻碍时拆目标按愿景缺口拆', splitNoBlockers.includes('离愿景还差什么'), '');
 // 目标仍有「约束」：补全与拆构思都按约束口径，不混成阻碍
 const goalConstraintsFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['constraints'] });
 check('目标补全仍是约束口径', goalConstraintsFill.includes('- 约束 3–5 条') && !goalConstraintsFill.includes('阻碍项'), '');
 const withGoalLimits = JSON.parse(JSON.stringify(fx));
-withGoalLimits.loop.children[0].constraints = '不改公开 API';
+withGoalLimits.milestone.children[0].constraints = '不改公开 API';
 const ideaLimited = composeIdeaPrompt({ ...fxArgs, card: withGoalLimits, nodeId: 'sw-g1' });
 check('拆构思仍注入目标约束', ideaLimited.includes('- 目标约束：不改公开 API'), '');
 const accIdea = JSON.parse(JSON.stringify(fx));
-accIdea.loop.children[0].children[0].acceptance = '章节与情节可双向查询';
+accIdea.milestone.children[0].children[0].acceptance = '章节与情节可双向查询';
 const accPlan = composePlanPrompt({ ...fxArgs, card: accIdea });
 check('构思自己的验收单独成块', accPlan.includes('\n验收\n- 章节与情节可双向查询'), '');
 // 长字段卡片（真实卡可能几百字场景/阻碍/验收）：裁剪预算必须兜住 1500 字 + 72 列
 const longCard = JSON.parse(JSON.stringify(fx));
-longCard.loop.scenario = Array.from({ length: 6 }, (_, i) => `${i + 1})操作：打开面板选择项目\n预期：看到预览\n体验：10 秒内完成`).join('\n');
-longCard.loop.blockers = Array.from({ length: 5 }, (_, i) => `${i + 1})缺第${i + 1}个模块（src/mod${i + 1}.ts 无实现）→ 挡在「练完可恢复」这一步`).join('\n');
-longCard.loop.children[0].acceptance = Array.from({ length: 5 }, (_, i) => `${i + 1})步骤${i + 1}：pnpm test:e2e 用例全绿且新增断言可复现`).join('；');
+longCard.milestone.children[0].scenario = Array.from({ length: 6 }, (_, i) => `${i + 1})操作：打开面板选择项目\n预期：看到预览\n体验：10 秒内完成`).join('\n');
+longCard.milestone.blockers = Array.from({ length: 5 }, (_, i) => `${i + 1})缺第${i + 1}个模块（src/mod${i + 1}.ts 无实现）→ 挡在「练完可恢复」这一步`).join('\n');
+longCard.milestone.children[0].acceptance = Array.from({ length: 5 }, (_, i) => `${i + 1})步骤${i + 1}：pnpm test:e2e 用例全绿且新增断言可复现`).join('；');
 const longPlan = composePlanPrompt({ ...fxArgs, card: longCard });
 const longWarn = lintPrompt(longPlan, { maxLength: 1500 }).warnings;
 check('长字段卡片：计划仍 ≤1500 字', [...longPlan].length <= 1500, String([...longPlan].length));
 check('长字段卡片：计划 lint 无警告（含 72 列）', longWarn.length === 0, JSON.stringify(longWarn.slice(0, 2)));
 check('长字段裁掉后有「全文见卡片」提示', longPlan.includes('（全文见卡片）'), '');
+
 // /goal 计划指针：240 字用来写「计划在哪」，不内联步骤
 const pointerXr = composeGoalObjective({ ...fxArgs, card: readCard('execution-records.rotation.json'), nodeId: 'xr-i1' });
 check('/goal 指向卡片文件', pointerXr.includes('/.dsh/rotation.json'), pointerXr.slice(0, 60));
@@ -221,7 +236,7 @@ check('收集服务：无已有服务时写「无」',
 
 /* ── 4. 模板优先级与 prompt_context 配置 ── */
 const custom = JSON.parse(JSON.stringify(fx));
-custom.loop.children[0].children[0].prompts = [{ id: 'mine', title: '我的模板', ask: '只输出一句话结论。' }];
+custom.milestone.children[0].children[0].prompts = [{ id: 'mine', title: '我的模板', ask: '只输出一句话结论。' }];
 const nodeList = listTaskPrompts({ projectName: 'X', card: custom, nodeId: 'sw-i1' });
 check('节点自定义模板优先', nodeList.from === '节点自定义' && nodeList.list[0].id === 'mine', nodeList.from);
 const withCtx = JSON.parse(JSON.stringify(fx));

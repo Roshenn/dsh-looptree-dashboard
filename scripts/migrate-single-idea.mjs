@@ -40,7 +40,7 @@ function planCard(card) {
     }
     (Array.isArray(n.children) ? n.children : []).forEach(walk);
   };
-  walk(card.loop);
+  walk(card.milestone);
   return moved;
 }
 
