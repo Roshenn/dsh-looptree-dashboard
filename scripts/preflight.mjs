@@ -49,6 +49,8 @@ try {
   await run(npm, ['run', 'mock:stale-run']);
   console.log('── mock:idle ──');
   await run(npm, ['run', 'mock:idle']);
+  console.log('── mock:genbtn ──');
+  await run(npm, ['run', 'mock:genbtn']);
   console.log('── validate:samples ──');
   await run(npm, ['run', 'validate:samples']);
   console.log('── verify:package ──');

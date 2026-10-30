@@ -507,13 +507,17 @@
   .editval[data-edit="blockers"]{-webkit-line-clamp:4}
   .detail-row .fielddd{display:flex;gap:6px;align-items:flex-start}
   .detail-row .fielddd .editval{flex:1;min-width:0}
-  /* 标题/路径右侧的「生成」：按标题补齐缺失字段 */
+  /* 卡片下缘 / 详情动作行的「生成 N 项」：按标题补齐缺失字段 */
   .detail-path-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
   .detail-path-row .detail-path{margin-bottom:0;flex:1;min-width:0}
   .genbtn{flex:0 0 auto;height:22px;padding:0 9px;font-size:11px;
     color:var(--brand-2);border-color:color-mix(in srgb,var(--brand) 40%,var(--b2))}
   .genbtn:hover{background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-2)}
   .genbtn:disabled{opacity:.45;cursor:default}
+  /* 缺项 > 0 即高亮（「刚生成」的节点天然字段全空）：描边强调而非实底，别和橙色主按钮抢焦点 */
+  .genbtn.is-hot{background:color-mix(in srgb,var(--brand) 13%,transparent);
+    border-color:color-mix(in srgb,var(--brand) 58%,var(--b2));
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--brand) 18%,transparent)}
   .detail-row.editing{grid-template-columns:1fr}
   .detail-row.editing dt{margin-bottom:4px}
   .dfield.expand{width:100%;min-height:104px;resize:vertical;font-size:12px;line-height:1.6}
@@ -1961,6 +1965,9 @@ function nodeMarkup(n, p){
   const leafCloseBtn = leafCanClose
     ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>`
     : '';
+  // 「生成 N 项」紧跟确认收敛 / 确认达成右侧（2026-10-30 用户要求：按钮从详情标题行挪到卡片下缘）。
+  // 收敛按钮在隐藏态（子节点没关完 / 从没衍生）时，它顶到 footer 左端，位置不变
+  const genBtn = (isContainer && p) ? genBtnMarkup(p, n) : '';
   const addKind = n.kind==='milestone' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
   // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
   // 构思卡不再抽候选：改为「生成计划 / 执行计划」，目标卡与里程碑卡保持候选池
@@ -1995,8 +2002,9 @@ function nodeMarkup(n, p){
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     candGen, candPool, ideaActs, viewSess,
   ].filter(Boolean).join('');
-  // 收敛 / 达成落在 footer 左端（footer 里唯一贴左边的内容），右侧留给「继续生成」那组动作
-  const lead = closeBtn ? `<span class="lead">${closeBtn}</span>` : '';
+  // 收敛 / 达成落在 footer 左端；「生成 N 项」紧跟其右侧（同一组 lead），右侧留给「继续生成」那组动作
+  const leadKids = [closeBtn, genBtn].filter(Boolean).join('');
+  const lead = leadKids ? `<span class="lead">${leadKids}</span>` : '';
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${idleMode ? ` data-idle="${idleMode}"` : ''}${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
       <span class="kind">${kindLabel(n)}</span>
@@ -3716,21 +3724,9 @@ function detailMarkup(p, n){
   // 执行记录（计划 / 执行 / 反馈）没有描述字段：详情卡只留动作、会话、耗时、结果这些只读信息
   const rec = isRecord(n);
   const fields = rec ? [] : (EDIT_FIELDS[n.kind] || []);
-  // 「生成」：标题是唯一必需项；有标题就能把其余空字段一次补出来
-  const GEN_FIELDS = { milestone: ['vision', 'blockers', 'metrics'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
-  const genFields = rec ? [] : (GEN_FIELDS[n.kind] || []);
-  const genMissing = genFields.filter(f => !String(r[f] || '').trim());
-  const hasTitle = !isBlankTitle(n.title);
-  const canGen = hasTitle && genMissing.length > 0;
-  const genLabel = canGen ? `生成 ${genMissing.length} 项` : '生成';
-  const genTitle = canGen
-    ? '按标题补全：' + genMissing.map(f => FIELD_LABEL[f] || f).join('、')
-    : (hasTitle ? '没有缺失项' : '先写标题，再用它生成其余字段');
-  // 这一类节点没有可补的字段（构思、执行记录）：整颗按钮都不出现，不留一个永远灰着的「生成」
-  const genBtn = genFields.length
-    ? `<button class="tbtn genbtn" data-gen="1" data-nid="${n.id}" data-proj="${p.id}"
-        ${canGen ? '' : 'disabled'} title="${genTitle}">${genLabel}</button>`
-    : '';
+  // 「生成 N 项」：标题是唯一必需项；有标题就能把其余空字段一次补出来。
+  // 2026-10-30：按钮从详情标题行挪到节点卡下缘（确认收敛右侧），详情卡放进动作行同一顺序
+  const genBtn = genBtnMarkup(p, n);
   const editableRows = fields.map((f) => {
     return `<div class="detail-row editable" data-field="${f}" data-nid="${n.id}" data-proj="${p.id}">
        <dt>${FIELD_LABEL[f]}</dt>
@@ -3799,6 +3795,7 @@ function detailMarkup(p, n){
     detailContainer
       ? convergeBtnMarkup(n, 'primary')
       : (canClose ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>` : ''),
+    genBtn,
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     ideaActs, candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
@@ -3814,7 +3811,6 @@ function detailMarkup(p, n){
     <h3 class="detail-title" data-nid="${n.id}" data-proj="${p.id}" title="点击编辑标题">${esc(n.title)}</h3>
     <div class="detail-path-row">
       <div class="detail-path">${pathHtml}</div>
-      ${genBtn}
     </div>
     <dl class="detail-sec" style="margin-top:0;padding-top:0;border-top:0">
       <div class="detail-row"><dt>状态</dt>
@@ -4039,6 +4035,29 @@ async function viewSession(sessionId){
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
     构思与执行记录没有可补的字段（方案已退役、记录只留只读信息），这里给空数组把入口关掉 */
 const GEN_FIELDS_CLIENT = { milestone: ['vision', 'blockers', 'metrics'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
+/** 缺项判据：与 generateMissing 共用同一份字段表，文案与高亮都从这一处派生 */
+function genStateOf(n){
+  const rec = isRecord(n);
+  const fields = rec ? [] : (GEN_FIELDS_CLIENT[n.kind] || []);
+  const raw = (n && n.raw) || {};
+  const missing = fields.filter(f => !String(raw[f] || '').trim());
+  return { fields, missing, hasTitle: !isBlankTitle(n && n.title) };
+}
+/**
+ * 「生成 N 项」按钮：节点卡下缘（确认收敛右侧）与详情卡动作行共用同一个出口。
+ * 高亮判据：缺项 > 0 就亮——「刚生成」的节点天然字段全空，补完自动变灰「无缺项」。
+ */
+function genBtnMarkup(p, n){
+  const st = genStateOf(n);
+  if (!st.fields.length) return '';       // 构思 / 执行记录没有可补字段：整颗按钮不出现
+  const canGen = st.hasTitle && st.missing.length > 0;
+  const label = canGen ? `生成 ${st.missing.length} 项` : (st.hasTitle ? '无缺项' : '生成');
+  const tip = canGen
+    ? '按标题补全：' + st.missing.map(f => FIELD_LABEL[f] || f).join('、')
+    : (st.hasTitle ? '没有缺失项' : '先写标题，再用它生成其余字段');
+  return `<button class="tbtn genbtn${canGen ? ' is-hot' : ''}" data-gen="1" data-nid="${n.id}" data-proj="${p.id}"
+    ${canGen ? '' : 'disabled'} title="${esc(tip)}">${label}</button>`;
+}
 /* ─────────── 候选池 ─────────── */
 const CAND_POOL = new Map();     // `${file}::${nodeId}` → 候选数组
 const CAND_COUNTS = new Map();   // `${file}::${nodeId}` → 候选条数（按项目批量拉，节点卡直接用）
