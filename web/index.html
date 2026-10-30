@@ -489,17 +489,12 @@
   .fp-hint{font-size:10.5px;color:var(--tx4)}
   #fp-items{margin:12px 16px 0;display:flex;flex-direction:column;gap:8px;max-height:min(52vh,480px);overflow:auto;padding-right:2px}
   .fp-item{border-radius:10px;border:1px solid color-mix(in srgb,var(--b2) 60%,transparent);overflow:hidden;
-    background:var(--p-bg);transition:box-shadow 120ms var(--ease-out),transform 120ms var(--ease-out);
-    display:grid;grid-template-columns:86px minmax(0,1fr);align-items:stretch}
-  .fp-item[data-drag="1"]{opacity:.45}
-  .fp-item[data-over="1"]{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 45%,transparent)}
-  .fp-item-head{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 6px;cursor:grab;
-    user-select:none;border-right:1px solid color-mix(in srgb,var(--b2) 55%,transparent);
-    background:color-mix(in srgb,#fff 24%,transparent)}
-  .fp-item-head:active{cursor:grabbing}
-  .fp-grip{color:var(--tx4);font-size:12px;letter-spacing:-1px}
-  .fp-idx{font-size:11px;font-weight:600;color:var(--tx2);font-variant-numeric:tabular-nums;min-width:18px}
-  .fp-item-note{font-size:10.5px;color:var(--tx4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    background:var(--p-bg);transition:box-shadow 120ms var(--ease-out);
+    display:grid;grid-template-columns:40px minmax(0,1fr);align-items:stretch}
+  .fp-item:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 32%,transparent)}
+  .fp-item-idx{display:flex;align-items:flex-start;justify-content:center;padding:11px 0 0;
+    font-size:11px;font-weight:600;color:var(--tx4);font-variant-numeric:tabular-nums;user-select:none;
+    border-right:1px solid color-mix(in srgb,var(--b2) 45%,transparent)}
   .fp-item-body{width:100%;border:0;background:transparent;color:var(--tx1);font-family:inherit;
     font-size:12.5px;line-height:1.65;padding:10px 12px;resize:vertical;min-height:56px;outline:none;display:block}
   .fp-item-body:focus{background:color-mix(in srgb,#fff 26%,transparent)}
@@ -2530,7 +2525,7 @@ function editProjectVision(){
   const p = PROJECTS.find(x => x.id === ctx.pid);
   if (!p || !p.card) return;
   const current = projectVisionOf(p);
-  openFieldEditor('项目愿景', current, '项目 · ' + p.name, 1000).then(async (next) => {
+  openFieldEditor('项目愿景', current, '项目 · ' + p.name, 1000, { text: true }).then(async (next) => {
     if (next == null) return;                       // Esc 取消
     const trimmed = next.trim();
     if (trimmed === current) return;
@@ -3075,6 +3070,8 @@ const isBlankTitle = (t) => {
 /* 可点开直接改的字段：构思只留标题（「方案」2026-10-29 退役），不改描述类字段 */
 const EDIT_FIELDS = { milestone:['vision','blockers','metrics'], goal:['scenario','constraints','acceptance'], idea:[], exec:['verify','proof'] };
 const FIELD_LABEL = { 'title':'标题', vision:'里程碑愿景', blockers:'阻碍项', blocker:'对应阻碍', metrics:'核心指标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
+/** 段落字段：叙事文本，编辑器里是一个文本框（不拆条目）；其余字段按「一条一块」编辑 */
+const TEXT_EDITOR_FIELDS = new Set(['vision']);
 
 /* ─────────── Prompt：查看 / 变更 / 发送 ───────────
  * 合成只有一份实现（host 的 lib/prompt.mjs），面板通过 GET /api/prompts 取；
@@ -4199,7 +4196,8 @@ function startEdit(field, anchor){
   const value = String(n0.raw[field] || '');
   const nodeLabel = `${KIND[n0.kind] || n0.kind} · ${n0.title || n0.id}`;
   const maxLen = field === 'vision' ? 1000 : 300;   // 里程碑愿景是长叙事，其余字段仍 300
-  openFieldEditor(FIELD_LABEL[field] || field, value, nodeLabel, maxLen).then(async (next) => {
+  // 段落字段（愿景）用单文本框；其余按条目编辑
+  openFieldEditor(FIELD_LABEL[field] || field, value, nodeLabel, maxLen, { text: TEXT_EDITOR_FIELDS.has(field) }).then(async (next) => {
     if (next == null) return;                       // Esc 取消
     const trimmed = next.trim();
     if (trimmed === String(value).trim()) return;
@@ -4287,19 +4285,27 @@ function serializeItems(parsed, items){
   return parsed.preamble ? `${parsed.preamble}${parsed.separator}${body}` : body;
 }
 
-function openFieldEditor(label, value, nodeLabel, maxLen = 300){
+/**
+ * 大号字段编辑器。
+ * - 段落字段（里程碑愿景 / 项目愿景，opts.text）：一个文本框，不拆条目——愿景是叙事，不是清单；
+ * - 条目字段（阻碍项 / 核心指标 / 验收 / 场景…）：一条一个彩色块，序号只做静态标注，不支持拖拽排序
+ *   （顺序靠直接改文本，拖拽的收益不值这份复杂度）。
+ */
+function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
   const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input'), listEl = $('#fp-items');
   if (!pop || !input) return Promise.resolve(null);
   $('#fp-label').textContent = label;
   $('#fp-node').textContent = nodeLabel || '';
 
-  const parsed = parseItems(value);
-  let items = parsed.items.map((x) => ({ ...x }));
-  const numbered = parsed.mode === 'numbered';
+  const textMode = !!opts.text;
+  const raw = String(value == null ? '' : value);
+  const parsed = textMode ? null : parseItems(raw);
+  let items = textMode ? [] : parsed.items.map((x) => ({ ...x }));
+  const numbered = !textMode && parsed.mode === 'numbered';
 
   const count = $('#fp-count');
   const MAXLEN = maxLen;
-  const serialized = () => serializeItems(parsed, items);
+  const serialized = () => (textMode ? String(input.value || '') : serializeItems(parsed, items));
   const syncCount = () => {
     if (!count) return;
     const n = serialized().length;
@@ -4313,78 +4319,51 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300){
     el.style.height = Math.min(Math.max(el.scrollHeight + 2, 56), 280) + 'px';
   };
 
-  /** 渲染条目列表（结构化模式） */
+  /** 渲染条目列表（结构化模式）：只读序号 + 每条一个文本框，不拖拽 */
   function renderItems(){
     if (!listEl) return;
     listEl.innerHTML = items.map((it, i) => `
-      <div class="fp-item" data-hue="${i % 6}" data-i="${i}" draggable="false">
-        <div class="fp-item-head" draggable="true" data-grip="${i}" title="拖拽调整顺序">
-          <span class="fp-grip">⠿</span>
-          ${numbered ? `<span class="fp-idx">${i + 1}</span>` : ''}
-        </div>
+      <div class="fp-item" data-hue="${i % 6}" data-i="${i}">
+        <div class="fp-item-idx">${numbered ? i + 1 : '·'}</div>
         <textarea class="fp-item-body" data-body="${i}" rows="2" spellcheck="false">${esc(it.content || '')}</textarea>
       </div>`).join('');
     listEl.querySelectorAll('[data-body]').forEach((el) => {
       el.addEventListener('input', () => {
         const idx = Number(el.dataset.body);
         if (items[idx]) items[idx].content = el.value;
-        const note = el.closest('.fp-item')?.querySelector('.fp-item-note');
-        if (note) note.textContent = el.value.split('\n')[0].slice(0, 28);
         autosize(el);
         syncCount();
       });
     });
-    listEl.querySelectorAll('.fp-item-head').forEach((head) => {
-      head.addEventListener('dragstart', (event) => {
-        dragFrom = Number(head.dataset.grip);
-        event.dataTransfer.effectAllowed = 'move';
-        try { event.dataTransfer.setData('text/plain', String(dragFrom)); } catch { /* noop */ }
-        head.closest('.fp-item')?.setAttribute('data-drag', '1');
-      });
-      head.addEventListener('dragend', () => {
-        dragFrom = null;
-        listEl.querySelectorAll('.fp-item').forEach((node) => node.removeAttribute('data-drag'));
-        listEl.querySelectorAll('.fp-item').forEach((node) => node.removeAttribute('data-over'));
-      });
-    });
-    listEl.querySelectorAll('.fp-item').forEach((row) => {
-      row.addEventListener('dragover', (event) => {
-        if (dragFrom == null) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        listEl.querySelectorAll('.fp-item').forEach((node) => node.removeAttribute('data-over'));
-        row.setAttribute('data-over', '1');
-      });
-      row.addEventListener('dragleave', () => row.removeAttribute('data-over'));
-      row.addEventListener('drop', (event) => {
-        event.preventDefault();
-        const to = Number(row.dataset.i);
-        if (dragFrom == null || dragFrom === to) return;
-        const [moved] = items.splice(dragFrom, 1);
-        items.splice(to, 0, moved);
-        dragFrom = null;
-        renderItems();
-        syncCount();
-      });
-    });
   }
 
-  input.hidden = true;
-  if (listEl) listEl.hidden = false;
-  renderItems();
-  syncCount();
-  pop.hidden = false;
-  mask.hidden = false;
-  if (listEl){
-    const bodies = listEl.querySelectorAll('.fp-item-body');
-    bodies.forEach(autosize);
-    requestAnimationFrame(() => bodies.forEach(autosize));
+  if (textMode){
+    // 段落字段：一个大文本框，不拆条目
+    input.value = raw;
+    input.hidden = false;
+    if (listEl) listEl.hidden = true;
+    pop.hidden = false;
+    mask.hidden = false;
+    syncCount();
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  } else {
+    input.hidden = true;
+    if (listEl) listEl.hidden = false;
+    renderItems();
+    syncCount();
+    pop.hidden = false;
+    mask.hidden = false;
+    if (listEl){
+      const bodies = listEl.querySelectorAll('.fp-item-body');
+      bodies.forEach(autosize);
+      requestAnimationFrame(() => bodies.forEach(autosize));
+    }
+    listEl?.querySelector('.fp-item-body')?.focus();
   }
-  (listEl?.querySelector('.fp-item-body') || input).focus();
 
   return new Promise((resolve) => {
     let settled = false;
-    let dragFrom = null;
     const finish = (result) => {
       if (settled) return;
       settled = true;
@@ -4406,7 +4385,7 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300){
       suppressDocTimer = setTimeout(() => { suppressDocClick = false; }, 600);
       resolve(result);
     };
-    const current = () => serializeItems(parsed, items);
+    const current = () => (textMode ? String(input.value || '') : serializeItems(parsed, items));
     const onInput = () => syncCount();
     const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(current()); };
     const onCancelBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(null); };
