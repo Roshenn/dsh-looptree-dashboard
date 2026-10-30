@@ -4799,6 +4799,10 @@ async function startAllServices(){
   setSvcAllBusy(true, '检测端口…');
   try {
     const { status, j } = await postSvcAll('/services/start-all');
+    if (status === 404 || status === 501){   // 旧宿主：批量接口还没注册
+      toast('宿主还是旧版：重启 DSH 后再试（/api/services/start-all 未加载）');
+      return;
+    }
     if (status === 409 || (j.conflicts && j.conflicts.length)){
       askInfo('端口冲突 · 已阻止拉起', svcConflictHtml(j.conflicts));
       return;
@@ -4836,8 +4840,18 @@ async function stopAllServices(){
   if (!API_BASE) return toast('未连接服务：需在 DSH 或本地服务里打开面板');
   setSvcAllBusy(true, '读取端口…');
   let info = null;
-  try { const r = await fetch(api('/services/all?probe=0')); if (r.ok) info = await r.json(); } catch {}
+  let hostOld = false;
+  try {
+    const r = await fetch(api('/services/all?probe=0'));
+    if (r.ok) info = await r.json();
+    else if (r.status === 404 || r.status === 501) hostOld = true;
+  } catch {}
   setSvcAllBusy(false);
+  if (hostOld){
+    askInfo('需要重启 DSH', `<div class="mnote">当前 DSH 里加载的还是旧版 host 代码，<code>/api/services/all</code> 还没注册。
+      刷新页面只会更新面板界面，不会重新加载 host 模块——重启 DSH 后这两个按钮才可用。</div>`);
+    return;
+  }
   const list = (info && info.services) || [];
   const local = list.filter((s) => isLocalServiceHost(svcHostOf(s)));
   const remoteCount = list.length - local.length;

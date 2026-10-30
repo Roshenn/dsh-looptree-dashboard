@@ -17,6 +17,7 @@
     `POST /api/services/stop-all`（按端口并行关闭，单端口失败只记录；远程地址进 skipped）。
   - 面板 `web/index.html`：工具栏加「拉起全部服务」「关闭全部服务」，冲突与结果用只读弹窗摊开，
     关闭前先列端口清单确认；请求中按钮锁住并显示阶段；只读弹窗只留「知道了」。
+    连到还没加载批量接口的旧宿主时（404 / 501）直接提示「重启 DSH」，不给含糊的失败提示。
   - 新 `scripts/services-batch-mock.mjs`（73 条断言：端口解析、冲突口径、probe=0、缺命令跳过、
     五类 pid 解析器、win32/mac/linux 杀进程策略、不杀宿主自身、远程地址不参与）并接进
     `npm run preflight`；README 中英文与 `docs/architecture.md` 同步。
