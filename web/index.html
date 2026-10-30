@@ -1271,20 +1271,38 @@ function activeAncestorOf(p, n){
 const IDLE_KINDS = ['milestone', 'goal', 'idea'];   // 执行记录是日志，不算分支
 /**
  * 项目内的可开工分支模型（纯函数：isBusy / isBlocked 外部注入，mock 直接抽这段跑断言）。
- *   running = 自身有 live run
- *   frozen  = 祖先有 live run（被上游冻住，起不了会话）
- *   blocked = 有未处置问题（红边已经够显眼，不再叠青绿）
- *   idle    = 其余
+ *   running            = 自身有 live run
+ *   frozen             = 祖先有 live run（被上游冻住，起不了会话）
+ *   descendant-running = 子节点 / 后代里有 live run（工作已经派下去了，父节点不再算「可开工」）
+ *   blocked            = 有未处置问题（红边已经够显眼，不再叠青绿）
+ *   idle               = 其余
  * 单条分支的项目最多到 modest（弱强调）；≥2 条才 strong（强高亮）。
  */
 function idleModelOf(project, isBusy, isBlocked) {
+  const nodes = [];
+  (function collect(n) { nodes.push(n); (n.children || []).forEach(collect); })(project.root);
+  const selfBusy = new Map();
+  nodes.forEach(n => selfBusy.set(n.id, !!(isBusy && isBusy(n))));
+  // 子树里有没有人在跑（自底向上）：子集在跑时，父节点不是「可开工」——
+  // 否则里程碑一边显示「可开工」、一边三个目标都在跑，读起来是自相矛盾的。
+  const subBusy = new Map();
+  for (let i = nodes.length - 1; i >= 0; i -= 1) {
+    const n = nodes[i];
+    let busy = selfBusy.get(n.id);
+    (n.children || []).forEach(k => { if (subBusy.get(k.id)) busy = true; });
+    subBusy.set(n.id, busy);
+  }
   const rows = [];
   (function dfs(n, ancestorBusy) {
-    const busy = !!(isBusy && isBusy(n));
+    const busy = selfBusy.get(n.id);
     if (IDLE_KINDS.includes(n.kind) && !n.closed) {
+      const childBusy = (n.children || []).some(k => subBusy.get(k.id));
       rows.push({
         node: n,
-        state: busy ? 'running' : ancestorBusy ? 'frozen' : ((isBlocked && isBlocked(n)) ? 'blocked' : 'idle'),
+        state: busy ? 'running'
+          : ancestorBusy ? 'frozen'
+            : childBusy ? 'descendant-running'
+              : ((isBlocked && isBlocked(n)) ? 'blocked' : 'idle'),
       });
     }
     const nextBusy = ancestorBusy || busy;

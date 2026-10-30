@@ -88,8 +88,9 @@ The panel is the view; DSH is the engine.
   cannot start a session while an ancestor is running — and marks the branches you can start on now:
   a `ready` tag plus a teal rail on the card, `running N · ready N` in the lane head, and a clickable
   **idle branch →** footer that scrolls to it. A lone branch that is running lights nothing up; a lone
-  idle branch gets a quiet emphasis. Single-versus-multiple is counted per project, and no new field
-  is written to the card.
+  idle branch gets a quiet emphasis. A parent whose children are running stays dark, so you never see
+  "milestone ready" next to three running goals. Single-versus-multiple is counted per project, and no
+  new field is written to the card.
 
 ## See it work
 

@@ -88,7 +88,25 @@ const pair = project(node('m', 'milestone', { kids: [node('g1', 'goal'), node('g
 const mPair = idleModelOf(pair, (n) => n.id === 'g2', none);
 ok('两条分支 → mode=strong', mPair.mode === 'strong', mPair.mode);
 ok('在跑的 g2 记 running，且不在空闲集合', mPair.running.length === 1 && !mPair.idleIds.has('g2'));
-ok('空闲的是 m 与 g1', mPair.idleIds.has('m') && mPair.idleIds.has('g1'), [...mPair.idleIds].join(','));
+ok('有子节点在跑 → 里程碑不算空闲（只剩 g1）', !mPair.idleIds.has('m') && mPair.idleIds.has('g1'), [...mPair.idleIds].join(','));
+ok('父节点记 descendant-running', mPair.rows.find((r) => r.node.id === 'm').state === 'descendant-running');
+
+/* ─── 3b) 子节点在跑时，父节点不再出现「可开工」（否则一边可开工、一边子集在跑，自相矛盾） ─── */
+const runningKid = project(node('m', 'milestone', { kids: [node('g1', 'goal'), node('g2', 'goal')] }));
+const mRunningKid = idleModelOf(runningKid, (n) => n.id === 'g1', none);
+ok('一个子节点在跑 → 父节点 descendant-running', mRunningKid.rows.find((r) => r.node.id === 'm').state === 'descendant-running');
+ok('另一个没跑的子节点仍可开工', mRunningKid.idleIds.has('g2') && !mRunningKid.idleIds.has('m'), [...mRunningKid.idleIds].join(','));
+
+/* ─── 3c) 孙子在跑 → 祖父也不算可开工 ─── */
+const nested = project(node('m', 'milestone', { kids: [node('g1', 'goal', { kids: [node('i1', 'idea', { kids: [node('e1', 'exec')] })] })] }));
+const mNested = idleModelOf(nested, (n) => n.id === 'i1', none);
+ok('构思在跑 → 目标 descendant-running', mNested.rows.find((r) => r.node.id === 'g1').state === 'descendant-running');
+ok('构思在跑 → 里程碑 descendant-running', mNested.rows.find((r) => r.node.id === 'm').state === 'descendant-running');
+ok('子孙在跑 → 整条链都不算空闲', mNested.idle.length === 0 && mNested.mode === 'none', [...mNested.idleIds].join(','));
+
+/* ─── 3d) 子节点跑完 → 父节点重新变回可开工 ─── */
+const mKidDone = idleModelOf(runningKid, none, none);
+ok('子节点全部跑完 → 父节点重新 idle', mKidDone.idleIds.has('m') && mKidDone.mode === 'strong', [...mKidDone.idleIds].join(','));
 
 /* ─── 4) 祖先在跑 → 后代 frozen，不算空闲（并行规范的核心） ─── */
 const mFrozen = idleModelOf(pair, (n) => n.id === 'm', none);
