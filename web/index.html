@@ -1057,7 +1057,7 @@ const MOCK_PROJECTS = [
 function countItems(text){
   const raw = String(text || '').trim();
   if (!raw) return 0;
-  const hits = raw.match(/(?:^|\n)\s*(?:[A-Z][.、)]|\d+[.)]|[-•*])\s+/g);
+  const hits = raw.match(/(?:^|\n)\s*(?:[A-Z][.、)]|\d+[.)]|[-•*○◯·∙▪◦]|[①-⑳])\s*/g);
   return hits ? hits.length : 0;
 }
 
@@ -4637,7 +4637,8 @@ function startEdit(field, anchor){
 
 /** 大号字段编辑器：返回 Promise<新文本 | null>（失焦=保存并关闭，Esc=取消） */
 let fieldEditorResolve = null;
-const ITEM_RE = /^\s*(?:(\d+)[.、)]\s*|([A-Za-z])[.、)]\s*|([一二三四五六七八九十]+)[、.]\s*|[-•*]\s+)(.*)$/;
+// 序号 / 符号都算「一条的起点」：模型爱用 ○ · ① 这类符号，不认它就会把 5 条揉成一块
+const ITEM_RE = /^\s*(?:(\d+)[.、)]\s*|([A-Za-z])[.、)]\s*|([一二三四五六七八九十]+)[、.]\s*|([-•*○◯·∙▪◦]|[①-⑳])\s*)(.*)$/;
 
 /** 去掉正文里自带的前缀序号（步骤3: / 第2步 / ③ / (4)），避免和左栏编号打架 */
 const ORDINAL_PREFIX_RE = /^\s*(?:步骤\s*[0-9一二三四五六七八九十]+|第\s*[0-9一二三四五六七八九十]+\s*步?|[①-⑳]|[（(]?[0-9]{1,2}[)）.、:：])\s*[:：.、,，\-—]?\s*/;
@@ -4668,7 +4669,7 @@ function parseItems(text){
       const m = line.match(ITEM_RE);
       if (m){
         if (current) items.push(current);
-        current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: stripOrdinalPrefix(m[4] || '') };
+        current = { markerKind: m[1] ? 'num' : m[2] ? 'alpha' : m[3] ? 'han' : 'dash', content: stripOrdinalPrefix(m[5] || '') };
       } else if (current){
         current.content += (current.content ? '\n' : '') + line;
       } else {

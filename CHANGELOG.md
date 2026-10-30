@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 0.14.6 — 列表字段改 JSON 数组，阻碍项不再揉成一块
+
+- **问题**（2026-10-30，用户截图）：补全阻碍项后 5 条挤在编辑器的一个条目里。根因不是模型乱写——
+  它按「一条一行」写了 `○` 前缀 + 单换行；是 `parseItems()` 只认 `1) A. 一、 -` 这类标记，
+  认不出 `○` 就退回 plain 模式（只按**空行**切），5 条变 1 块。同一时刻卡片 chips 按行数仍显示
+  「阻碍 5 条」，两边口径打架。
+- **澄清结论（用户拍板）**：生成端列表字段改 **JSON 数组**契约；解析端**扩充符号白名单**；
+  范围＝所有列表字段（阻碍项 / 核心指标 / 验收 / 约束 / 场景）；**不改存量**，打开编辑器即拆。
+- **改动**：
+  - `lib/prompt.mjs`：补全输出契约按字段分型——列表字段 `{"blockers": ["…", "…"]}`，
+    字符串字段保持 `{"vision": "..."}`；约束块写明「一条一个元素、元素内不换行、行首不要加 ○ · • 符号」。
+  - `lib/core.mjs`：新增 `LIST_FIELDS` 与 `normalizeListValue()`——数组/旧字符串统一成
+    「一条一行、每行 `N)`」，剥掉 `1) A. 一、 ● ○ ①` 前缀再重编号；`1.5 倍`、`89 份…` 这类开头不误剥。
+  - `lib/index.js`：`applyFillResult` 对列表字段走 `normalizeListValue`（旧字符串结果同样兜底）。
+  - `web/index.html`：`ITEM_RE` 扩到 `[-•*○◯·∙▪◦]` 与 `[①-⑳]`；`parseItems` 取 content 分组跟着改；
+    `countItems` 同步认这些符号（验收 chips 计数不再漏）。
+  - `scripts/list-fields-mock.mjs` 新增 25 条断言（归一 / 混用标记 / 小数保护 / 符号解析 / round-trip /
+    接线），接进 `preflight`；`prompt-mock` 的补全契约断言改为数组。
+  - 文档：`docs/prompts.md` 规则 11 + 字段表；`docs/prompt-audit/templates.md` §8.4；`rotation-card-spec.md` 补口径。
+- **验证**：`mock:list-fields` 25/25；`mock:prompt` 全绿；`preflight` 全绿；假 ctx 实测 `POST /api/fill`
+  （模型返回数组）落盘为 `1)…\n2)…`；浏览器打开历史融合的阻碍项编辑器已拆成多条。
+
 ## 0.14.5 — 显示风格加「隐藏已闭环」
 
 - **需求**（2026-10-30，用户截图）：已闭环节点只能靠「▸ 已闭环 N」折叠行收起来，

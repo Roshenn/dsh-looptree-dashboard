@@ -53,6 +53,8 @@ try {
   await run(npm, ['run', 'mock:genbtn']);
   console.log('── mock:hide-closed ──');
   await run(npm, ['run', 'mock:hide-closed']);
+  console.log('── mock:list-fields ──');
+  await run(npm, ['run', 'mock:list-fields']);
   console.log('── validate:samples ──');
   await run(npm, ['run', 'validate:samples']);
   console.log('── verify:package ──');

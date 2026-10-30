@@ -126,7 +126,7 @@ check('拆构思要 JSON ideas', ideaText.includes('{"ideas"'));
 const candText = composeCandidatePrompt({ ...fxArgs, nodeId: 'sw-i1', count: 3 });
 check('候选要 JSON 数组', candText.includes('[{"title"'));
 const fillText = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['acceptance'] });
-check('补全要 JSON 对象', fillText.includes('{"acceptance": "..."'));
+check('补全要 JSON 对象', fillText.includes('{"acceptance": ["…", "…"]'));
 check('补全带字段上限', fillText.includes('≤300 字'));
 
 /* ── 3.5 新块与两个信息通道（docs/prompt-audit §3.3 / §3.4 / §3.6） ── */
@@ -192,7 +192,12 @@ check('核心指标从里程碑愿景反推', msFill.includes('从里程碑标�
 check('核心指标不写验收命令', msFill.includes('不写测试命令') && msFill.includes('验收另有流程'), '');
 check('核心指标可长期对比', msFill.includes('看得出是变好还是变差'), '');
 check('里程碑补全不再产出验收', !msFill.includes('达成判据') && !msFill.includes('验收 3–5 条'), '');
-check('里程碑补全 JSON 契约', msFill.includes('{"vision": "..."') && msFill.includes('"blockers": "..."') && msFill.includes('"metrics": "..."'), '');
+check('里程碑补全 JSON 契约：愿景字符串、列表字段数组',
+  msFill.includes('{"vision": "..."')
+  && msFill.includes('"blockers": ["…", "…"]')
+  && msFill.includes('"metrics": ["…", "…"]'), msFill.split('\n').filter((x) => x.includes('blockers')).join(' | '));
+check('列表字段写明「一条一个元素」', msFill.includes('一条一个元素'), '');
+check('列表字段禁止符号前缀', msFill.includes('行首不要加 ○ · • 这类符号'), '');
 check('里程碑补全 lint', lintPrompt(msFill).warnings.length === 0, JSON.stringify(lintPrompt(msFill).warnings.slice(0, 2)));
 // 目标补全：场景流程（操作 / 预期 / 体验 3–5 步），不出现愿景
 const goalFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['scenario', 'constraints', 'acceptance'] });
