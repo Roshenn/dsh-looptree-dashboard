@@ -147,6 +147,8 @@ check('执行候选不带 strength', !candText.includes('"strength"'), '');
 check('候选有示例块', candText.includes('\n示例\n'), '');
 // 场景 / 阻碍注入：样例卡里有里程碑阻碍项 + 目标的落地场景流程
 const withCtxFields = JSON.parse(JSON.stringify(fx));
+withCtxFields.project.vision = '作者改一段情节，视觉与结构同时更新，评审不用再截图对稿。';
+withCtxFields.milestone.metrics = '1)任意一章改完，三层图同步刷新且无残影\n2)首屏渲染 < 800ms';
 withCtxFields.milestone.blockers = '1)缺进度持久化（无 POST /api/progress）→ 挡在「练完可恢复」\n2)缺逐句对齐（无 timecode 解析）→ 挡在「逐句跟读」';
 const scPlan = composePlanPrompt({ ...fxArgs, card: withCtxFields });
 check('计划注入里程碑阻碍', scPlan.includes('- 阻碍：') && scPlan.includes('缺进度持久化'), '');
@@ -158,15 +160,21 @@ check('构思候选注入里程碑阻碍', scCandGoal.includes('- 里程碑阻�
 const ideaVision = composeIdeaPrompt({ ...fxArgs, nodeId: 'sw-g1' });
 check('拆构思注入里程碑愿景', ideaVision.includes('- 所属里程碑愿景：'), '');
 check('拆构思注入目标场景', ideaVision.includes('目标已定的落地场景流程'), '');
-// 里程碑补全：愿景（宏大叙事 / ≤500 字）+ 阻碍项（基于愿景）+ 证据要求 + JSON 契约
-const msFill = composeFillPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', fields: ['vision', 'blockers', 'acceptance'] });
-check('里程碑补全带愿景规则', msFill.includes('愿景 3–6 句'), '');
-check('里程碑补全愿景上限 1000', msFill.includes('愿景 ≤1000 字'), '');
+// 里程碑补全：里程碑愿景（宏大叙事 / ≤1000 字）+ 阻碍项 + 核心指标（2–5 条，不是验收）+ JSON 契约
+const msFill = composeFillPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', fields: ['vision', 'blockers', 'metrics'] });
+check('里程碑补全带愿景规则', msFill.includes('里程碑愿景 3–6 句'), '');
+check('里程碑补全愿景上限 1000', msFill.includes('里程碑愿景 ≤1000 字'), '');
 check('里程碑补全愿景要宏大叙事', msFill.includes('宏大叙事') && msFill.includes('不写功能清单'), '');
 check('里程碑阻碍项要「证据要求」块', msFill.includes('\n证据要求\n'), '');
 check('里程碑阻碍项格式：缺什么 → 挡在愿景哪一步 → 模块', msFill.includes('缺什么 → 挡在愿景的哪一步 → 涉及模块或文件'), '');
 check('里程碑阻碍项要 3–5 条', msFill.includes('阻碍项 3–5 条'), '');
-check('里程碑补全 JSON 契约', msFill.includes('{"vision": "..."') && msFill.includes('"blockers": "..."'), '');
+check('里程碑补全注入项目愿景', msFill.includes('- 项目愿景：') && msFill.includes('视觉与结构同时更新'), '');
+check('里程碑补全要核心指标 2–5 条', msFill.includes('核心指标 2–5 条'), '');
+check('核心指标从里程碑愿景反推', msFill.includes('从里程碑标题与里程碑愿景反推'), '');
+check('核心指标不写验收命令', msFill.includes('不写测试命令') && msFill.includes('验收另有流程'), '');
+check('核心指标可长期对比', msFill.includes('看得出是变好还是变差'), '');
+check('里程碑补全不再产出验收', !msFill.includes('达成判据') && !msFill.includes('验收 3–5 条'), '');
+check('里程碑补全 JSON 契约', msFill.includes('{"vision": "..."') && msFill.includes('"blockers": "..."') && msFill.includes('"metrics": "..."'), '');
 check('里程碑补全 lint', lintPrompt(msFill).warnings.length === 0, JSON.stringify(lintPrompt(msFill).warnings.slice(0, 2)));
 // 目标补全：场景流程（操作 / 预期 / 体验 3–5 步），不出现愿景
 const goalFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-g1', fields: ['scenario', 'constraints', 'acceptance'] });
@@ -175,7 +183,9 @@ check('目标补全不出现愿景', !goalFill.includes('愿景 ≤500'), '');
 check('目标补全 lint', lintPrompt(goalFill).warnings.length === 0, JSON.stringify(lintPrompt(goalFill).warnings.slice(0, 2)));
 // 拆目标：愿景 + 阻碍项（不再有场景块），blocker 契约
 const splitBlockers = composeSplitPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
-check('拆目标注入愿景', splitBlockers.includes('- 愿景：'), '');
+check('拆目标注入里程碑愿景', splitBlockers.includes('- 里程碑愿景：'), '');
+check('拆目标注入核心指标', splitBlockers.includes('- 核心指标：') && splitBlockers.includes('三层图同步刷新'), '');
+check('拆目标不再注入验收判据', !splitBlockers.includes('达成判据'), '');
 check('拆目标注入已知阻碍', splitBlockers.includes('- 已知阻碍项：') && splitBlockers.includes('缺进度持久化'), '');
 check('拆目标不再出场景块', !splitBlockers.includes('\n场景\n'), '');
 check('拆目标要每条对应阻碍', splitBlockers.includes('每条目标对应一条阻碍项'), '');
