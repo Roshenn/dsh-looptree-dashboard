@@ -15,9 +15,11 @@ DSH 进程
 │   ├─ /rotation/api/projects       注册表读写
 │   ├─ /rotation/api/cards          卡片读写（PUT 走 validate → tmp+rename 原子写）
 │   ├─ /rotation/api/run*           节点会话（lib/runner.mjs → ctx.agents）
-├─ /rotation/api/prompts        prompt 合成（lib/prompt.mjs，只读）
-└─ /rotation/api/service*       服务探活 / 拉起 / 停止（lib/services.mjs）
-    └─ /rotation/api/services*  服务收集（AI 会话 → 草稿 → 预览探活 → 写回）
+│   ├─ /rotation/api/prompts        prompt 合成（lib/prompt.mjs，只读）
+│   ├─ /rotation/api/service*       单个服务拉起 / 停止（lib/services.mjs）
+│   ├─ /rotation/api/services/all   全部项目的服务、端口与冲突
+│   ├─ /rotation/api/services/start-all · stop-all   跨项目批量拉起（有冲突整批拒绝）/ 按端口关闭
+│   └─ /rotation/api/services*      服务收集（AI 会话 → 草稿 → 预览探活 → 写回）
 └─ client 半 lib/client.js          （__ModuleLoader__ 模块）
     └─ sidebar.right.pane.tab       右栏「轮转」入口 → 打开 /rotation/app/
 ```
@@ -71,7 +73,7 @@ lib/index.js      宿主插件入口（路由 + 装配）
 lib/prompt.mjs    prompt 唯一实现（结构规范 / 合成 / lint，host 与测试共用）
 lib/store.mjs     注册表 / 卡片读写
 lib/runner.mjs    会话执行器
-lib/services.mjs  服务探活与拉起
+lib/services.mjs  服务探活、单个/批量拉起、按端口关闭（端口解析与冲突检测也在这里）
 lib/core.mjs      rotation/v1 校验（host 与 CLI 共用）
 lib/client.js     浏览器侧入口
 web/              面板本体（index.html + cards.js 兜底数据）
@@ -87,6 +89,7 @@ samples/          5 张样例卡（也是校验样例）
 | host 半路由 | `npm run dev` → `/rotation/api/health` |
 | 面板 + 发起会话联调 | `MOCK_AGENTS=1 npm run dev`（假 agent，状态会走 运行中→完成） |
 | 会话状态机 | `npm run mock:session`（done / failed / cancelled） |
+| 全部服务批量控制（端口冲突 / 按端口杀进程） | `npm run mock:services-batch` |
 | client 半契约 | `npm run mock:client` |
 | 装进 DSH 后 | `npm run check`（health / panel / registry） |
 | 全量 | `npm run preflight` |

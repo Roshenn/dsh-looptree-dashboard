@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## 0.13.3 — 全部项目服务：一键拉起 / 一键关闭 + 端口冲突预检
+
+> 版本号顺延：这条原记为 0.13.0（远端线），与本地 0.13.x 线（项目愿景 / 里程碑愿景 / 核心指标）合并后取 0.13.3。
+
+- **需求**（2026-10-30）：面板只能逐个服务点「一键拉起 / 停止」，要两个跨项目的批量按钮来操作
+  所有项目配置的端口；拉起前必须检测所有服务的端口冲突，有冲突则无法一键拉起。
+  澄清结论（用户拍板）：冲突只看 `rotation.json` 配置里同一端口被多个服务占用（不探测系统实际
+  占用）；已在线的服务跳过、继续拉其余；关闭按端口杀监听进程（含终端里手动起的）；
+  没有当前平台启动命令的服务跳过并提示。
+- **改动**：
+  - host `lib/services.mjs`：`portOf`（url → 端口，http 80 / https 443）、`findPortConflicts`、
+    `isLocalServiceHost` / `splitStopTargets`（只把本机回环端口当关闭目标）；可注入的命令执行器与
+    pid 解析（PowerShell / netstat / lsof / ss）；`createPortKiller`（Windows `taskkill /F /T`，
+    mac/linux 先 SIGTERM 再 SIGKILL）；`createServiceRunner` 暴露 `killPort` / `pidsOnPort`。
+  - host `lib/index.js` 三条批量路由：`GET /api/services/all`（`?probe=0` 静态枚举、省掉逐个探活）、
+    `POST /api/services/start-all`（冲突 409 且一个都不拉，在线 / 缺命令进 skipped）、
+    `POST /api/services/stop-all`（按端口并行关闭，单端口失败只记录；远程地址进 skipped）。
+  - 面板 `web/index.html`：工具栏加「拉起全部服务」「关闭全部服务」，冲突与结果用只读弹窗摊开，
+    关闭前先列端口清单确认；请求中按钮锁住并显示阶段；只读弹窗只留「知道了」。
+    连到还没加载批量接口的旧宿主时（404 / 501）直接提示「重启 DSH」，不给含糊的失败提示。
+  - 新 `scripts/services-batch-mock.mjs`（73 条断言：端口解析、冲突口径、probe=0、缺命令跳过、
+    五类 pid 解析器、win32/mac/linux 杀进程策略、不杀宿主自身、远程地址不参与）并接进
+    `npm run preflight`；README 中英文与 `docs/architecture.md` 同步。
+- **验证**：`npm run preflight` 全绿；`npm run mock:services-batch` 73/73、`npm run mock:services`
+  27/27 无回归；真实 Windows 集成——临时项目 + 3 个 node 监听，一键拉起后三个端口 LISTENING，
+  二次拉起全部 skipped，一键关闭后端口无监听且 `killed` 带 pid；面板浏览器实测：拉起结果弹窗、
+  端口冲突 409 弹窗（列出 :41210 的两个占用方）、关闭确认弹窗与端口释放。版本 0.13.0
+
 ## 0.13.2 — 条目字段可添加 / 删除条目
 
 - **需求**（2026-10-30）：去掉拖拽后，条目字段（核心指标 / 阻碍项 / 验收 / 场景）没法新增第 2 条——
@@ -54,7 +82,28 @@
 - 验证：`npm run preflight` 全绿；浏览器实测里程碑详情卡字段顺序、项目信息弹窗编辑并落盘 `project.vision`、
   核心指标编辑落盘 `milestone.metrics`；`npm run validate:samples` 6/6 通过。版本 0.13.0
 
+## 0.12.2 — README 标准化 + MIT 许可
+
+- **需求**（2026-10-30）：README 488 行、两个 H1，正文其实是开发日志，缺首屏定位、安装步骤与 License；
+  要求按流行 DSH 插件（modsearch / modlens / dsh-market / dsh-TUI / dsh-context）的骨架重排，
+  许可证定为 **MIT**。
+- **改动**：
+  - `README.md` 改成英文标准结构：banner → 一句话定位 → 语言切换 → badges → Why → Features →
+    See it work → Installation → Usage → Data model → HTTP API → Configuration → Security →
+    Known limitations → Development → Documentation 索引 → Contributing → License；
+  - 新增 `README.zh-CN.md` 中文对照，两版顶部互链、章节一一对应；
+  - 旧 README 全文归档到 `docs/devlog.md`（顶部加归档说明、标注已过期项，图片链接改指 `../assets/`），信息不丢；
+  - 新增 `LICENSE`（MIT，© 2026 jrri）；`package.json` 补 `license` / `author` / `repository` /
+    `homepage` / `bugs` / `keywords`（含 `dsh-plugin`），`files` 加 `assets`，版本 0.12.2；
+  - 9 张 `preview-*.png` 从仓库根目录移到 `assets/`，并补现版 UI 截图（`hero` / `detail` /
+    `prompt-structure`），README 首屏与「看效果」统一引用；
+  - `INSTALL.md` 里指向 README「入口结论」的链接改指 `docs/devlog.md`。
+- **验证**：本机 `npm run preflight` 红在 `mock:registry`（7 项）——已在 HEAD 的干净 worktree 复现，
+  与本次改动无关：本机 `~/.dsh/rotation/registry.json` 有一条 `english-shadow`，mock 的临时
+  `ROTATION_HOME` 没把它隔离掉。文档改动按 AGENTS.md 走人工核对（章节对应、链接、图片路径）。版本 0.12.2
+
 ## 0.12.1 — 愿景上限放宽到 1000 字
+
 
 - **需求**（2026-10-30）：愿景是宏大叙事，300 字（0.12.0 里放宽到 500 字）仍然不够写清「变成什么样」，
   上限改为 **1000 字**；其余长字段仍是 300 字。
