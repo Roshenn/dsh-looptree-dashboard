@@ -811,6 +811,19 @@
   </div>
 </div>
 
+<div class="modal" id="projinfo" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="projinfo-title" style="width:min(560px,94vw)">
+    <div class="modal-head">
+      <span id="projinfo-title">项目信息</span>
+      <button class="modal-x" id="projinfo-x" aria-label="关闭项目信息">✕</button>
+    </div>
+    <div class="modal-body" id="projinfo-body"></div>
+    <div class="modal-foot">
+      <button class="tbtn" id="projinfo-close">关闭</button>
+    </div>
+  </div>
+</div>
+
 <div class="addmenu" id="addmenu" hidden role="menu" aria-label="添加子节点"></div>
 <div class="addmenu" id="prjmenu" hidden role="menu" aria-label="项目菜单"></div>
 
@@ -1025,9 +1038,12 @@ function cardToProject(card, file){
       if (byKind.goal) out.push(`${byKind.goal} 目标`);
       if (byKind.idea) out.push(`${byKind.idea} 构思`);
       if (byKind.exec) out.push(`${byKind.exec} 执行`);
-      const accItems = countItems(n.acceptance);
+      const accItems = n.kind === 'milestone' ? 0 : countItems(n.acceptance);
       if (accItems >= 3) out.push(`验收 ${accItems} 项`);
       if (n.kind === 'milestone') {
+        // 核心指标按行数算：一行一条，不要求带编号标记
+        const metricItems = String(n.metrics || '').trim().split('\n').filter((line) => line.trim()).length;
+        if (metricItems) out.push(`核心指标 ${metricItems} 项`);
         const blk = String(n.blockers || '').trim().split('\n').filter((line) => line.trim()).length;
         if (blk) out.push(`阻碍 ${blk} 条`);
       }
@@ -1040,7 +1056,7 @@ function cardToProject(card, file){
     meta: isRec ? '' : (n.kind === 'exec'
       ? summarizeField(n.verify, '验证')
       : (n.kind === 'milestone'
-        ? (summarizeField(n.vision, '愿景') || summarizeField(n.acceptance, '达成'))
+        ? summarizeField(n.vision, '里程碑愿景')
         : summarizeField(n.acceptance, '验收'))),
     issues: (n.issues || []).filter(i => !i.resolved_at).map(i => i.text),
     children: (n.children || []).map(conv),
@@ -1052,6 +1068,7 @@ function cardToProject(card, file){
   const proj = {
     id: 'card-' + root.id,
     name: (card.project && card.project.name) || '未命名里程碑',
+    projectVision: (card.project && card.project.vision) || '',
     tag: tail || '未绑定工作区',
     session: '', sessions: [], trail: [],
     file: file || '',
@@ -1075,7 +1092,7 @@ function countExecItems(root){
 /** 历史快照只保留回看需要的字段：结构完整，不背 session / 计划全文 */
 function compactMilestoneSnapshot(node){
   if (!node || typeof node !== 'object') return null;
-  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','acceptance','blockers','blocker','verify','proof','action','lessons'];
+  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','vision','metrics','acceptance','blockers','blocker','verify','proof','action','lessons'];
   const out = {};
   KEEP.forEach((k) => { if (node[k] != null) out[k] = node[k]; });
   if (Array.isArray(node.issues) && node.issues.length){
@@ -1293,7 +1310,7 @@ function blockerGate(n){ return !!n && n.kind === 'milestone' && !n.closed && !!
 function blockerGateTip(n){ return `还有 ${blockerCountOf(n)} 条阻碍项：先在「阻碍项」里清空或消除后才能确认达成`; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
 // 构思没有「方案」字段（2026-10-29 退役），所以这里也不再拿它判「有内容」
-const INFO_FIELDS = ['vision','scenario','blockers','constraints','acceptance','verify','proof'];
+const INFO_FIELDS = ['vision','metrics','scenario','blockers','constraints','acceptance','verify','proof'];
 // 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
 const PLACEHOLDER_RE = /^[（(]待补[）)]/;
 function isFilled(v){
@@ -1981,7 +1998,7 @@ function laneMarkup(p){
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}">
     <div class="lane-head">
       <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}${stateChip}
-        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
+        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标${closed ? ' · 已达成' : gated ? ` · 阻碍 ${blockerCountOf(p.root)} 条未清` : (canConverge ? ' · 待确认达成' : '关闭')}</div>
       ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
@@ -2085,7 +2102,7 @@ function renderFocus(){
       <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}">
         <div class="lane-head">
           <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>
-        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
+        ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
           ${(p.root.closed || canConverge) ? `<div class="lane-actions">
@@ -2337,7 +2354,7 @@ function chooseAddMenu(which){
   }
 }
 
-/* ─────────── 项目菜单：服务信息收集 / 移除项目 ─────────── */
+/* ─────────── 项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 移除项目 ─────────── */
 let projMenuCtx = null;                   // { pid, btn }
 const collecting = new Map();             // file -> { status:'running'|'failed', error?, at }
 
@@ -2349,7 +2366,12 @@ function openProjMenu(btn){
   const running = busy && busy.status === 'running';
   const histCount = closedMilestonesOf(p).length;
   const closedLoop = !!p.root.closed;
+  const hasVision = !!String(p.card && p.card.project && p.card.project.vision || '').trim();
   menu.innerHTML = `
+    <button type="button" data-prj-act="info" role="menuitem">
+      <span>项目信息</span><span class="am-sub">${hasVision ? '已填愿景' : '未填愿景'}</span>
+    </button>
+    <div class="am-sep"></div>
     <button type="button" class="am-ai${running ? ' is-locked' : ''}" data-prj-act="collect" role="menuitem"${running ? ' aria-disabled="true"' : ''}>
       <span>服务信息收集</span><span class="am-sub">${running ? '收集中…' : 'AI 读项目后填 services'}</span>
     </button>
@@ -2398,7 +2420,8 @@ function chooseProjMenu(act){
   if (!ctx) return;
   const p = PROJECTS.find(x => x.id === ctx.pid);
   if (!p) return;
-  if (act === 'collect') collectServices(p);
+  if (act === 'info') openProjectInfo(p);
+  else if (act === 'collect') collectServices(p);
   else if (act === 'history') openProjectHistory(p);
   else if (act === 'new-loop') newLoopConfirm(p);
   else if (act === 'reopen-loop') reopenNode(p.root.id);
@@ -2472,10 +2495,54 @@ function openHistorySnapshot(entry){
       <span class="grow"></span>
       <span class="hist-meta">收敛于 ${esc(fmtHistTime(entry.closed_at))}</span>
     </div>
-    <div class="mnote" style="margin-bottom:4px">${esc(snap.vision || '（没有记录愿景）')}</div>
+    <div class="mnote" style="margin-bottom:4px">${esc(snap.vision || '（没有记录里程碑愿景）')}</div>
     <div class="hist-tree">${historyTreeHtml(snap, 0)}</div>`;
 }
 function closeHistory(){ hideModal($('#history')); historyCtx = null; }
+
+/* ─────────── 项目信息：项目名 / 工作区 / 卡片 / 里程碑 + 项目愿景 ─────────── */
+let projInfoCtx = null;   // { pid }
+function projectVisionOf(p){
+  return String((p && p.card && p.card.project && p.card.project.vision) || '').trim();
+}
+function projectInfoBody(p){
+  const proj = (p.card && p.card.project) || {};
+  const vision = projectVisionOf(p);
+  const updated = p.card && p.card.updated ? fmtHistTime(p.card.updated) : '—';
+  return `<div class="detail-row"><dt>项目名</dt><dd>${esc(p.name)}</dd></div>
+    <div class="detail-row"><dt>工作区</dt><dd class="mono">${esc(proj.workspace || p.tag || '—')}</dd></div>
+    <div class="detail-row"><dt>卡片</dt><dd class="mono">${esc(p.file || '—')}</dd></div>
+    <div class="detail-row"><dt>更新</dt><dd class="mono">${esc(updated)}</dd></div>
+    <div class="detail-row"><dt>当前里程碑</dt><dd>${esc((p.root && p.root.title) || '—')}</dd></div>
+    <div class="detail-row"><dt>项目愿景</dt><dd class="fielddd"><button class="editval${vision ? '' : ' empty'}" data-proj-vision="1" title="点击编辑项目愿景：这个项目最终要变成什么样">${vision ? esc(vision) : '点击填写'}</button></dd></div>`;
+}
+function openProjectInfo(p){
+  if (!p || !p.card) return;
+  projInfoCtx = { pid: p.id };
+  $('#projinfo-title').textContent = `项目信息 · ${p.name}`;
+  $('#projinfo-body').innerHTML = projectInfoBody(p);
+  showModal($('#projinfo'));
+}
+function closeProjInfo(){ hideModal($('#projinfo')); projInfoCtx = null; }
+function editProjectVision(){
+  const ctx = projInfoCtx;
+  if (!ctx) return;
+  const p = PROJECTS.find(x => x.id === ctx.pid);
+  if (!p || !p.card) return;
+  const current = projectVisionOf(p);
+  openFieldEditor('项目愿景', current, '项目 · ' + p.name, 1000).then(async (next) => {
+    if (next == null) return;                       // Esc 取消
+    const trimmed = next.trim();
+    if (trimmed === current) return;
+    p.card.project = p.card.project || {};
+    p.card.project.vision = trimmed;
+    p.projectVision = trimmed;
+    $('#projinfo-body').innerHTML = projectInfoBody(p);
+    const res = await persist(p);
+    if (!res.ok) toast('保存失败：' + res.error);
+    else if (res.warnings && res.warnings.length) toast('已保存（有警告：' + res.warnings[0] + '）');
+  });
+}
 
 /* ─────────── 开新里程碑 / 重开 ─────────── */
 function hasActiveRunFor(p){
@@ -2511,7 +2578,7 @@ function newLoopConfirm(p){
         title: '新里程碑（待命名）',
         vision: '',
         blockers: '',
-        acceptance: '（待补）达成判据',
+        metrics: '（待补）核心指标',
         status: 'plan',
         closed_at: null,
         children: [],
@@ -3006,8 +3073,8 @@ const isBlankTitle = (t) => {
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
 /* 可点开直接改的字段：构思只留标题（「方案」2026-10-29 退役），不改描述类字段 */
-const EDIT_FIELDS = { milestone:['vision','blockers','acceptance'], goal:['scenario','constraints','acceptance'], idea:[], exec:['verify','proof'] };
-const FIELD_LABEL = { 'title':'标题', vision:'愿景', blockers:'阻碍项', blocker:'对应阻碍', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
+const EDIT_FIELDS = { milestone:['vision','blockers','metrics'], goal:['scenario','constraints','acceptance'], idea:[], exec:['verify','proof'] };
+const FIELD_LABEL = { 'title':'标题', vision:'里程碑愿景', blockers:'阻碍项', blocker:'对应阻碍', metrics:'核心指标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
 
 /* ─────────── Prompt：查看 / 变更 / 发送 ───────────
  * 合成只有一份实现（host 的 lib/prompt.mjs），面板通过 GET /api/prompts 取；
@@ -3299,7 +3366,7 @@ function detailMarkup(p, n){
   const rec = isRecord(n);
   const fields = rec ? [] : (EDIT_FIELDS[n.kind] || []);
   // 「生成」：标题是唯一必需项；有标题就能把其余空字段一次补出来
-  const GEN_FIELDS = { milestone: ['vision', 'blockers', 'acceptance'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
+  const GEN_FIELDS = { milestone: ['vision', 'blockers', 'metrics'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
   const genFields = rec ? [] : (GEN_FIELDS[n.kind] || []);
   const genMissing = genFields.filter(f => !String(r[f] || '').trim());
   const hasTitle = !isBlankTitle(n.title);
@@ -3622,7 +3689,7 @@ async function viewSession(sessionId){
 
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
     构思与执行记录没有可补的字段（方案已退役、记录只留只读信息），这里给空数组把入口关掉 */
-const GEN_FIELDS_CLIENT = { milestone: ['vision', 'blockers', 'acceptance'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
+const GEN_FIELDS_CLIENT = { milestone: ['vision', 'blockers', 'metrics'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
 /* ─────────── 候选池 ─────────── */
 const CAND_POOL = new Map();     // `${file}::${nodeId}` → 候选数组
 const CAND_COUNTS = new Map();   // `${file}::${nodeId}` → 候选条数（按项目批量拉，节点卡直接用）
@@ -4131,7 +4198,7 @@ function startEdit(field, anchor){
   if (!p0 || !n0) return;
   const value = String(n0.raw[field] || '');
   const nodeLabel = `${KIND[n0.kind] || n0.kind} · ${n0.title || n0.id}`;
-  const maxLen = field === 'vision' ? 1000 : 300;   // 愿景是长叙事，其余字段仍 300
+  const maxLen = field === 'vision' ? 1000 : 300;   // 里程碑愿景是长叙事，其余字段仍 300
   openFieldEditor(FIELD_LABEL[field] || field, value, nodeLabel, maxLen).then(async (next) => {
     if (next == null) return;                       // Esc 取消
     const trimmed = next.trim();
@@ -4643,11 +4710,15 @@ $('#history').addEventListener('keydown', (e) => {
   const entry = historyCtx.list[Number(row.dataset.histView)];
   if (entry) openHistorySnapshot(entry);
 });
+$('#projinfo-x').addEventListener('click', closeProjInfo);
+$('#projinfo-close').addEventListener('click', closeProjInfo);
+$('#projinfo').addEventListener('click', (e) => { if (e.target.id === 'projinfo') closeProjInfo(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('#addmenu').hidden) { closeAddMenu(); return; }
   if (!$('#prjmenu').hidden) { closeProjMenu(); return; }
-  if (!$('#history').hidden) closeHistory();
+  if (!$('#projinfo').hidden) closeProjInfo();
+  else if (!$('#history').hidden) closeHistory();
   else if (!$('#ask').hidden) hideModal($('#ask'));
   else if (!$('#launch').hidden) closeLaunch();
   else if (!$('#modal').hidden) closeConfirm();
@@ -5355,6 +5426,8 @@ document.addEventListener('click', (e)=>{
   if (exp){ const p0 = PROJECTS.find(x=>x.id===exp.dataset.export); if (p0) exportCard(p0); return; }
   const sess = e.target.closest('[data-sess]');
   if (sess){ toast(`已请求切回会话 ${sess.dataset.sess}（原型未接宿主）`); return; }
+  const projVisionBtn = e.target.closest('[data-proj-vision]');
+  if (projVisionBtn){ e.stopPropagation(); editProjectVision(); return; }
   const histView = e.target.closest('[data-hist-view]');
   if (histView && historyCtx){
     const entry = historyCtx.list[Number(histView.dataset.histView)];
