@@ -490,11 +490,19 @@
   #fp-items{margin:12px 16px 0;display:flex;flex-direction:column;gap:8px;max-height:min(52vh,480px);overflow:auto;padding-right:2px}
   .fp-item{border-radius:10px;border:1px solid color-mix(in srgb,var(--b2) 60%,transparent);overflow:hidden;
     background:var(--p-bg);transition:box-shadow 120ms var(--ease-out);
-    display:grid;grid-template-columns:40px minmax(0,1fr);align-items:stretch}
+    display:grid;grid-template-columns:40px minmax(0,1fr) 26px;align-items:stretch}
   .fp-item:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 32%,transparent)}
   .fp-item-idx{display:flex;align-items:flex-start;justify-content:center;padding:11px 0 0;
     font-size:11px;font-weight:600;color:var(--tx4);font-variant-numeric:tabular-nums;user-select:none;
     border-right:1px solid color-mix(in srgb,var(--b2) 45%,transparent)}
+  .fp-item-del{align-self:flex-start;margin:6px 3px 0;padding:2px 4px;border:0;border-radius:6px;background:transparent;
+    color:var(--tx4);font-size:12px;line-height:1;cursor:pointer;opacity:0;transition:opacity 120ms var(--ease-out),color 120ms}
+  .fp-item:hover .fp-item-del,.fp-item:focus-within .fp-item-del{opacity:1}
+  .fp-item-del:hover{color:var(--red);background:color-mix(in srgb,var(--red) 12%,transparent)}
+  .fp-add{margin:8px 16px 0;align-self:flex-start;padding:6px 12px;border-radius:8px;cursor:pointer;
+    border:1px dashed color-mix(in srgb,var(--b2) 85%,transparent);background:color-mix(in srgb,var(--brand) 7%,transparent);
+    color:var(--tx3);font:inherit;font-size:11.5px}
+  .fp-add:hover{color:var(--tx1);border-color:color-mix(in srgb,var(--brand) 55%,transparent)}
   .fp-item-body{width:100%;border:0;background:transparent;color:var(--tx1);font-family:inherit;
     font-size:12.5px;line-height:1.65;padding:10px 12px;resize:vertical;min-height:56px;outline:none;display:block}
   .fp-item-body:focus{background:color-mix(in srgb,#fff 26%,transparent)}
@@ -745,6 +753,7 @@
     </div>
     <textarea id="fp-input" class="dfield" spellcheck="false"></textarea>
     <div id="fp-items" hidden></div>
+    <button class="fp-add" id="fp-add" type="button" hidden>＋ 添加一条</button>
     <div class="fp-foot">
       <span class="fp-hint">点外面自动保存 · ⌘/Ctrl+Enter 保存 · Esc 取消</span>
       <span class="fp-count" id="fp-count"></span>
@@ -4292,7 +4301,7 @@ function serializeItems(parsed, items){
  *   （顺序靠直接改文本，拖拽的收益不值这份复杂度）。
  */
 function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
-  const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input'), listEl = $('#fp-items');
+  const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input'), listEl = $('#fp-items'), addBtn = $('#fp-add');
   if (!pop || !input) return Promise.resolve(null);
   $('#fp-label').textContent = label;
   $('#fp-node').textContent = nodeLabel || '';
@@ -4319,13 +4328,14 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
     el.style.height = Math.min(Math.max(el.scrollHeight + 2, 56), 280) + 'px';
   };
 
-  /** 渲染条目列表（结构化模式）：只读序号 + 每条一个文本框，不拖拽 */
+  /** 渲染条目列表（结构化模式）：只读序号 + 每条一个文本框，不拖拽；顺序靠改文本，删条目走行尾 × */
   function renderItems(){
     if (!listEl) return;
     listEl.innerHTML = items.map((it, i) => `
       <div class="fp-item" data-hue="${i % 6}" data-i="${i}">
         <div class="fp-item-idx">${numbered ? i + 1 : '·'}</div>
         <textarea class="fp-item-body" data-body="${i}" rows="2" spellcheck="false">${esc(it.content || '')}</textarea>
+        <button class="fp-item-del" type="button" data-del="${i}" title="删除这一条" aria-label="删除第 ${i + 1} 条">×</button>
       </div>`).join('');
     listEl.querySelectorAll('[data-body]').forEach((el) => {
       el.addEventListener('input', () => {
@@ -4335,8 +4345,19 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
         syncCount();
       });
     });
+    listEl.querySelectorAll('[data-del]').forEach((el) => {
+      el.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        items.splice(Number(el.dataset.del), 1);
+        if (!items.length) items.push({ content: '' });   // 至少留一个空块，不然没地方写
+        renderItems();
+        syncCount();
+      });
+    });
   }
 
+  if (addBtn) addBtn.hidden = textMode;
   if (textMode){
     // 段落字段：一个大文本框，不拆条目
     input.value = raw;
@@ -4378,6 +4399,7 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
       $('#fp-save')?.removeEventListener('click', onSaveBtn);
       $('#fp-cancel')?.removeEventListener('click', onCancelBtn);
       $('#fp-close')?.removeEventListener('click', onCancelBtn);
+      addBtn?.removeEventListener('click', onAddBtn);
       fieldEditorResolve = null;
       // 这一下点击只用于关编辑器，别再穿透去关详情卡（600ms 兜底，消费即清）
       suppressDocClick = true;
@@ -4389,9 +4411,21 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
     const onInput = () => syncCount();
     const onSaveBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(current()); };
     const onCancelBtn = (event) => { event.preventDefault(); event.stopPropagation(); finish(null); };
+    /** 加一条空条目：直接聚焦新块，用户接着写 */
+    const onAddBtn = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      items.push({ content: '' });
+      renderItems();
+      syncCount();
+      const bodies = listEl ? listEl.querySelectorAll('.fp-item-body') : [];
+      const last = bodies[bodies.length - 1];
+      if (last){ autosize(last); last.focus(); last.scrollIntoView({ block: 'nearest' }); }
+    };
     $('#fp-save')?.addEventListener('click', onSaveBtn);
     $('#fp-cancel')?.addEventListener('click', onCancelBtn);
     $('#fp-close')?.addEventListener('click', onCancelBtn);
+    if (!textMode) addBtn?.addEventListener('click', onAddBtn);
     const onBlur = (event) => {
       // 结构化模式里在条目间切换焦点不算「点了外面」
       if (event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest('#field-pop')) return;
