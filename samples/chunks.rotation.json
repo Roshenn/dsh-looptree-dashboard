@@ -4,12 +4,20 @@
   "name": "词块",
   "workspace": "/Users/julian/agentic/projects/chunks"
  },
- "updated": "2026-10-26T23:20:00+08:00",
- "loop": {
+ "updated": "2026-10-30T00:42:55.975Z",
+ "prompt_context": {
+  "fields": [
+   "project",
+   "milestone",
+   "goal",
+   "node"
+  ],
+  "siblings": 0
+ },
+ "milestone": {
   "id": "ck-loop",
-  "kind": "loop",
+  "kind": "milestone",
   "title": "双轨学习闭环",
-  "intent": "教与学两条路径都能独立走完一组词块",
   "acceptance": "两轨各完成 1 组词块且进度不互相覆盖",
   "status": "doing",
   "closed_at": null,
@@ -80,15 +88,7 @@
     "started_at": "2026-10-23T09:00:00+08:00"
    }
   ],
-  "started_at": "2026-10-24T21:00:00+08:00"
- },
- "prompt_context": {
-  "fields": [
-   "project",
-   "loop",
-   "goal",
-   "node"
-  ],
-  "siblings": 0
+  "started_at": "2026-10-24T21:00:00+08:00",
+  "vision": "教与学两条路径都能独立走完一组词块"
  }
 }

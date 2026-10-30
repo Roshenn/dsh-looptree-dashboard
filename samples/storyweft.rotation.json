@@ -4,12 +4,68 @@
   "name": "StoryWeft",
   "workspace": "/Users/julian/agentic/projects/storyweft"
  },
- "updated": "2026-10-27T01:36:13.555Z",
- "loop": {
+ "updated": "2026-10-30T00:42:55.984Z",
+ "prompts": {
+  "idea": [
+   {
+    "id": "regen",
+    "title": "重新生成构思（保留验收）",
+    "ask": "保留闭环意图与目标验收，重新给出 2 个替代构思；每个写清与现方案的差异、代价、以及对验收方式的影响。"
+   },
+   {
+    "id": "split3",
+    "title": "拆成 3 个执行动作",
+    "ask": "把这个构思拆成恰好 3 个执行动作，每个动作一条可直接运行的验证命令。"
+   },
+   {
+    "id": "contract",
+    "title": "写成接口契约",
+    "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码、以及谁调用它。"
+   }
+  ]
+ },
+ "prompt_context": {
+  "fields": [
+   "project",
+   "milestone",
+   "milestone.vision",
+   "milestone.acceptance",
+   "goal",
+   "goal.acceptance",
+   "idea",
+   "idea.approach",
+   "siblings",
+   "node",
+   "node.approach",
+   "exec.verify",
+   "exec.proof",
+   "exec.issues",
+   "children"
+  ],
+  "siblings": 3,
+  "refs": [
+   "sw-e4"
+  ]
+ },
+ "services": [
+  {
+   "id": "panel",
+   "name": "轮转面板 4173",
+   "url": "http://127.0.0.1:4173",
+   "health": "/api/run-config"
+  },
+  {
+   "id": "web5800",
+   "name": "本地预览 5800",
+   "url": "http://127.0.0.1:5800",
+   "start": "python3 -m http.server 5800",
+   "cwd": "/tmp/rt-workspace"
+  }
+ ],
+ "milestone": {
   "id": "sw-loop",
-  "kind": "loop",
+  "kind": "milestone",
   "title": "3 情节层渲染可视化",
-  "intent": "打开项目就能看到三层情节图，不用读代码",
   "acceptance": "三层各 ≥ 8 节点、可折叠、首屏 < 800ms",
   "status": "doing",
   "closed_at": null,
@@ -76,7 +132,8 @@
      }
     ],
     "started_at": "2026-10-23T09:00:00+08:00",
-    "blocker": "缺章节→情节索引"
+    "blocker": "缺章节→情节索引",
+    "scenario": "1) 操作：在章节编辑区改一段情节\n  预期：右侧三层情节图在 300ms 内更新\n  体验：不用手动刷新、不用切 tab\n2) 操作：点开第二层的某个节点\n  预期：展开该节点的三层关联（上级长卷 / 同级 / 下级情节）\n  体验：一屏内看完，不需要二次搜索\n3) 操作：折叠第二层\n  预期：第一、三层仍然对齐，折叠状态刷新后保留\n  体验：折叠/展开 ≤ 2 次点击"
    },
    {
     "id": "sw-g2",
@@ -187,63 +244,7 @@
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
-  "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步"
- },
- "prompts": {
-  "idea": [
-   {
-    "id": "regen",
-    "title": "重新生成构思（保留验收）",
-    "ask": "保留闭环意图与目标验收，重新给出 2 个替代构思；每个写清与现方案的差异、代价、以及对验收方式的影响。"
-   },
-   {
-    "id": "split3",
-    "title": "拆成 3 个执行动作",
-    "ask": "把这个构思拆成恰好 3 个执行动作，每个动作一条可直接运行的验证命令。"
-   },
-   {
-    "id": "contract",
-    "title": "写成接口契约",
-    "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码、以及谁调用它。"
-   }
-  ]
- },
- "prompt_context": {
-  "fields": [
-   "project",
-   "loop",
-   "loop.intent",
-   "loop.acceptance",
-   "goal",
-   "goal.acceptance",
-   "idea",
-   "idea.approach",
-   "siblings",
-   "node",
-   "node.approach",
-   "exec.verify",
-   "exec.proof",
-   "exec.issues",
-   "children"
-  ],
-  "siblings": 3,
-  "refs": [
-   "sw-e4"
-  ]
- },
- "services": [
-  {
-   "id": "panel",
-   "name": "轮转面板 4173",
-   "url": "http://127.0.0.1:4173",
-   "health": "/api/run-config"
-  },
-  {
-   "id": "web5800",
-   "name": "本地预览 5800",
-   "url": "http://127.0.0.1:5800",
-   "start": "python3 -m http.server 5800",
-   "cwd": "/tmp/rt-workspace"
-  }
- ]
+  "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步",
+  "vision": "打开项目就能看到三层情节图，不用读代码"
+ }
 }

@@ -4,12 +4,11 @@
   "name": "竞品知识图谱",
   "workspace": "/Users/julian/agentic/projects/kg"
  },
- "updated": "2026-10-26T23:20:00+08:00",
- "loop": {
+ "updated": "2026-10-30T00:42:55.982Z",
+ "milestone": {
   "id": "kg-loop",
-  "kind": "loop",
+  "kind": "milestone",
   "title": "竞品知识图谱闭环",
-  "intent": "竞品功能和交互能在一个图谱里横向对比",
   "acceptance": "2 个目标全部关闭，4 款竞品可切换",
   "status": "done",
   "closed_at": "2026-10-18T16:40:00+08:00",
@@ -74,6 +73,7 @@
      }
     ]
    }
-  ]
+  ],
+  "vision": "竞品功能和交互能在一个图谱里横向对比"
  }
 }

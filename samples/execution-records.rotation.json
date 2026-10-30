@@ -4,12 +4,11 @@
   "name": "练习卡面板",
   "workspace": "/Users/julian/agentic/projects/english-shadow-loop"
  },
- "updated": "2026-10-29T12:45:00.000Z",
- "loop": {
+ "updated": "2026-10-30T00:42:55.982Z",
+ "milestone": {
   "id": "xr-loop",
-  "kind": "loop",
+  "kind": "milestone",
   "title": "外部链接生成逐句练习卡",
-  "intent": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
   "acceptance": "三步走通：生成卡 → 跟读计数 → 刷新不丢",
   "status": "doing",
   "closed_at": null,
@@ -45,7 +44,10 @@
       "closed_at": null,
       "plan": {
        "goal": "粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡",
-       "verify": ["npm run preflight", "npx playwright test tests/e2e/journey.spec.ts"],
+       "verify": [
+        "npm run preflight",
+        "npx playwright test tests/e2e/journey.spec.ts"
+       ],
        "steps": [
         "解析链接拿到 videoId，用 oEmbed 取标题与作者",
         "字幕可用性探测失败时降级为手动上传字幕",
@@ -144,7 +146,10 @@
       "closed_at": null,
       "plan": {
        "goal": "同一句可反复跟读，次数可靠累计并能清零",
-       "verify": ["npm run preflight", "npx playwright test tests/e2e/count.spec.ts"],
+       "verify": [
+        "npm run preflight",
+        "npx playwright test tests/e2e/count.spec.ts"
+       ],
        "steps": [
         "抽出计数模块，读写 localStorage 带版本号",
         "Enter / 点击「本句已练」都记一次，避免重复绑定",
@@ -177,6 +182,7 @@
      }
     ]
    }
-  ]
+  ],
+  "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡"
  }
 }

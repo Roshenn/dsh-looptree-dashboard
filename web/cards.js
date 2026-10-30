@@ -6,12 +6,20 @@ window.ROTATION_CARDS = [
    "name": "词块",
    "workspace": "/Users/julian/agentic/projects/chunks"
   },
-  "updated": "2026-10-26T23:20:00+08:00",
-  "loop": {
+  "updated": "2026-10-30T00:42:55.975Z",
+  "prompt_context": {
+   "fields": [
+    "project",
+    "milestone",
+    "goal",
+    "node"
+   ],
+   "siblings": 0
+  },
+  "milestone": {
    "id": "ck-loop",
-   "kind": "loop",
+   "kind": "milestone",
    "title": "双轨学习闭环",
-   "intent": "教与学两条路径都能独立走完一组词块",
    "acceptance": "两轨各完成 1 组词块且进度不互相覆盖",
    "status": "doing",
    "closed_at": null,
@@ -82,16 +90,8 @@ window.ROTATION_CARDS = [
      "started_at": "2026-10-23T09:00:00+08:00"
     }
    ],
-   "started_at": "2026-10-24T21:00:00+08:00"
-  },
-  "prompt_context": {
-   "fields": [
-    "project",
-    "loop",
-    "goal",
-    "node"
-   ],
-   "siblings": 0
+   "started_at": "2026-10-24T21:00:00+08:00",
+   "vision": "教与学两条路径都能独立走完一组词块"
   }
  },
  {
@@ -100,12 +100,11 @@ window.ROTATION_CARDS = [
    "name": "练习卡面板",
    "workspace": "/Users/julian/agentic/projects/english-shadow-loop"
   },
-  "updated": "2026-10-29T12:45:00.000Z",
-  "loop": {
+  "updated": "2026-10-30T00:42:55.982Z",
+  "milestone": {
    "id": "xr-loop",
-   "kind": "loop",
+   "kind": "milestone",
    "title": "外部链接生成逐句练习卡",
-   "intent": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
    "acceptance": "三步走通：生成卡 → 跟读计数 → 刷新不丢",
    "status": "doing",
    "closed_at": null,
@@ -279,7 +278,8 @@ window.ROTATION_CARDS = [
       }
      ]
     }
-   ]
+   ],
+   "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡"
   }
  },
  {
@@ -288,12 +288,11 @@ window.ROTATION_CARDS = [
    "name": "竞品知识图谱",
    "workspace": "/Users/julian/agentic/projects/kg"
   },
-  "updated": "2026-10-26T23:20:00+08:00",
-  "loop": {
+  "updated": "2026-10-30T00:42:55.982Z",
+  "milestone": {
    "id": "kg-loop",
-   "kind": "loop",
+   "kind": "milestone",
    "title": "竞品知识图谱闭环",
-   "intent": "竞品功能和交互能在一个图谱里横向对比",
    "acceptance": "2 个目标全部关闭，4 款竞品可切换",
    "status": "done",
    "closed_at": "2026-10-18T16:40:00+08:00",
@@ -358,7 +357,8 @@ window.ROTATION_CARDS = [
       }
      ]
     }
-   ]
+   ],
+   "vision": "竞品功能和交互能在一个图谱里横向对比"
   }
  },
  {
@@ -367,12 +367,11 @@ window.ROTATION_CARDS = [
    "name": "NeedsFinder",
    "workspace": "/Users/julian/agentic/projects/needsfinder"
   },
-  "updated": "2026-10-26T23:20:00+08:00",
-  "loop": {
+  "updated": "2026-10-30T00:42:55.983Z",
+  "milestone": {
    "id": "nf-loop",
-   "kind": "loop",
+   "kind": "milestone",
    "title": "需求发现闭环",
-   "intent": "从小红书真实讨论里端到端产出可验证的需求列表",
    "acceptance": "10 条需求中 ≥6 条可由第三方复现",
    "status": "doing",
    "closed_at": null,
@@ -444,7 +443,8 @@ window.ROTATION_CARDS = [
      ]
     }
    ],
-   "started_at": "2026-10-24T21:00:00+08:00"
+   "started_at": "2026-10-24T21:00:00+08:00",
+   "vision": "从小红书真实讨论里端到端产出可验证的需求列表"
   }
  },
  {
@@ -453,12 +453,11 @@ window.ROTATION_CARDS = [
    "name": "shadowing",
    "workspace": "/Users/julian/agentic/projects/shadowing"
   },
-  "updated": "2026-10-26T23:20:00+08:00",
-  "loop": {
+  "updated": "2026-10-30T00:42:55.983Z",
+  "milestone": {
    "id": "sh-loop",
-   "kind": "loop",
+   "kind": "milestone",
    "title": "youtube 跟读闭环",
-   "intent": "选一条视频就能逐句跟读并对齐",
    "acceptance": "10 条视频中 ≥9 条字幕可渲染",
    "status": "doing",
    "closed_at": null,
@@ -542,7 +541,8 @@ window.ROTATION_CARDS = [
      "started_at": "2026-10-23T09:00:00+08:00"
     }
    ],
-   "started_at": "2026-10-24T21:00:00+08:00"
+   "started_at": "2026-10-24T21:00:00+08:00",
+   "vision": "选一条视频就能逐句跟读并对齐"
   }
  },
  {
@@ -551,12 +551,68 @@ window.ROTATION_CARDS = [
    "name": "StoryWeft",
    "workspace": "/Users/julian/agentic/projects/storyweft"
   },
-  "updated": "2026-10-27T01:36:13.555Z",
-  "loop": {
+  "updated": "2026-10-30T00:42:55.984Z",
+  "prompts": {
+   "idea": [
+    {
+     "id": "regen",
+     "title": "重新生成构思（保留验收）",
+     "ask": "保留闭环意图与目标验收，重新给出 2 个替代构思；每个写清与现方案的差异、代价、以及对验收方式的影响。"
+    },
+    {
+     "id": "split3",
+     "title": "拆成 3 个执行动作",
+     "ask": "把这个构思拆成恰好 3 个执行动作，每个动作一条可直接运行的验证命令。"
+    },
+    {
+     "id": "contract",
+     "title": "写成接口契约",
+     "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码、以及谁调用它。"
+    }
+   ]
+  },
+  "prompt_context": {
+   "fields": [
+    "project",
+    "milestone",
+    "milestone.vision",
+    "milestone.acceptance",
+    "goal",
+    "goal.acceptance",
+    "idea",
+    "idea.approach",
+    "siblings",
+    "node",
+    "node.approach",
+    "exec.verify",
+    "exec.proof",
+    "exec.issues",
+    "children"
+   ],
+   "siblings": 3,
+   "refs": [
+    "sw-e4"
+   ]
+  },
+  "services": [
+   {
+    "id": "panel",
+    "name": "轮转面板 4173",
+    "url": "http://127.0.0.1:4173",
+    "health": "/api/run-config"
+   },
+   {
+    "id": "web5800",
+    "name": "本地预览 5800",
+    "url": "http://127.0.0.1:5800",
+    "start": "python3 -m http.server 5800",
+    "cwd": "/tmp/rt-workspace"
+   }
+  ],
+  "milestone": {
    "id": "sw-loop",
-   "kind": "loop",
+   "kind": "milestone",
    "title": "3 情节层渲染可视化",
-   "intent": "打开项目就能看到三层情节图，不用读代码",
    "acceptance": "三层各 ≥ 8 节点、可折叠、首屏 < 800ms",
    "status": "doing",
    "closed_at": null,
@@ -623,7 +679,8 @@ window.ROTATION_CARDS = [
       }
      ],
      "started_at": "2026-10-23T09:00:00+08:00",
-     "blocker": "缺章节→情节索引"
+     "blocker": "缺章节→情节索引",
+     "scenario": "1) 操作：在章节编辑区改一段情节\n  预期：右侧三层情节图在 300ms 内更新\n  体验：不用手动刷新、不用切 tab\n2) 操作：点开第二层的某个节点\n  预期：展开该节点的三层关联（上级长卷 / 同级 / 下级情节）\n  体验：一屏内看完，不需要二次搜索\n3) 操作：折叠第二层\n  预期：第一、三层仍然对齐，折叠状态刷新后保留\n  体验：折叠/展开 ≤ 2 次点击"
     },
     {
      "id": "sw-g2",
@@ -734,64 +791,8 @@ window.ROTATION_CARDS = [
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
-   "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步"
-  },
-  "prompts": {
-   "idea": [
-    {
-     "id": "regen",
-     "title": "重新生成构思（保留验收）",
-     "ask": "保留闭环意图与目标验收，重新给出 2 个替代构思；每个写清与现方案的差异、代价、以及对验收方式的影响。"
-    },
-    {
-     "id": "split3",
-     "title": "拆成 3 个执行动作",
-     "ask": "把这个构思拆成恰好 3 个执行动作，每个动作一条可直接运行的验证命令。"
-    },
-    {
-     "id": "contract",
-     "title": "写成接口契约",
-     "ask": "把这个构思写成可对接的接口契约：输入、输出、错误码、以及谁调用它。"
-    }
-   ]
-  },
-  "prompt_context": {
-   "fields": [
-    "project",
-    "loop",
-    "loop.intent",
-    "loop.acceptance",
-    "goal",
-    "goal.acceptance",
-    "idea",
-    "idea.approach",
-    "siblings",
-    "node",
-    "node.approach",
-    "exec.verify",
-    "exec.proof",
-    "exec.issues",
-    "children"
-   ],
-   "siblings": 3,
-   "refs": [
-    "sw-e4"
-   ]
-  },
-  "services": [
-   {
-    "id": "panel",
-    "name": "轮转面板 4173",
-    "url": "http://127.0.0.1:4173",
-    "health": "/api/run-config"
-   },
-   {
-    "id": "web5800",
-    "name": "本地预览 5800",
-    "url": "http://127.0.0.1:5800",
-    "start": "python3 -m http.server 5800",
-    "cwd": "/tmp/rt-workspace"
-   }
-  ]
+   "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步",
+   "vision": "打开项目就能看到三层情节图，不用读代码"
+  }
  }
 ];

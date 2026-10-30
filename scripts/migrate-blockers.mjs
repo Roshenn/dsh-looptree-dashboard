@@ -36,13 +36,13 @@ function planCard(card) {
   const removed = [];
   const walk = (n) => {
     if (!n || typeof n !== 'object') return;
-    if (n.kind === 'loop' && typeof n.constraints === 'string' && n.constraints.trim()) {
+    if (n.kind === 'milestone' && typeof n.constraints === 'string' && n.constraints.trim()) {
       removed.push({ nodeId: n.id, title: n.title || '', constraints: n.constraints });
       delete n.constraints;
     }
     (Array.isArray(n.children) ? n.children : []).forEach(walk);
   };
-  walk(card.loop);
+  walk(card.milestone);
   return removed;
 }
 

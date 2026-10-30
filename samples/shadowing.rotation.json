@@ -4,12 +4,11 @@
   "name": "shadowing",
   "workspace": "/Users/julian/agentic/projects/shadowing"
  },
- "updated": "2026-10-26T23:20:00+08:00",
- "loop": {
+ "updated": "2026-10-30T00:42:55.983Z",
+ "milestone": {
   "id": "sh-loop",
-  "kind": "loop",
+  "kind": "milestone",
   "title": "youtube 跟读闭环",
-  "intent": "选一条视频就能逐句跟读并对齐",
   "acceptance": "10 条视频中 ≥9 条字幕可渲染",
   "status": "doing",
   "closed_at": null,
@@ -93,6 +92,7 @@
     "started_at": "2026-10-23T09:00:00+08:00"
    }
   ],
-  "started_at": "2026-10-24T21:00:00+08:00"
+  "started_at": "2026-10-24T21:00:00+08:00",
+  "vision": "选一条视频就能逐句跟读并对齐"
  }
 }
