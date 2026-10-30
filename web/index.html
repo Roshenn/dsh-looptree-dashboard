@@ -4131,7 +4131,8 @@ function startEdit(field, anchor){
   if (!p0 || !n0) return;
   const value = String(n0.raw[field] || '');
   const nodeLabel = `${KIND[n0.kind] || n0.kind} · ${n0.title || n0.id}`;
-  openFieldEditor(FIELD_LABEL[field] || field, value, nodeLabel).then(async (next) => {
+  const maxLen = field === 'vision' ? 1000 : 300;   // 愿景是长叙事，其余字段仍 300
+  openFieldEditor(FIELD_LABEL[field] || field, value, nodeLabel, maxLen).then(async (next) => {
     if (next == null) return;                       // Esc 取消
     const trimmed = next.trim();
     if (trimmed === String(value).trim()) return;
@@ -4219,7 +4220,7 @@ function serializeItems(parsed, items){
   return parsed.preamble ? `${parsed.preamble}${parsed.separator}${body}` : body;
 }
 
-function openFieldEditor(label, value, nodeLabel){
+function openFieldEditor(label, value, nodeLabel, maxLen = 300){
   const pop = $('#field-pop'), mask = $('#fp-mask'), input = $('#fp-input'), listEl = $('#fp-items');
   if (!pop || !input) return Promise.resolve(null);
   $('#fp-label').textContent = label;
@@ -4230,7 +4231,7 @@ function openFieldEditor(label, value, nodeLabel){
   const numbered = parsed.mode === 'numbered';
 
   const count = $('#fp-count');
-  const MAXLEN = 300;
+  const MAXLEN = maxLen;
   const serialized = () => serializeItems(parsed, items);
   const syncCount = () => {
     if (!count) return;

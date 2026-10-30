@@ -161,7 +161,7 @@ check('拆构思注入目标场景', ideaVision.includes('目标已定的落地�
 // 里程碑补全：愿景（宏大叙事 / ≤500 字）+ 阻碍项（基于愿景）+ 证据要求 + JSON 契约
 const msFill = composeFillPrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', fields: ['vision', 'blockers', 'acceptance'] });
 check('里程碑补全带愿景规则', msFill.includes('愿景 3–6 句'), '');
-check('里程碑补全愿景上限 500', msFill.includes('愿景 ≤500 字'), '');
+check('里程碑补全愿景上限 1000', msFill.includes('愿景 ≤1000 字'), '');
 check('里程碑补全愿景要宏大叙事', msFill.includes('宏大叙事') && msFill.includes('不写功能清单'), '');
 check('里程碑阻碍项要「证据要求」块', msFill.includes('\n证据要求\n'), '');
 check('里程碑阻碍项格式：缺什么 → 挡在愿景哪一步 → 模块', msFill.includes('缺什么 → 挡在愿景的哪一步 → 涉及模块或文件'), '');
@@ -182,6 +182,12 @@ check('拆目标要每条对应阻碍', splitBlockers.includes('每条目标对�
 check('拆目标 blocker 契约', splitBlockers.includes('"blocker":"…"'), '');
 check('拆目标照抄阻碍短名', splitBlockers.includes('照抄阻碍项原文的短名'), '');
 check('拆目标 lint（带阻碍）', lintPrompt(splitBlockers).warnings.length === 0, JSON.stringify(lintPrompt(splitBlockers).warnings.slice(0, 2)));
+// 愿景可到 1000 字：拆目标只取「要变成什么样」，超长部分裁剪并标「全文见卡片」
+const longVisionCard = JSON.parse(JSON.stringify(fx));
+longVisionCard.milestone.vision = '愿景很长的一句话。'.repeat(80);   // ≈ 800 字
+const splitLongVision = composeSplitPrompt({ ...fxArgs, card: longVisionCard, nodeId: 'sw-loop' });
+check('拆目标愿景超长时裁剪并标全文见卡片',
+  splitLongVision.includes('全文见卡片') && [...splitLongVision].length < 1600, String([...splitLongVision].length));
 const noBlockerCard = JSON.parse(JSON.stringify(fx));
 delete noBlockerCard.milestone.blockers;
 const splitNoBlockers = composeSplitPrompt({ ...fxArgs, card: noBlockerCard, nodeId: 'sw-loop' });
