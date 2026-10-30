@@ -2,16 +2,17 @@
  "schema": "rotation/v1",
  "project": {
   "name": "新项目",
-  "workspace": "/absolute/path/to/workspace"
+  "workspace": "/absolute/path/to/workspace",
+  "vision": "项目愿景：这个项目最终要变成什么样（2–4 句，里程碑愿景都要能挂上来）"
  },
  "updated": "2026-10-30T00:00:00+08:00",
  "milestone": {
   "id": "new-milestone",
   "kind": "milestone",
   "title": "这个里程碑把项目带到哪",
-  "vision": "一段宏大叙事：这个里程碑之后项目/用户变成什么样（3–6 句，不写功能清单、不写手段）",
+  "vision": "里程碑愿景：这个里程碑之后项目/用户变成什么样（3–6 句，不写功能清单、不写手段）",
   "blockers": "1) 缺什么 → 挡在愿景的哪一步 → 涉及模块/文件（3–5 条，一条一行）",
-  "acceptance": "可判定的达成判据（怎么判定愿景达成，最好能落成一次走查或一条命令）",
+  "metrics": "1) 核心指标：用什么可观察的结果证明愿景达成（2–5 条，一条一行；不写测试命令，验收另有流程）",
   "status": "plan",
   "closed_at": null,
   "children": [

@@ -2,14 +2,14 @@
  "schema": "rotation/v1",
  "project": {
   "name": "NeedsFinder",
-  "workspace": "/Users/julian/agentic/projects/needsfinder"
+  "workspace": "/Users/julian/agentic/projects/needsfinder",
+  "vision": "选题不再靠猜：每天从小红书真实讨论里捞出需求，按痛点强度排好，直接能开工。"
  },
  "updated": "2026-10-30T00:42:55.983Z",
  "milestone": {
   "id": "nf-loop",
   "kind": "milestone",
   "title": "需求发现闭环",
-  "acceptance": "10 条需求中 ≥6 条可由第三方复现",
   "status": "doing",
   "closed_at": null,
   "children": [
@@ -81,6 +81,7 @@
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
-  "vision": "从小红书真实讨论里端到端产出可验证的需求列表"
+  "vision": "从小红书真实讨论里端到端产出可验证的需求列表",
+  "metrics": "1)单次运行产出 ≥10 条去重需求，每条带原帖出处\n2)其中 ≥6 条能被第三方按原帖复现\n3)从抓取到排序一次跑完，不需要人工补数据"
  }
 }

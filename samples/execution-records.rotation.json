@@ -2,14 +2,14 @@
  "schema": "rotation/v1",
  "project": {
   "name": "练习卡面板",
-  "workspace": "/Users/julian/agentic/projects/english-shadow-loop"
+  "workspace": "/Users/julian/agentic/projects/english-shadow-loop",
+  "vision": "任何一条英文视频链接，都能变成可跟读、可计数的练习卡，学员不用自己剪音频、不必装本地工具。"
  },
  "updated": "2026-10-30T00:42:55.982Z",
  "milestone": {
   "id": "xr-loop",
   "kind": "milestone",
   "title": "外部链接生成逐句练习卡",
-  "acceptance": "三步走通：生成卡 → 跟读计数 → 刷新不丢",
   "status": "doing",
   "closed_at": null,
   "started_at": "2026-10-29T12:00:00+08:00",
@@ -183,6 +183,7 @@
     ]
    }
   ],
-  "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡"
+  "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
+  "metrics": "1)粘贴任意 YouTube 链接，90 秒内出练习卡\n2)刷新页面后跟读计数与练习进度不丢\n3)抽 10 条链接，≥9 条能直接出卡且不用手工修字幕"
  }
 }

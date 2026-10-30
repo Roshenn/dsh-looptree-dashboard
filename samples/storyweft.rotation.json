@@ -2,7 +2,8 @@
  "schema": "rotation/v1",
  "project": {
   "name": "StoryWeft",
-  "workspace": "/Users/julian/agentic/projects/storyweft"
+  "workspace": "/Users/julian/agentic/projects/storyweft",
+  "vision": "作者改一段情节，视觉与结构同时更新：评审不用再截图对稿，打开项目就能看到三层情节图。"
  },
  "updated": "2026-10-30T00:42:55.984Z",
  "prompts": {
@@ -29,7 +30,7 @@
    "project",
    "milestone",
    "milestone.vision",
-   "milestone.acceptance",
+   "milestone.metrics",
    "goal",
    "goal.acceptance",
    "idea",
@@ -66,7 +67,6 @@
   "id": "sw-loop",
   "kind": "milestone",
   "title": "3 情节层渲染可视化",
-  "acceptance": "三层各 ≥ 8 节点、可折叠、首屏 < 800ms",
   "status": "doing",
   "closed_at": null,
   "children": [
@@ -245,6 +245,7 @@
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
   "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步",
+  "metrics": "1)三层图各 ≥8 节点，可折叠\n2)首屏渲染 < 800ms\n3)点任一情节节点，能定位到对应章节原文",
   "vision": "打开项目就能看到三层情节图，不用读代码"
  }
 }

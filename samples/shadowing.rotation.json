@@ -2,14 +2,14 @@
  "schema": "rotation/v1",
  "project": {
   "name": "shadowing",
-  "workspace": "/Users/julian/agentic/projects/shadowing"
+  "workspace": "/Users/julian/agentic/projects/shadowing",
+  "vision": "任意一条视频都能当教材：选一条就能逐句跟读，随时看到自己对齐了多少、还差哪几句。"
  },
  "updated": "2026-10-30T00:42:55.983Z",
  "milestone": {
   "id": "sh-loop",
   "kind": "milestone",
   "title": "youtube 跟读闭环",
-  "acceptance": "10 条视频中 ≥9 条字幕可渲染",
   "status": "doing",
   "closed_at": null,
   "children": [
@@ -93,6 +93,7 @@
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
-  "vision": "选一条视频就能逐句跟读并对齐"
+  "vision": "选一条视频就能逐句跟读并对齐",
+  "metrics": "1)抽样 10 条视频，≥9 条字幕可渲染\n2)逐句高亮与音频偏差 < 200ms\n3)中途退出再回来，进度停在原句不丢"
  }
 }

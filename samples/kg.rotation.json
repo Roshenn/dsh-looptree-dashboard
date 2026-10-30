@@ -2,14 +2,14 @@
  "schema": "rotation/v1",
  "project": {
   "name": "竞品知识图谱",
-  "workspace": "/Users/julian/agentic/projects/kg"
+  "workspace": "/Users/julian/agentic/projects/kg",
+  "vision": "选型对比不再翻十几个标签页：四款竞品的功能、交互、定价在一张图里横向看完。"
  },
  "updated": "2026-10-30T00:42:55.982Z",
  "milestone": {
   "id": "kg-loop",
   "kind": "milestone",
   "title": "竞品知识图谱闭环",
-  "acceptance": "2 个目标全部关闭，4 款竞品可切换",
   "status": "done",
   "closed_at": "2026-10-18T16:40:00+08:00",
   "children": [
@@ -74,6 +74,7 @@
     ]
    }
   ],
-  "vision": "竞品功能和交互能在一个图谱里横向对比"
+  "vision": "竞品功能和交互能在一个图谱里横向对比",
+  "metrics": "1)4 款竞品全部入图，可一键切换\n2)任一功能点都能追到出处（官网 / 文档链接）\n3)单屏看完 4 款核心差异，不用滚第二屏"
  }
 }

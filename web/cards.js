@@ -4,7 +4,8 @@ window.ROTATION_CARDS = [
   "schema": "rotation/v1",
   "project": {
    "name": "词块",
-   "workspace": "/Users/julian/agentic/projects/chunks"
+   "workspace": "/Users/julian/agentic/projects/chunks",
+   "vision": "一套词块数据同时服务教与学两种用法：换教材只改数据、不改流程，两条路径都能独立交付。"
   },
   "updated": "2026-10-30T00:42:55.975Z",
   "prompt_context": {
@@ -20,7 +21,6 @@ window.ROTATION_CARDS = [
    "id": "ck-loop",
    "kind": "milestone",
    "title": "双轨学习闭环",
-   "acceptance": "两轨各完成 1 组词块且进度不互相覆盖",
    "status": "doing",
    "closed_at": null,
    "children": [
@@ -91,21 +91,22 @@ window.ROTATION_CARDS = [
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
-   "vision": "教与学两条路径都能独立走完一组词块"
+   "vision": "教与学两条路径都能独立走完一组词块",
+   "metrics": "1)两轨各自走完 1 组词块，进度互不覆盖\n2)同一组词块在教/学两个入口都能打开，切换 ≤2 次点击\n3)换一套词块数据后，两轨都不改代码即可跑通"
   }
  },
  {
   "schema": "rotation/v1",
   "project": {
    "name": "练习卡面板",
-   "workspace": "/Users/julian/agentic/projects/english-shadow-loop"
+   "workspace": "/Users/julian/agentic/projects/english-shadow-loop",
+   "vision": "任何一条英文视频链接，都能变成可跟读、可计数的练习卡，学员不用自己剪音频、不必装本地工具。"
   },
   "updated": "2026-10-30T00:42:55.982Z",
   "milestone": {
    "id": "xr-loop",
    "kind": "milestone",
    "title": "外部链接生成逐句练习卡",
-   "acceptance": "三步走通：生成卡 → 跟读计数 → 刷新不丢",
    "status": "doing",
    "closed_at": null,
    "started_at": "2026-10-29T12:00:00+08:00",
@@ -279,21 +280,22 @@ window.ROTATION_CARDS = [
      ]
     }
    ],
-   "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡"
+   "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
+   "metrics": "1)粘贴任意 YouTube 链接，90 秒内出练习卡\n2)刷新页面后跟读计数与练习进度不丢\n3)抽 10 条链接，≥9 条能直接出卡且不用手工修字幕"
   }
  },
  {
   "schema": "rotation/v1",
   "project": {
    "name": "竞品知识图谱",
-   "workspace": "/Users/julian/agentic/projects/kg"
+   "workspace": "/Users/julian/agentic/projects/kg",
+   "vision": "选型对比不再翻十几个标签页：四款竞品的功能、交互、定价在一张图里横向看完。"
   },
   "updated": "2026-10-30T00:42:55.982Z",
   "milestone": {
    "id": "kg-loop",
    "kind": "milestone",
    "title": "竞品知识图谱闭环",
-   "acceptance": "2 个目标全部关闭，4 款竞品可切换",
    "status": "done",
    "closed_at": "2026-10-18T16:40:00+08:00",
    "children": [
@@ -358,21 +360,22 @@ window.ROTATION_CARDS = [
      ]
     }
    ],
-   "vision": "竞品功能和交互能在一个图谱里横向对比"
+   "vision": "竞品功能和交互能在一个图谱里横向对比",
+   "metrics": "1)4 款竞品全部入图，可一键切换\n2)任一功能点都能追到出处（官网 / 文档链接）\n3)单屏看完 4 款核心差异，不用滚第二屏"
   }
  },
  {
   "schema": "rotation/v1",
   "project": {
    "name": "NeedsFinder",
-   "workspace": "/Users/julian/agentic/projects/needsfinder"
+   "workspace": "/Users/julian/agentic/projects/needsfinder",
+   "vision": "选题不再靠猜：每天从小红书真实讨论里捞出需求，按痛点强度排好，直接能开工。"
   },
   "updated": "2026-10-30T00:42:55.983Z",
   "milestone": {
    "id": "nf-loop",
    "kind": "milestone",
    "title": "需求发现闭环",
-   "acceptance": "10 条需求中 ≥6 条可由第三方复现",
    "status": "doing",
    "closed_at": null,
    "children": [
@@ -444,21 +447,22 @@ window.ROTATION_CARDS = [
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
-   "vision": "从小红书真实讨论里端到端产出可验证的需求列表"
+   "vision": "从小红书真实讨论里端到端产出可验证的需求列表",
+   "metrics": "1)单次运行产出 ≥10 条去重需求，每条带原帖出处\n2)其中 ≥6 条能被第三方按原帖复现\n3)从抓取到排序一次跑完，不需要人工补数据"
   }
  },
  {
   "schema": "rotation/v1",
   "project": {
    "name": "shadowing",
-   "workspace": "/Users/julian/agentic/projects/shadowing"
+   "workspace": "/Users/julian/agentic/projects/shadowing",
+   "vision": "任意一条视频都能当教材：选一条就能逐句跟读，随时看到自己对齐了多少、还差哪几句。"
   },
   "updated": "2026-10-30T00:42:55.983Z",
   "milestone": {
    "id": "sh-loop",
    "kind": "milestone",
    "title": "youtube 跟读闭环",
-   "acceptance": "10 条视频中 ≥9 条字幕可渲染",
    "status": "doing",
    "closed_at": null,
    "children": [
@@ -542,14 +546,16 @@ window.ROTATION_CARDS = [
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
-   "vision": "选一条视频就能逐句跟读并对齐"
+   "vision": "选一条视频就能逐句跟读并对齐",
+   "metrics": "1)抽样 10 条视频，≥9 条字幕可渲染\n2)逐句高亮与音频偏差 < 200ms\n3)中途退出再回来，进度停在原句不丢"
   }
  },
  {
   "schema": "rotation/v1",
   "project": {
    "name": "StoryWeft",
-   "workspace": "/Users/julian/agentic/projects/storyweft"
+   "workspace": "/Users/julian/agentic/projects/storyweft",
+   "vision": "作者改一段情节，视觉与结构同时更新：评审不用再截图对稿，打开项目就能看到三层情节图。"
   },
   "updated": "2026-10-30T00:42:55.984Z",
   "prompts": {
@@ -576,7 +582,7 @@ window.ROTATION_CARDS = [
     "project",
     "milestone",
     "milestone.vision",
-    "milestone.acceptance",
+    "milestone.metrics",
     "goal",
     "goal.acceptance",
     "idea",
@@ -613,7 +619,6 @@ window.ROTATION_CARDS = [
    "id": "sw-loop",
    "kind": "milestone",
    "title": "3 情节层渲染可视化",
-   "acceptance": "三层各 ≥ 8 节点、可折叠、首屏 < 800ms",
    "status": "doing",
    "closed_at": null,
    "children": [
@@ -792,6 +797,7 @@ window.ROTATION_CARDS = [
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
    "blockers": "1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算，8 节点起就掉帧）→ 挡在「首屏 < 800ms」\n3)缺折叠交互（无展开/收起状态）→ 挡在「可折叠」这一步",
+   "metrics": "1)三层图各 ≥8 节点，可折叠\n2)首屏渲染 < 800ms\n3)点任一情节节点，能定位到对应章节原文",
    "vision": "打开项目就能看到三层情节图，不用读代码"
   }
  }
