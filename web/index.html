@@ -13,6 +13,8 @@
     --hover:#ffffff14; --active:#ffffff24;
     --brand:#5686fe; --brand-2:#4d93f8; --brand-dim:#26324a;
     --blue-300:#93c5fd; --amber:#f7ad31; --green:#4ed17e; --red:#f25a5a;
+    /* --ready：可开工（空闲分支）。与 brand（运行中）/ green（已达成）/ amber（待确认）/ red（阻断）区分 */
+    --ready:#2fd4b2;
     --corner:superellipse(1.5);
     --lane-head:224px;
     --info-col:272px;
@@ -27,6 +29,7 @@
     --hover:#2631480f; --active:#2631481a;
     --brand:#4176e6; --brand-2:#3b82f6; --brand-dim:#e4edfd;
     --blue-300:#2563eb; --amber:#dd8629; --green:#22c55e; --red:#e04a4a;
+    --ready:#0a7a62;
     --shadow-pop:0 12px 30px -20px rgba(16,24,40,.3);
   }
   *{box-sizing:border-box}
@@ -113,6 +116,14 @@
     color:var(--tone);border:1px solid color-mix(in srgb,var(--tone) 38%,transparent);
     background:color-mix(in srgb,var(--tone) 10%,transparent);white-space:nowrap}
   .lane-state[data-state="review"]{border-style:dashed}
+  /* 泳道头第三行：这个项目里现在有几条可开工分支 / 几条在跑（0/0 时不显示） */
+  .lane-live{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10.5px;color:var(--tx4)}
+  .lane-live[hidden]{display:none}
+  .lane-live .ll{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .lane-live .dot.ready{background:var(--ready)}
+  .lane-live .ll-idle{color:color-mix(in srgb,var(--ready) 76%,var(--tx2))}
+  .lane-live .ll-maxed{color:var(--amber)}
+  .lane[data-live="idle"] .lane-head{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--ready) 72%,transparent)}
   .mini{display:inline-flex;align-items:center;gap:5px;height:23px;padding:0 8px;border-radius:6px;corner-shape:var(--corner);
     border:1px solid var(--b2);color:var(--tx3);font-size:11.5px;background:var(--l2);
     transition:color 160ms var(--ease-out),background-color 160ms var(--ease-out),transform 160ms var(--ease-out)}
@@ -173,14 +184,33 @@
   .tnode[data-state="todo"]{opacity:.82;border-style:dashed}
   .tnode[data-state="doing"]{border-color:color-mix(in srgb,var(--brand) 30%,var(--b1))}
   .tnode[data-state="closed"]{border-color:color-mix(in srgb,var(--green) 45%,var(--b1));background:color-mix(in srgb,var(--green) 7%,var(--l2));opacity:.9}
-  .tnode-top{display:flex;align-items:center;gap:6px;margin-bottom:3px}
-  .kind{font-size:9.5px;letter-spacing:.06em;color:var(--tone);text-transform:uppercase}
-  .nid{font-size:9.5px;color:var(--tx4);letter-spacing:.03em}
-  .st{margin-left:auto;font-size:10px;padding:0 5px;border-radius:5px;line-height:16px;white-space:nowrap;
+  .tnode-top{display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:nowrap}
+  .kind{font-size:9.5px;letter-spacing:.06em;color:var(--tone);text-transform:uppercase;white-space:nowrap;flex:0 0 auto}
+  .nid{font-size:9.5px;color:var(--tx4);letter-spacing:.03em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .st{margin-left:auto;flex:0 0 auto;font-size:10px;padding:0 5px;border-radius:5px;line-height:16px;white-space:nowrap;
     color:var(--st-tone,var(--tx3));background:color-mix(in srgb,var(--st-tone,var(--tx3)) 13%,transparent);
     border:1px solid color-mix(in srgb,var(--st-tone,var(--tx3)) 24%,transparent)}
   .tnode[data-frozen="1"]{opacity:.46;filter:grayscale(.35) saturate(.7);transition:opacity 160ms var(--ease-out)}
   .tnode[data-frozen="1"]:hover{opacity:.72}
+  /* ── 可开工（空闲分支）：只有没在跑、祖先也没在跑、没有未处置问题的节点才亮 ── */
+  .idle-pill{display:none;align-items:center;height:15px;padding:0 5px;border-radius:5px;font-size:9px;line-height:1;
+    letter-spacing:.04em;white-space:nowrap;flex:0 0 auto;font-weight:500;
+    color:var(--ready);border:1px solid color-mix(in srgb,var(--ready) 34%,transparent);
+    background:color-mix(in srgb,var(--ready) 12%,transparent)}
+  .tnode[data-idle="strong"] .idle-pill,.tnode[data-idle="modest"] .idle-pill{display:inline-flex}
+  .tnode[data-idle="strong"]{border-color:color-mix(in srgb,var(--ready) 44%,var(--b1));
+    box-shadow:0 0 0 1.5px color-mix(in srgb,var(--ready) 24%,transparent)}
+  .tnode[data-idle="strong"]::before{width:3px;background:var(--ready);opacity:1}
+  .tnode[data-idle="modest"]{border-color:color-mix(in srgb,var(--ready) 30%,var(--b1))}
+  .tnode[data-idle="modest"]::before{width:2px;background:var(--ready);opacity:.55}
+  .tnode[data-idle="strong"]:hover,.tnode[data-idle="modest"]:hover{border-color:color-mix(in srgb,var(--ready) 62%,var(--b3))}
+  /* 刚变空闲时闪一次（只在状态翻转那一下，不做常驻呼吸动画） */
+  .tnode[data-idle-pulse="1"]{animation:idleFlash 700ms var(--ease-out)}
+  @keyframes idleFlash{
+    0%{background:color-mix(in srgb,var(--ready) 26%,var(--l2))}
+    100%{background:var(--l2)}
+  }
+  @media (prefers-reduced-motion:reduce){ .tnode[data-idle-pulse="1"]{animation:none} }
   .frozenbad{font-size:9.5px;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);
     border-radius:4px;padding:2px 5px;line-height:1;white-space:nowrap}
   .tnode-title{font-size:12.5px;line-height:1.42;color:var(--tx1);
@@ -372,8 +402,22 @@
   /* ───────── footer ───────── */
   .footer{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:7px 16px;border-top:1px solid var(--b2);
     background:var(--l1);font-size:11.5px;color:var(--tx4)}
-  .footer .next{display:flex;align-items:center;gap:8px;color:var(--tx3)}
+  .footer .next{display:flex;align-items:center;gap:8px;color:var(--tx3);
+    border:0;background:none;padding:0;text-align:left;cursor:pointer;border-radius:6px}
   .footer .next b{color:var(--tx2);font-weight:500}
+  .footer .next:disabled{cursor:default}
+  .footer .next .pill{border-color:color-mix(in srgb,var(--ready) 32%,var(--b2));color:var(--ready);
+    background:color-mix(in srgb,var(--ready) 10%,transparent)}
+  .footer .next .pill .dot{background:var(--ready)}
+  .footer .next[data-kind="blocked"] .pill{border-color:color-mix(in srgb,var(--red) 36%,var(--b2));color:var(--red);
+    background:color-mix(in srgb,var(--red) 10%,transparent)}
+  .footer .next[data-kind="blocked"] .pill .dot{background:var(--red)}
+  .footer .next[data-kind="none"] .pill{color:var(--tx4);border-color:var(--b2);background:var(--l2)}
+  .footer .next[data-kind="none"] .pill .dot{background:var(--tx4)}
+  .footer .next .next-arrow{color:var(--tx4);transition:transform 160ms var(--ease-out),color 160ms var(--ease-out)}
+  .footer .next:not(:disabled):hover .next-arrow{color:var(--tx1);transform:translateX(2px)}
+  .footer .next:not(:disabled):hover b{color:var(--tx1)}
+  .footer .next:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
   .pill{display:inline-flex;align-items:center;gap:5px;height:21px;padding:0 8px;border-radius:6px;corner-shape:var(--corner);
     border:1px solid var(--b2);color:var(--tx3);font-size:11px;background:var(--l2)}
 
@@ -735,11 +779,12 @@
   </main>
 
   <footer class="footer">
-    <span class="next">
-      <span class="pill"><span class="dot blocked"></span>建议下一个轮转</span>
+    <button class="next" id="next-jump" type="button" data-kind="none" aria-label="跳到空闲分支">
+      <span class="pill"><span class="dot"></span><span id="next-pill-text">建议下一个轮转</span></span>
       <b id="next-project">–</b>
       <span id="next-reason">–</span>
-    </span>
+      <span class="next-arrow" aria-hidden="true">→</span>
+    </button>
     <div class="grow"></div>
     <span>父子关系用连线表示 · 关闭自下而上传播 · 全部关闭后里程碑达成</span>
   </footer>
@@ -1217,6 +1262,70 @@ function activeAncestorOf(p, n){
   const trail = walkPath(p.root, []);
   return trail && trail.length ? (trail.find(isActive) || null) : null;
 }
+
+/* ─────────── 空闲分支（可开工）───────────
+ * 「并行规范」里已经有的那条：上游节点在跑时，下游节点起不了会话（activeAncestorOf）。
+ * 这里不新增规则、不新增字段，只把同一条判定翻过来用于渲染：没在跑、祖先也没在跑的就高亮。
+ * 注意：卡片跨机器同步来的 running 已被 staticRun 降级成 stale，所以旧快照不会被算成「忙」。
+ */
+const IDLE_KINDS = ['milestone', 'goal', 'idea'];   // 执行记录是日志，不算分支
+/**
+ * 项目内的可开工分支模型（纯函数：isBusy / isBlocked 外部注入，mock 直接抽这段跑断言）。
+ *   running = 自身有 live run
+ *   frozen  = 祖先有 live run（被上游冻住，起不了会话）
+ *   blocked = 有未处置问题（红边已经够显眼，不再叠青绿）
+ *   idle    = 其余
+ * 单条分支的项目最多到 modest（弱强调）；≥2 条才 strong（强高亮）。
+ */
+function idleModelOf(project, isBusy, isBlocked) {
+  const rows = [];
+  (function dfs(n, ancestorBusy) {
+    const busy = !!(isBusy && isBusy(n));
+    if (IDLE_KINDS.includes(n.kind) && !n.closed) {
+      rows.push({
+        node: n,
+        state: busy ? 'running' : ancestorBusy ? 'frozen' : ((isBlocked && isBlocked(n)) ? 'blocked' : 'idle'),
+      });
+    }
+    const nextBusy = ancestorBusy || busy;
+    (n.children || []).forEach(k => dfs(k, nextBusy));
+  })(project.root, false);
+  const idle = rows.filter(r => r.state === 'idle');
+  const running = rows.filter(r => r.state === 'running');
+  const mode = rows.length <= 1 ? (idle.length ? 'modest' : 'none') : (idle.length ? 'strong' : 'none');
+  return { rows, idle, running, mode, maxed: false, idleIds: new Set(idle.map(r => r.node.id)) };
+}
+function isLiveNode(p, n) {
+  const r = runFor(p, n);
+  return !!(r && (r.status === 'starting' || r.status === 'running'));
+}
+function liveRunCount() {
+  let n = 0;
+  for (const r of runMap.values()) if (r.status === 'starting' || r.status === 'running') n += 1;
+  return n;
+}
+/** 只看当前视图里看得见的项目：矩阵按筛选，聚焦视图只看当前项目 */
+function idleScopeProjects() {
+  if (state.view === 'focus') {
+    const p = PROJECTS.find(x => x.id === state.focusId) || PROJECTS[0];
+    return p ? [p] : [];
+  }
+  return visibleProjects();
+}
+/** 重算各项目的空闲分支模型；渲染前与每轮 run 轮询后都走这里 */
+function recomputeIdle() {
+  for (const p of PROJECTS) p.idle = null;
+  if (!RUN_CFG) return;   // 宿主没连上：亮了你点也起不了会话，干脆不亮
+  const maxed = !!(RUN_CFG.maxConcurrent && liveRunCount() >= RUN_CFG.maxConcurrent);
+  for (const p of idleScopeProjects()) {
+    const model = idleModelOf(p, n => isLiveNode(p, n), n => hasIssues(n));
+    model.maxed = maxed;
+    // 并发已满时再强高亮是新谎：降成弱强调，页脚与泳道头会写明「并发已满」
+    if (maxed && model.mode === 'strong') model.mode = 'modest';
+    p.idle = model;
+  }
+}
+
 const RUN_LABEL = { starting:'启动中', running:'运行中', done:'完成', failed:'失败', cancelled:'已取消', stale:'进程已不在' };
 const RUN_TONE = { starting:'var(--brand-2)', running:'var(--brand-2)', done:'var(--green)', failed:'var(--red)', cancelled:'var(--tx3)', stale:'var(--amber)' };
 
@@ -1812,6 +1921,9 @@ function nodeMarkup(n, p){
   const bars = kidsExist ? `<span class="bars">${kids.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>` : '';
   const issues = (n.issues||[]).map(i=>`<div class="issue">⚠ ${i}</div>`).join('');
   const upstream = p ? activeAncestorOf(p, n) : null;
+  const idleModel = p && p.idle;
+  const idleMode = idleModel && idleModel.idleIds.has(n.id)
+    ? (idleModel.mode === 'strong' ? 'strong' : 'modest') : '';
   const foot = [
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     canClose && blockerGate(n)
@@ -1820,10 +1932,11 @@ function nodeMarkup(n, p){
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     candGen, candPool, ideaActs, viewSess,
   ].filter(Boolean).join('');
-  return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
+  return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${idleMode ? ` data-idle="${idleMode}"` : ''}${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
       <span class="kind">${kindLabel(n)}</span>
       <span class="nid mono">${n.id}</span>
+      <span class="idle-pill">可开工</span>
       <span class="st">${st.label}</span>
     </div>
     <div class="tnode-title" title="${n.title}">${n.title}</div>
@@ -1948,9 +2061,11 @@ function layoutCanvas(project, canvas, cols){
     for (const k of kids){
       const cx = k.x, cy = k.y + k.h/2;
       const dx = Math.max(28, (cx - px) * .55);
-      const stroke = k.closed ? 'var(--green)' : (hasIssues(k) ? 'var(--red)' : tone);
-      const cls = k.closed ? 'done' : (hasIssues(k) ? 'blocked' : '');
-      out += `<path class="${cls}" d="M ${px} ${py} C ${px+dx} ${py}, ${cx-dx} ${cy}, ${cx} ${cy}" style="--edge:${stroke};--ew:${sw}"/>`;
+      // 可开工的强高亮分支：把父→子的那一段连线也点亮，读成「一条分支」而不是一个孤立的点
+      const idleStrong = !!(project && project.idle && project.idle.mode === 'strong' && project.idle.idleIds.has(k.id));
+      const stroke = idleStrong ? 'var(--ready)' : (k.closed ? 'var(--green)' : (hasIssues(k) ? 'var(--red)' : tone));
+      const cls = idleStrong ? 'idle' : (k.closed ? 'done' : (hasIssues(k) ? 'blocked' : ''));
+      out += `<path class="${cls}" d="M ${px} ${py} C ${px+dx} ${py}, ${cx-dx} ${cy}, ${cx} ${cy}" style="--edge:${stroke};--ew:${idleStrong ? sw + .6 : sw}"/>`;
     }
   }
   out += anchors.map(([x,y,tone]) => `<circle class="j" cx="${x}" cy="${y}" r="2.6" fill="${tone}"/>`).join('');
@@ -2006,11 +2121,14 @@ function laneMarkup(p){
     : gated
       ? `<button class="mini primary-converge is-locked" data-close="${esc(p.root.id)}" disabled title="${esc(blockerGateTip(p.root))}">确认达成</button>`
       : (canConverge ? `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认达成</button>` : '');
-  return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}">
+  const laneLive = laneLiveMarkup(p.idle);
+  const laneLiveKind = p.idle && p.idle.idle.length ? 'idle' : (p.idle && p.idle.running.length ? 'running' : 'none');
+  return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}" data-live="${laneLiveKind}">
     <div class="lane-head">
       <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}${stateChip}
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
+      <div class="lane-live mono" data-lane-live${laneLive ? '' : ' hidden'}>${laneLive}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标${closed ? ' · 已达成' : gated ? ` · 阻碍 ${blockerCountOf(p.root)} 条未清` : (canConverge ? ' · 待确认达成' : '关闭')}</div>
       ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
       ${laneServices(p)}
@@ -2097,6 +2215,8 @@ function renderFocus(){
   const wrap = $('#focus');
   const p = PROJECTS.find(x=>x.id===state.focusId) || PROJECTS[0];
   const pr = progressOf(p.root), st = stateOf(p.root), acts = nextAction(p);
+  const focusLive = laneLiveMarkup(p.idle);
+  const focusLiveKind = p.idle && p.idle.idle.length ? 'idle' : (p.idle && p.idle.running.length ? 'running' : 'none');
   const rootState = stateOf(p.root);
   const gated = blockerGate(p.root);
   const canConverge = !p.root.closed && rootState.key === 'review';
@@ -2110,11 +2230,12 @@ function renderFocus(){
     </div>
 
     <div class="focus-lane">
-      <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}">
+      <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}" data-live="${focusLiveKind}">
         <div class="lane-head">
           <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
           <div class="lane-tag mono">${p.tag}</div>
+          <div class="lane-live mono" data-lane-live${focusLive ? '' : ' hidden'}>${focusLive}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
           ${(p.root.closed || canConverge) ? `<div class="lane-actions">
             ${p.root.closed
@@ -2169,6 +2290,7 @@ function renderFocus(){
 function render(){
   const keepDetail = detailNode;   // 重渲染后把详情卡重新挂回原节点（窗口 resize / 切主题都会走这里）
   closeDetail();
+  recomputeIdle();                 // 先算空闲分支，nodeMarkup / laneMarkup 才有 data-idle 可写
   document.documentElement.dataset.theme = state.theme;
   setTimeout(applyFrozenStates, 0);
   $('#tab-matrix').setAttribute('aria-pressed', state.view==='matrix');
@@ -2187,9 +2309,10 @@ function render(){
   if (emptyEl) emptyEl.hidden = !isEmpty;
   if (matrixEl) matrixEl.hidden = isEmpty || state.view !== 'matrix';
   if (focusEl) focusEl.hidden = isEmpty || state.view !== 'focus';
-  if (isEmpty) { updateKpis(); return; }
+  if (isEmpty) { updateKpis(); paintFooter(); return; }
   if (state.view==='matrix') renderMatrix(); else renderFocus();
   updateKpis();
+  paintIdle();                     // 刷新 data-idle + 泳道头 + 页脚（run 轮询也走同一处）
   if (keepDetail && findProjectByNode(keepDetail)){
     requestAnimationFrame(() => openDetail(keepDetail));
     setTimeout(() => { if (!detailNode) openDetail(keepDetail); }, 60);
@@ -2206,15 +2329,165 @@ function updateKpis(){
   $('#k-review').textContent = review;
   $('#k-blocked').textContent = blocked;
   $('#k-done').textContent = closedLoops;
-  const hasReview = (p) => { let hit = false; walk(p.root, n => { if (!hit && !n.closed && deriveState(n) === 'review') hit = true; }); return hit; };
-  const next = PROJECTS.find(hasBlocked) || PROJECTS.find(hasReview) || PROJECTS.find(p=>!p.root.closed) || PROJECTS[0];
-  $('#next-project').textContent = next ? next.name : '—';
-  $('#next-reason').textContent = !next ? '还没有项目，先添加一个'
-    : (hasBlocked(next) ? '有阻断未处置，先看它'
-      : (next.root.closed ? '已达成 · 可去里程碑历史回看'
-        : (hasReview(next) ? '子项已全关闭，待确认达成' : '里程碑仍在推进')));
 }
 
+/* ─────────── 空闲分支：重绘 + 页脚建议 + 跳转 ─────────── */
+let prevIdleIds = null;            // null = 还没建立基线，首帧不闪
+let idlePulseTimer = null;
+let jumpIdx = 0;
+let footerListCache = [];
+function reduceMotion(){
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function laneLiveMarkup(model){
+  if (!model) return '';
+  const run = model.running.length, idle = model.idle.length;
+  if (!run && !idle) return '';
+  const bits = [];
+  if (run) bits.push(`<span class="ll ll-run"><i class="dot doing"></i>运行中 ${run}</span>`);
+  if (idle) bits.push(`<span class="ll ll-idle"><i class="dot ready"></i>可开工 ${idle}</span>`);
+  if (model.maxed) bits.push(`<span class="ll ll-maxed">并发已满</span>`);
+  return bits.join('<span class="ll-sep">·</span>');
+}
+function syncLaneLive(lane, p){
+  const box = lane.querySelector('[data-lane-live]');
+  if (box){
+    const html = laneLiveMarkup(p && p.idle);
+    box.innerHTML = html;
+    box.hidden = !html;
+  }
+  lane.dataset.live = (p && p.idle && p.idle.idle.length) ? 'idle'
+    : (p && p.idle && p.idle.running.length ? 'running' : 'none');
+}
+/** 只改属性、不重渲染整页：run 轮询（每 2s）走这条 */
+function paintIdle(){
+  recomputeIdle();
+  const nowIds = new Set();
+  document.querySelectorAll('.tnode[data-nid]').forEach(el => {
+    const nid = el.dataset.nid;
+    const p = findProjectByNode(nid);
+    const n = p && findNode(p.root, nid);
+    const model = p && p.idle;
+    let v = '';
+    if (model && n && model.idleIds.has(n.id)) v = model.mode === 'strong' ? 'strong' : 'modest';
+    if (v){ el.dataset.idle = v; nowIds.add(n.id); }
+    else el.removeAttribute('data-idle');
+  });
+  document.querySelectorAll('.lane[data-project]').forEach(lane => {
+    syncLaneLive(lane, PROJECTS.find(x => x.id === lane.dataset.project));
+  });
+  paintFooter();
+  const fresh = prevIdleIds ? [...nowIds].filter(id => !prevIdleIds.has(id)) : [];
+  prevIdleIds = nowIds;
+  if (!fresh.length) return;
+  requestAnimationFrame(() => {
+    fresh.forEach(id => {
+      document.querySelectorAll(`.tnode[data-nid="${id}"]`).forEach(el => { el.dataset.idlePulse = '1'; });
+    });
+    clearTimeout(idlePulseTimer);
+    idlePulseTimer = setTimeout(() => {
+      document.querySelectorAll('.tnode[data-idle-pulse]').forEach(el => el.removeAttribute('data-idle-pulse'));
+    }, 780);
+  });
+}
+/**
+ * 页脚建议的顺序：先未处置阻断（现有口径），再空闲分支——
+ * 待确认（一步收口）> 没有未关闭子节点的前沿节点 > 容器。
+ */
+function footerTargets(){
+  const blocked = [];
+  for (const p of PROJECTS){
+    walk(p.root, n => { if (!n.closed && hasIssues(n)) blocked.push({ p, n, kind: 'blocked', why: '有阻断未处置，先看它', rank: 0, order: 0 }); });
+  }
+  if (blocked.length) return blocked;
+  const out = [];
+  for (const p of idleScopeProjects()){
+    const model = p.idle;
+    if (!model || !model.idle.length) continue;
+    const order = new Map();
+    let i = 0;
+    walk(p.root, n => order.set(n.id, i++));
+    for (const row of model.idle){
+      const n = row.node;
+      const openKid = (n.children || []).some(k => !k.closed && !isRecord(k) && IDLE_KINDS.includes(k.kind));
+      const review = deriveState(n) === 'review';
+      out.push({
+        p, n, kind: 'idle', order: order.get(n.id) || 0,
+        rank: review ? 0 : (openKid ? 2 : 1),
+        why: review ? '子项已全关闭，等你确认' : (openKid ? '可开工的分支' : '下一条可开工的分支'),
+      });
+    }
+  }
+  return out.sort((a, b) =>
+    a.rank - b.rank || PROJECTS.indexOf(a.p) - PROJECTS.indexOf(b.p) || a.order - b.order);
+}
+function paintFooter(){
+  const btn = document.querySelector('#next-jump');
+  if (!btn) return;
+  const pillText = document.querySelector('#next-pill-text');
+  const np = document.querySelector('#next-project');
+  const nr = document.querySelector('#next-reason');
+  if (!RUN_CFG){
+    // 没连宿主（只读样例）：没有 run 状态可算，退回原来的项目级建议，且不可跳转
+    const hasReview = (p) => { let hit = false; walk(p.root, n => { if (!hit && !n.closed && deriveState(n) === 'review') hit = true; }); return hit; };
+    const next = PROJECTS.find(hasBlocked) || PROJECTS.find(hasReview) || PROJECTS.find(p=>!p.root.closed) || PROJECTS[0];
+    btn.disabled = true;
+    btn.dataset.kind = next && hasBlocked(next) ? 'blocked' : 'none';
+    if (pillText) pillText.textContent = '建议下一个轮转';
+    if (np) np.textContent = next ? next.name : '—';
+    if (nr) nr.textContent = !next ? '还没有项目，先添加一个'
+      : (hasBlocked(next) ? '有阻断未处置，先看它'
+        : (next.root.closed ? '已达成 · 可去里程碑历史回看'
+          : (hasReview(next) ? '子项已全关闭，待确认达成' : '里程碑仍在推进')));
+    btn.setAttribute('aria-label', '未连接宿主：只能看，不能跳转');
+    return;
+  }
+  const list = footerTargets();
+  footerListCache = list;
+  if (!list.length){
+    btn.disabled = true;
+    btn.dataset.kind = 'none';
+    if (pillText) pillText.textContent = PROJECTS.length ? '都在运行' : '建议下一个轮转';
+    if (np) np.textContent = '—';
+    if (nr) nr.textContent = PROJECTS.length ? '等一个会话结束，空闲分支会自动亮起来' : '还没有项目，先添加一个';
+    btn.setAttribute('aria-label', '当前没有空闲分支');
+    return;
+  }
+  const t = list[jumpIdx % list.length];
+  btn.disabled = false;
+  btn.dataset.kind = t.kind;
+  if (pillText) pillText.textContent = t.kind === 'blocked' ? '先解阻断' : '空闲分支';
+  if (np) np.textContent = t.n.title;
+  if (nr) nr.textContent = `${t.p.name} · ${t.why}${list.length > 1 ? ` · 共 ${list.length} 条` : ''}`;
+  btn.setAttribute('aria-label',
+    `跳到${t.kind === 'blocked' ? '阻断' : '空闲'}分支：${t.n.title}，共 ${list.length} 条`);
+}
+let activeFlashTimer = null;
+function flashNode(el){
+  document.querySelectorAll('.tnode.is-active').forEach(x => x.classList.remove('is-active'));
+  el.classList.add('is-active');
+  clearTimeout(activeFlashTimer);
+  activeFlashTimer = setTimeout(() => el.classList.remove('is-active'), 1400);
+}
+/** 点页脚：展开（泳道折叠 / 已闭环折叠都算）→ 滚到卡片 → 闪一下；多条时循环 */
+function jumpToNextTarget(){
+  const list = footerListCache.length ? footerListCache : footerTargets();
+  if (!list.length) return;
+  const t = list[jumpIdx % list.length];
+  jumpIdx += 1;
+  if (collapsed.has(t.p.id)) collapsed.delete(t.p.id);
+  ensureVisible(t.n.id);
+  if (state.view === 'focus') state.focusId = t.p.id;
+  render();
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`.tnode[data-nid="${t.n.id}"]`);
+    if (el){
+      el.scrollIntoView({ block: 'center', inline: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' });
+      flashNode(el);
+    }
+    paintFooter();   // 页脚立刻显示「下一条」
+  });
+}
 /* ─────────── 关闭 / 重开 / 加节点 ─────────── */
 function findProjectByNode(id){
   for (const p of PROJECTS){ if (findNode(p.root, id)) return p; }
@@ -4764,6 +5037,7 @@ function paintRunBadges(){
     const html = runBadge(p, n);
     if (html) el.insertAdjacentHTML('beforeend', html);
   });
+  paintIdle();          // run 状态变了，「可开工」跟着变；只改属性，不重渲染整页
   if (detailNode) openDetail(detailNode);
 }
 // 调试/自检钩子：从控制台或测试脚本手动触发刷新
@@ -5106,6 +5380,7 @@ function toast(msg){
 // 切视图就停掉正在跑的动作轮询（不打断会话本身，回来点刷新照样能看到结果）
 $('#tab-matrix').addEventListener('click', ()=>{ stopActionPolls(); state.view='matrix'; render(); });
 $('#tab-focus').addEventListener('click', ()=>{ stopActionPolls(); state.view='focus'; render(); });
+$('#next-jump').addEventListener('click', jumpToNextTarget);   // 页脚「空闲分支 →」：滚到那条分支
 window.addEventListener('pagehide', stopActionPolls);
 $('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
 // 刷新：真实重新拉一次 /api/cards + 服务/会话状态，再报数量（旧版只重绘内存，提示还写着 mock）
