@@ -122,6 +122,9 @@ async function seedProject({ id, name, services }) {
   return { id, name, workspace: ws, file: `${id}.rotation.json` };
 }
 
+// 「只有非当前平台命令」的服务：换个平台跑也确定跳过（不假定作者在哪个平台跑 mock）
+const OTHER_PLATFORM = process.platform === 'darwin' ? 'windows' : 'mac';
+
 const entries = await Promise.all([
   // A：两个服务抢同一端口（触发批量拒绝）+ 一个 https 缺省端口 + 没有启动命令
   seedProject({
@@ -132,13 +135,13 @@ const entries = await Promise.all([
       { id: 'docs', name: 'Docs 443', url: 'https://127.0.0.1/' },
     ],
   }),
-  // B：一个在线（指向 mock 自己）+ 缺命令 + 只有 mac 命令（当前平台缺命令）
+  // B：一个在线（指向 mock 自己）+ 缺命令 + 只有非当前平台命令（当前平台缺命令）
   seedProject({
     id: 'proj-b', name: '项目 B',
     services: [
       { id: 'health', name: 'Mock Health', url: `${mockPeer}${BASE}/api/health` },
       { id: 'nocmd', name: 'NoCmd 59124', url: 'http://127.0.0.1:59124' },
-      { id: 'maconly', name: 'MacOnly 59125', url: 'http://127.0.0.1:59125', start: { mac: 'pnpm dev' } },
+      { id: 'otheronly', name: 'OtherOnly 59125', url: 'http://127.0.0.1:59125', start: { [OTHER_PLATFORM]: 'pnpm dev' } },
     ],
   }),
   // C：只用来验证「在线 / 缺命令全部跳过」的干净项目
@@ -147,7 +150,7 @@ const entries = await Promise.all([
     services: [
       { id: 'up', name: 'Up', url: `${mockPeer}${BASE}/api/health` },
       { id: 'nocmd', name: 'NoCmd 59126', url: 'http://127.0.0.1:59126' },
-      { id: 'maconly', name: 'MacOnly 59127', url: 'http://127.0.0.1:59127', start: { mac: 'pnpm dev' } },
+      { id: 'otheronly', name: 'OtherOnly 59127', url: 'http://127.0.0.1:59127', start: { [OTHER_PLATFORM]: 'pnpm dev' } },
     ],
   }),
   // D：url 解析不了 → port null，且不参与冲突检测
@@ -369,8 +372,7 @@ try {
     rowOf('proj-a', 'web')?.host === '127.0.0.1' && rowOf('proj-b', 'health')?.host === '127.0.0.1',
     JSON.stringify([rowOf('proj-a', 'web')?.host, rowOf('proj-b', 'health')?.host]));
   check('summary.total / up 正确', all.body?.summary?.total === 14 && all.body?.summary?.up === 5, JSON.stringify(all.body?.summary));
-  const macMissing = process.platform === 'darwin' ? 0 : 2;   // 只有 mac 命令的服务：在 mac 上不算缺命令
-  check('summary.missingCommand 统计缺当前平台命令的服务', all.body?.summary?.missingCommand === 9 + macMissing, JSON.stringify(all.body?.summary));
+  check('summary.missingCommand 统计缺当前平台命令的服务', all.body?.summary?.missingCommand === 11, JSON.stringify(all.body?.summary));
   const conflictOf = (list, port) => (list || []).find((group) => group.port === port);
   check('冲突包含「同端口两个离线服务」（A 的 59123）',
     conflictOf(all.body?.conflicts, 59123)?.services.length === 2, JSON.stringify(all.body?.conflicts));
@@ -391,7 +393,7 @@ try {
   check('probe=0 conflicts 同口径', (staticAll.body?.conflicts || []).length === 2
     && !!conflictOf(staticAll.body?.conflicts, clashPeer.port), JSON.stringify(staticAll.body?.conflicts));
   check('probe=0 summary 按静态 startCommand 统计', staticAll.body?.summary?.up === 0
-    && staticAll.body?.summary?.missingCommand === 9 + macMissing, JSON.stringify(staticAll.body?.summary));
+    && staticAll.body?.summary?.missingCommand === 11, JSON.stringify(staticAll.body?.summary));
 
   /* 7. 既有单项目接口行为不变 */
   const perProject = await getJson('/api/services?file=proj-a');
@@ -425,7 +427,7 @@ try {
   check('干净项目返回 200', clean.status === 200 && clean.body?.ok === true, JSON.stringify(clean.body));
   check('在线服务跳过 reason=up', skippedOf('up')?.reason === 'up', JSON.stringify(clean.body?.skipped));
   check('缺命令服务跳过 reason=no-command', skippedOf('nocmd')?.reason === 'no-command', JSON.stringify(clean.body?.skipped));
-  check('只有 mac 命令的服务在本平台跳过', skippedOf('maconly')?.reason === 'no-command', JSON.stringify(clean.body?.skipped));
+  check('只有非当前平台命令的服务在本平台跳过', skippedOf('otheronly')?.reason === 'no-command', JSON.stringify(clean.body?.skipped));
   check('没拉起任何服务', (clean.body?.started || []).length === 0 && (clean.body?.failed || []).length === 0, JSON.stringify(clean.body));
   await sleep(300);
   check('跳过场景也没有 spawn 标记', !existsSync(marker));
