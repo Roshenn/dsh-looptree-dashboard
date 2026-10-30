@@ -157,6 +157,24 @@ const scCand = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 
 check('执行候选注入目标场景', scCand.includes('\n场景\n') && scCand.includes('候选不能越出'), '');
 const scCandGoal = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-g1' });
 check('构思候选注入里程碑阻碍', scCandGoal.includes('- 里程碑阻碍：') && scCandGoal.includes('缺进度持久化'), '');
+// 里程碑候选：完全由阻碍项驱动（2026-10-30 用户反馈「目标脱离里程碑、抽象」）
+const msCand = composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop' });
+check('里程碑候选逐条注入阻碍项', msCand.includes('- 阻碍项（每条候选只认领其中一条）：') && msCand.includes('缺进度持久化'), '');
+check('里程碑候选去掉差异轴要求', !msCand.includes('差异轴'), '');
+check('里程碑候选每条只解决一条阻碍', msCand.includes('每条只解决一条阻碍项') && msCand.includes('认领一条不同的阻碍项'), '');
+check('里程碑候选条数受阻碍条数约束', msCand.includes('给出 2 条候选目标'), msCand.split('\n').find((x) => x.includes('给出')) || '');
+check('里程碑候选 count 不超过阻碍条数', composeCandidatePrompt({ ...fxArgs, card: withCtxFields, nodeId: 'sw-loop', count: 6 }).includes('给出 2 条候选目标'), '');
+check('里程碑候选要复现阻碍证据', msCand.includes('复现阻碍现状') && msCand.includes('"evidence"'), '');
+check('里程碑候选验收＝阻碍消除判据', msCand.includes('阻碍消除后能观察到的判据'), '');
+check('里程碑候选 blocker 照抄短名', msCand.includes('照抄阻碍项原文的短名'), '');
+check('里程碑候选去掉原文编号叠号', !msCand.includes('1) 1)') && !msCand.includes('2) 2)'), '');
+check('里程碑候选 lint', lintPrompt(msCand).warnings.length === 0, JSON.stringify(lintPrompt(msCand).warnings.slice(0, 2)));
+// 阻碍项为空：直接拒绝，不退化成「按愿景缺口」编抽象目标
+const msNoBlockerCard = JSON.parse(JSON.stringify(fx));
+delete msNoBlockerCard.milestone.blockers;
+let msNoBlockerErr = null;
+try { composeCandidatePrompt({ ...fxArgs, card: msNoBlockerCard, nodeId: 'sw-loop' }); } catch (error) { msNoBlockerErr = error; }
+check('无阻碍项时拒绝生成目标候选', !!msNoBlockerErr && msNoBlockerErr.code === 'BLOCKERS_REQUIRED', String(msNoBlockerErr && msNoBlockerErr.message));
 const ideaVision = composeIdeaPrompt({ ...fxArgs, nodeId: 'sw-g1' });
 check('拆构思注入里程碑愿景', ideaVision.includes('- 所属里程碑愿景：'), '');
 check('拆构思注入目标场景', ideaVision.includes('目标已定的落地场景流程'), '');

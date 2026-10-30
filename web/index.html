@@ -4247,7 +4247,9 @@ const candRowHtml = (c, p0, n0) => {
     <div class="cand-row" data-cand-row="${candUid(c)}">
       <div class="cand-main">
         <div class="cand-title">${esc(c.title || '（未命名）')}</div>
+        ${c.blocker ? `<div class="cand-str">阻碍：${esc(c.blocker)}</div>` : ''}
         ${c.strength ? `<div class="cand-str">优势：${esc(c.strength)}</div>` : ''}
+        ${c.evidence ? `<div class="cand-str">证据：${esc(c.evidence)}</div>` : ''}
         ${c.acceptance ? `<div class="cand-acc">${esc(c.acceptance)}</div>` : ''}
       </div>
       <button class="tbtn primary" data-cand-adopt="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}"
