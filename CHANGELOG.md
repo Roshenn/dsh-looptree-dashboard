@@ -1,6 +1,27 @@
 # CHANGELOG
 
+## 0.12.2 — README 标准化 + MIT 许可
+
+- **需求**（2026-10-30）：README 488 行、两个 H1，正文其实是开发日志，缺首屏定位、安装步骤与 License；
+  要求按流行 DSH 插件（modsearch / modlens / dsh-market / dsh-TUI / dsh-context）的骨架重排，
+  许可证定为 **MIT**。
+- **改动**：
+  - `README.md` 改成英文标准结构：banner → 一句话定位 → 语言切换 → badges → Why → Features →
+    See it work → Installation → Usage → Data model → HTTP API → Configuration → Security →
+    Known limitations → Development → Documentation 索引 → Contributing → License；
+  - 新增 `README.zh-CN.md` 中文对照，两版顶部互链、章节一一对应；
+  - 旧 README 全文归档到 `docs/devlog.md`（顶部加归档说明、标注已过期项，图片链接改指 `../assets/`），信息不丢；
+  - 新增 `LICENSE`（MIT，© 2026 jrri）；`package.json` 补 `license` / `author` / `repository` /
+    `homepage` / `bugs` / `keywords`（含 `dsh-plugin`），`files` 加 `assets`，版本 0.12.2；
+  - 9 张 `preview-*.png` 从仓库根目录移到 `assets/`，并补现版 UI 截图（`hero` / `detail` /
+    `prompt-structure`），README 首屏与「看效果」统一引用；
+  - `INSTALL.md` 里指向 README「入口结论」的链接改指 `docs/devlog.md`。
+- **验证**：本机 `npm run preflight` 红在 `mock:registry`（7 项）——已在 HEAD 的干净 worktree 复现，
+  与本次改动无关：本机 `~/.dsh/rotation/registry.json` 有一条 `english-shadow`，mock 的临时
+  `ROTATION_HOME` 没把它隔离掉。文档改动按 AGENTS.md 走人工核对（章节对应、链接、图片路径）。版本 0.12.2
+
 ## 0.12.1 — 愿景上限放宽到 1000 字
+
 
 - **需求**（2026-10-30）：愿景是宏大叙事，300 字（0.12.0 里放宽到 500 字）仍然不够写清「变成什么样」，
   上限改为 **1000 字**；其余长字段仍是 300 字。
