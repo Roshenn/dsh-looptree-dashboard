@@ -91,11 +91,13 @@ const SOURCE = [
   grabFunction('blockersOf'),
   grabFunction('blockerCountOf'),
   grabFunction('blockerGate'),
+  grabFunction('blockerGateTip'),
   grabFunction('closeLabelOf'),
+  grabFunction('convergeGate'),
 ].join('\n');
 
 const api = new Function(`${SOURCE}
-return { walk, workKids, ideaRecordsDone, deriveState, stateOf, autoCloseTree, syncRawStatus, STATE_DEF, parseItems, serializeItems, blockersOf, blockerCountOf, blockerGate, closeLabelOf };`)();
+return { walk, workKids, ideaRecordsDone, deriveState, stateOf, autoCloseTree, syncRawStatus, STATE_DEF, parseItems, serializeItems, blockersOf, blockerCountOf, blockerGate, closeLabelOf, convergeGate };`)();
 
 /* ── 造节点（和面板 conv() 后的形状一致：记录靠 raw.action 识别） ── */
 const N = (id, kind, opts = {}) => ({
@@ -192,6 +194,19 @@ check('阻碍项清空 → 放行', api.blockerGate(N('ms-clear', 'milestone', {
 const gateClosed = N('ms-done', 'milestone', { title: '里程碑', closed: true, raw: { acceptance: 'x', blockers: '1) 缺 A', closed_at: '2026-10-29T00:00:00Z' }, children: [] });
 check('已达成的里程碑不再拦（闸门只管未闭合）', api.blockerGate(gateClosed) === false);
 check('非里程碑节点不拦（闸门只管里程碑）', api.blockerGate(N('g1', 'goal', { title: '目标', raw: { acceptance: 'x', blockers: '1) 缺 A' }, children: [] })) === false);
+
+/* 8. convergeGate：没衍生过子节点就灰；折叠克隆（可见 kids 为空）仍按原节点放行 */
+check('从没衍生过子节点的目标 → 置灰（no-kids）', api.convergeGate(N('g-empty', 'goal', { title: '空目标', raw: { acceptance: 'x' }, children: [] })).state === 'no-kids', JSON.stringify(api.convergeGate(N('g-empty', 'goal', { title: '空目标', raw: { acceptance: 'x' }, children: [] }))));
+check('没有目标子节点的里程碑 → 置灰（no-kids）', api.convergeGate(N('ms-empty', 'milestone', { title: '空里程碑', raw: { acceptance: 'x' }, children: [] })).state === 'no-kids', JSON.stringify(api.convergeGate(N('ms-empty', 'milestone', { title: '空里程碑', raw: { acceptance: 'x' }, children: [] }))));
+check('目标子节点全关闭 → 可点（ready）', api.convergeGate(reviewMilestone).state === 'ready', JSON.stringify(api.convergeGate(reviewMilestone)));
+check('目标还有子节点没关完 → 不显示按钮（hidden）', api.convergeGate(doingMilestone).state === 'hidden', JSON.stringify(api.convergeGate(doingMilestone)));
+const foldedClone = { ...reviewGoal, children: [], src: reviewGoal };   // 子节点全关闭后被折叠掉的卡片形状
+check('折叠克隆（可见 kids 空、原节点有 kids）→ 仍可点，不误灰', api.convergeGate(foldedClone).state === 'ready', JSON.stringify(api.convergeGate(foldedClone)));
+check('置灰文案指向详情页「删除节点」', /详情页点「删除节点」/.test(api.convergeGate(N('g-empty2', 'goal', { title: '空目标', raw: { acceptance: 'x' }, children: [] })).tip));
+check('里程碑阻碍项非空 → 置灰（locked）而不是可点',
+  api.convergeGate(N('ms-blk', 'milestone', { title: '里程碑', raw: { acceptance: 'x', blockers: '1)缺 A' }, children: [closedGoal] })).state === 'locked');
+check('叶子 / 构思不走收敛闸门（hidden）', api.convergeGate(N('i1', 'idea', { title: '构思', children: [] })).state === 'hidden' && api.convergeGate(N('e1', 'exec', { title: '记录', children: [] })).state === 'hidden');
+check('已关闭的容器卡不显示收敛按钮', api.convergeGate({ ...reviewGoal, closed: true }).state === 'hidden');
 
 const failed = results.filter((r) => !r.pass).length;
 console.log(failed ? `\n${failed} 项失败` : '\n手动确认规则全部通过');

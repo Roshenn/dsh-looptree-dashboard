@@ -157,7 +157,9 @@ Three steps, once per day:
    show running / done / failed with the session result.
 2. **Close what is closed.** A goal whose children are all done is **待确认收敛** — confirm it to write
    `closed_at`. A milestone whose blockers are empty is **待确认达成** — confirm it to snapshot it into
-   the milestone history and keep the project in the main lane.
+   the milestone history and keep the project in the main lane. Both buttons sit at the card's left edge;
+   a goal that never spawned a child keeps its button greyed out — delete that node from its detail panel
+   instead of converging it.
 3. **Push the next step.** Every node has a prompt template; **发起** previews the prompt, then starts
    a real DSH session in that project's `workspace`.
 

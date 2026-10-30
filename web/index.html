@@ -278,6 +278,8 @@
   .tbtn:disabled{opacity:.45;cursor:default;pointer-events:none}
   /* 锁定态用 aria-disabled 而不是 disabled：按钮还能点，点一下用 toast 说清为什么不能生成 */
   .tbtn.is-locked{opacity:.5;cursor:not-allowed}
+  /* 收敛 / 达成独占卡片 footer 左端：它与右侧「继续生成」那组动作语义相反，物理分开防误点 */
+  .tfootline .lead{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
   /* 候选池计数槽位定宽：数字 0→6 变化不改变按钮宽度，节点卡不会因刷新而换行/长高 */
   .cand-n{display:inline-block;min-width:8px;margin-left:3px;text-align:right;font-variant-numeric:tabular-nums}
   .tbtn.primary{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:color-mix(in srgb,var(--amber) 40%,transparent);color:var(--amber)}
@@ -1477,6 +1479,43 @@ function closeLabelOf(n){
   if (n.kind === 'goal') return '确认收敛';
   return '完成';
 }
+/**
+ * 收敛 / 达成的闸门：目标「确认收敛」、里程碑「确认达成」都必须真的衍生出过工作子节点。
+ * 没衍生出去就没有可收口的分支——按钮置灰，想结束它进详情页点「删除节点」。
+ * 判据取原节点 (n.src)：折叠克隆会把已闭环子节点藏掉，看可见 kids 会把正常收敛路径一起灰掉。
+ * 返回 { state, label, tip }：
+ *   ready  可点（子节点全关闭）
+ *   locked 灰（阻碍项没清）
+ *   no-kids 灰（从来没衍生过子节点）
+ *   hidden 不显示（叶子 / 构思 / 已闭环 / 子节点还没关完）
+ */
+function convergeGate(n){
+  if (!n || n.closed) return { state: 'hidden', label: '', tip: '' };
+  const src = n.src || n;
+  if (src.kind !== 'goal' && src.kind !== 'milestone') return { state: 'hidden', label: '', tip: '' };
+  const label = closeLabelOf(src);
+  const kids = workKids(src);
+  if (!kids.length){
+    const childKind = src.kind === 'goal' ? '构思' : '目标';
+    const how = src.kind === 'goal'
+      ? '想结束它，进详情页点「删除节点」'
+      : '里程碑根节点不能删：先给它加目标，或从项目列表移除这张卡';
+    return { state: 'no-kids', label, tip: `还没有${childKind}子节点，没衍生出去就没有可收口的分支。${how}` };
+  }
+  if (blockerGate(src)) return { state: 'locked', label, tip: blockerGateTip(src) };
+  if (!kids.every(k => k.closed)) return { state: 'hidden', label, tip: '' };
+  return { state: 'ready', label, tip: '' };
+}
+/** 收敛 / 达成按钮：节点卡与详情卡共用同一个出口，口径不会分叉 */
+function convergeBtnMarkup(n, tone){
+  const g = convergeGate(n);
+  if (g.state === 'hidden') return '';
+  if (g.state === 'ready'){
+    return `<button class="tbtn ${tone || (n.kind === 'milestone' ? 'primary-converge' : 'primary')}" data-close="${n.id}">${g.label}</button>`;
+  }
+  // 灰态：视觉上不可点，点一下只用 toast 说清为什么、该走哪条路（disabled 的按钮发不出 toast）
+  return `<button class="tbtn is-locked" data-close="${n.id}" aria-disabled="true" title="${esc(g.tip)}">${g.label}</button>`;
+}
 /** 构思的「记录全闭环」判据：计划 / 执行 / 反馈都关闭，且至少有一次执行（只出计划不算完成） */
 function ideaRecordsDone(n){
   if (!n || n.kind !== 'idea') return false;
@@ -1912,8 +1951,16 @@ function nodeMarkup(n, p){
   const isContainer = n.kind === 'milestone' || n.kind === 'goal';
   // 目标/里程碑：子项全关闭后由人确认；构思：记录还有未闭环的也不给关（否则校验 422）
   const recordOpen = isIdea && (n.children || []).some(k => !k.closed);
-  const canClose = !n.closed && (kidsExist ? (isContainer && kids.every(k => k.closed)) : !recordOpen);
-  const closeLabel = closeLabelOf(n);
+  // 容器卡（目标 / 里程碑）走收敛闸门：从没衍生过子节点就置灰，不再凭空收口。
+  // 叶子与构思保持原来的「完成」判据（记录没全闭环不给关），位置也不动
+  const leafCanClose = !isContainer && !n.closed && !recordOpen;
+  // 收敛 / 达成（只有容器卡有）独占 footer 左端；叶子「完成」仍在原来的按钮组位置
+  const closeBtn = isContainer
+    ? convergeBtnMarkup(n, n.kind === 'milestone' ? 'primary-converge' : 'primary')
+    : '';
+  const leafCloseBtn = leafCanClose
+    ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>`
+    : '';
   const addKind = n.kind==='milestone' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
   // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
   // 构思卡不再抽候选：改为「生成计划 / 执行计划」，目标卡与里程碑卡保持候选池
@@ -1944,12 +1991,12 @@ function nodeMarkup(n, p){
     ? (idleModel.mode === 'strong' ? 'strong' : 'modest') : '';
   const foot = [
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
-    canClose && blockerGate(n)
-      ? `<button class="tbtn is-locked" data-close="${n.id}" disabled title="${esc(blockerGateTip(n))}">${closeLabel}</button>`
-      : canClose ? `<button class="tbtn ${n.kind==='milestone'?'primary-converge':'primary'}" data-close="${n.id}">${closeLabel}</button>` : '',
+    leafCloseBtn,
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     candGen, candPool, ideaActs, viewSess,
   ].filter(Boolean).join('');
+  // 收敛 / 达成落在 footer 左端（footer 里唯一贴左边的内容），右侧留给「继续生成」那组动作
+  const lead = closeBtn ? `<span class="lead">${closeBtn}</span>` : '';
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${idleMode ? ` data-idle="${idleMode}"` : ''}${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
       <span class="kind">${kindLabel(n)}</span>
@@ -1969,7 +2016,7 @@ function nodeMarkup(n, p){
     ${issues}
     ${recordErrorLine(n)}
     ${foldedMarkup(n)}
-    ${(bars||foot) ? `<div class="tfootline">${bars}<span class="grow"></span>${foot}</div>` : ''}
+    ${(bars||lead||foot) ? `<div class="tfootline">${lead}${bars}<span class="grow"></span>${foot}</div>` : ''}
   </div>`;
 }
 
@@ -3724,12 +3771,10 @@ function detailMarkup(p, n){
       </div></div>`
     : '';
   // 目标/里程碑：子项全关闭后由人确认；叶子/构思：可直接完成（记录未全闭环时不给关）
-  const detailKids = workKids(n);
   const detailContainer = n.kind === 'milestone' || n.kind === 'goal';
   const detailRecordOpen = n.kind === 'idea' && (n.children || []).some(k => !k.closed);
-  const canClose = !n.closed && (detailKids.length
-    ? (detailContainer && detailKids.every(k => k.closed))
-    : !detailRecordOpen);
+  // 容器卡与节点卡共用 convergeGate：卡片上灰掉的，详情页不会突然变可点
+  const canClose = !detailContainer && !n.closed && !detailRecordOpen;
   const isIdea = n.kind === 'idea';
   const childKind = { milestone: 'goal', goal: 'idea', idea: 'exec' }[n.kind];
   const poolCount = (!isIdea && childKind) ? candidateCount(p, n) : 0;
@@ -3751,9 +3796,9 @@ function detailMarkup(p, n){
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
   const acts = [
-    canClose && blockerGate(n)
-      ? `<button class="tbtn primary is-locked" data-close="${n.id}" disabled title="${esc(blockerGateTip(n))}">${closeLabelOf(n)}</button>`
-      : canClose ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>` : '',
+    detailContainer
+      ? convergeBtnMarkup(n, 'primary')
+      : (canClose ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>` : ''),
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     ideaActs, candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
@@ -5891,7 +5936,17 @@ document.addEventListener('click', (e)=>{
   const fchip = e.target.closest('[data-focus]');
   if (fchip){ state.focusId = fchip.dataset.focus; render(); return; }
   const closeBtn = e.target.closest('[data-close]');
-  if (closeBtn){ e.stopPropagation(); closeNode(closeBtn.dataset.close); return; }
+  if (closeBtn){
+    e.stopPropagation();
+    const id = closeBtn.dataset.close;
+    const p0 = findProjectByNode(id);
+    const n0 = p0 && findNode(p0.root, id);
+    const gate = n0 ? convergeGate(n0) : { state: 'ready', tip: '' };
+    // 灰态按钮不执行收敛，只用 toast 说清为什么、该走哪条路
+    if (gate.state === 'locked' || gate.state === 'no-kids') return toast(gate.tip);
+    closeNode(id);
+    return;
+  }
   const reopenBtn = e.target.closest('[data-reopen]');
   if (reopenBtn){ e.stopPropagation(); reopenNode(reopenBtn.dataset.reopen); return; }
   const addMenuBtn = e.target.closest('[data-addmenu]');
