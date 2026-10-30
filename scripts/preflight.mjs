@@ -43,6 +43,8 @@ try {
   await run(npm, ['run', 'mock:registry']);
   console.log('── mock:services ──');
   await run(npm, ['run', 'mock:services'], { PORT: String(Number(port) + 3) });
+  console.log('── mock:services-batch ──');
+  await run(npm, ['run', 'mock:services-batch']);
   console.log('── mock:stale-run ──');
   await run(npm, ['run', 'mock:stale-run']);
   console.log('── validate:samples ──');

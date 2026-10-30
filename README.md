@@ -67,6 +67,11 @@ The panel is the view; DSH is the engine.
   5s, and starts them with one click using the command mapped to the current platform (`mac` /
   `windows` / `linux`). An AI pass can read the project and propose its services — as a draft you
   review and probe before anything is written back.
+- **Start all / stop all across projects.** The toolbar has two batch buttons. **Start all** runs a
+  port-conflict precheck first: when two services point at the same port, nothing is started and the
+  panel lists the collision (fail closed); services already up are skipped. **Stop all** kills whatever
+  is listening on the configured loopback ports, including services you started in a terminal, and
+  reports per-port failures instead of stopping the batch.
 - **The arithmetic is on screen.** Convergence health, close span, close rate, in-flight ages, overdue
   count and ETA are computed from the tree, not typed in by hand. Formulas are in
   [rotation-card-spec.md](rotation-card-spec.md).
@@ -183,6 +188,9 @@ atomically (`tmp` + rename, no `.bak` — git is the history).
 | `POST` | `/rotation/api/service/start` · `/rotation/api/service/stop` | one-click start / stop |
 | `POST` | `/rotation/api/services/probe` · `/rotation/api/services/collect` | probe a service / AI discovery (draft → preview → write-back) |
 | `GET` | `/rotation/api/services/collect?file=` | the pending service draft for a card |
+| `GET` | `/rotation/api/services/all` | every project's services, ports and conflicts (`?probe=0` skips probing) |
+| `POST` | `/rotation/api/services/start-all` | start all offline services; `409` + conflicts means nothing was started |
+| `POST` | `/rotation/api/services/stop-all` | kill listeners on the configured loopback ports; remote hosts are reported as skipped |
 
 The panel also calls a few UI-only endpoints (`/rotation/api/sessions`, `/session`, `/workspaces`,
 `/pick-directory`, `/candidates/*`, `/fill`, `/splits`); they are not a stable contract — read
@@ -242,6 +250,11 @@ Nothing leaves the machine except the model calls that DSH already routes.
 - The listener is loopback-only and unauthenticated by design (see above).
 - UI copy is Chinese-only for now; the data model and API are language-neutral.
 - Markdown in prompts is plain text on purpose — DSH chat bubbles do not render it.
+- Stop all locates listeners by port: on Windows it uses `Get-NetTCPConnection` then `netstat` /
+  `taskkill`, on macOS it needs `lsof` (bundled with the OS), on Linux it falls back to `ss` /
+  `netstat`. Services whose URL is not a loopback address (`localhost`, `127.0.0.0/8`, `::1`) are
+  reported as skipped and never killed — a configured `https://example.com` must not take down
+  whatever listens on the local `:443`.
 
 ## Development
 
@@ -252,7 +265,7 @@ npm run check          # against a running DSH: health / panel / registry
 ```
 
 Individual suites: `npm run lint:plugin`, `mock:client`, `mock:session`, `mock:action`, `mock:prompt`,
-`mock:idea-lock`, `mock:closure`, `mock:registry`, `mock:services`, `mock:stale-run`,
+`mock:idea-lock`, `mock:closure`, `mock:registry`, `mock:services`, `mock:services-batch`, `mock:stale-run`,
 `validate:samples`. Migration scripts for older cards: `migrate`, `migrate:single-idea`,
 `migrate:blockers`, `migrate:milestone` — all dry-run by default, `--write` to persist.
 

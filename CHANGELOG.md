@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 0.13.0 — 全部项目服务：一键拉起 / 一键关闭 + 端口冲突预检
+
+- **需求**（2026-10-30）：面板只能逐个服务点「一键拉起 / 停止」，要两个跨项目的批量按钮来操作
+  所有项目配置的端口；拉起前必须检测所有服务的端口冲突，有冲突则无法一键拉起。
+  澄清结论（用户拍板）：冲突只看 `rotation.json` 配置里同一端口被多个服务占用（不探测系统实际
+  占用）；已在线的服务跳过、继续拉其余；关闭按端口杀监听进程（含终端里手动起的）；
+  没有当前平台启动命令的服务跳过并提示。
+- **改动**：
+  - host `lib/services.mjs`：`portOf`（url → 端口，http 80 / https 443）、`findPortConflicts`、
+    `isLocalServiceHost` / `splitStopTargets`（只把本机回环端口当关闭目标）；可注入的命令执行器与
+    pid 解析（PowerShell / netstat / lsof / ss）；`createPortKiller`（Windows `taskkill /F /T`，
+    mac/linux 先 SIGTERM 再 SIGKILL）；`createServiceRunner` 暴露 `killPort` / `pidsOnPort`。
+  - host `lib/index.js` 三条批量路由：`GET /api/services/all`（`?probe=0` 静态枚举、省掉逐个探活）、
+    `POST /api/services/start-all`（冲突 409 且一个都不拉，在线 / 缺命令进 skipped）、
+    `POST /api/services/stop-all`（按端口并行关闭，单端口失败只记录；远程地址进 skipped）。
+  - 面板 `web/index.html`：工具栏加「拉起全部服务」「关闭全部服务」，冲突与结果用只读弹窗摊开，
+    关闭前先列端口清单确认；请求中按钮锁住并显示阶段；只读弹窗只留「知道了」。
+  - 新 `scripts/services-batch-mock.mjs`（73 条断言：端口解析、冲突口径、probe=0、缺命令跳过、
+    五类 pid 解析器、win32/mac/linux 杀进程策略、不杀宿主自身、远程地址不参与）并接进
+    `npm run preflight`；README 中英文与 `docs/architecture.md` 同步。
+- **验证**：`npm run preflight` 全绿；`npm run mock:services-batch` 73/73、`npm run mock:services`
+  27/27 无回归；真实 Windows 集成——临时项目 + 3 个 node 监听，一键拉起后三个端口 LISTENING，
+  二次拉起全部 skipped，一键关闭后端口无监听且 `killed` 带 pid；面板浏览器实测：拉起结果弹窗、
+  端口冲突 409 弹窗（列出 :41210 的两个占用方）、关闭确认弹窗与端口释放。版本 0.13.0
+
 ## 0.12.2 — README 标准化 + MIT 许可
 
 - **需求**（2026-10-30）：README 488 行、两个 H1，正文其实是开发日志，缺首屏定位、安装步骤与 License；

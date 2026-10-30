@@ -74,6 +74,10 @@
   .chip:hover{color:var(--tx1);background:var(--hover)}
   .chip[aria-pressed="true"]{color:var(--tx1);background:var(--brand-dim);border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
   .chip:active{transform:scale(.97)}
+  /* 全部服务批量操作：请求中禁用 + 关闭按钮用危险色 */
+  .chip[aria-busy="true"]{opacity:.55;cursor:progress;pointer-events:none}
+  .chip.chip-danger{color:color-mix(in srgb,var(--red) 74%,var(--tx2))}
+  .chip.chip-danger:hover{color:var(--red);background:color-mix(in srgb,var(--red) 12%,transparent);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
   .hint{font-size:11.5px;color:var(--tx4)}
   /* 工具栏里的提示不许被挤成竖排：只允许单行截断，放不下出省略号 */
   .toolbar .hint{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -702,6 +706,9 @@
       <button class="chip" id="load-json">载入 JSON</button>
       <input type="file" id="file-input" accept=".json,application/json" hidden>
       <button class="chip" id="export-json">导出 JSON</button>
+      <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
+      <button class="chip" id="svc-start-all" title="所有项目：先检测端口冲突，有冲突则一个都不拉；已在线的服务跳过">拉起全部服务</button>
+      <button class="chip chip-danger" id="svc-stop-all" title="所有项目：按端口结束监听进程（含终端里手动起的）">关闭全部服务</button>
       <span class="hint" id="save-state" style="margin-left:6px"></span>
       <span class="hint" id="data-src" style="margin-left:6px"></span>
     </div>
@@ -4712,6 +4719,155 @@ function svcFor(btn){
   const svc = list && list.find(x => x.id === (btn.dataset.svcOpen || btn.dataset.svcStart || btn.dataset.svcStop || btn.dataset.svcCopy));
   return { p0, svc };
 }
+
+/* ─────────── 全部服务：跨项目一键拉起 / 一键关闭 ───────────
+   后端契约（host 半）：
+     GET  /services/all        → { ok, platform, services[], conflicts[], summary }
+     POST /services/start-all  → 409 冲突（一个都不拉）/ 200 { started, skipped, failed }
+     POST /services/stop-all   → 200 { killed, failed, skipped, managedStopped }
+   冲突口径：配置里同一端口被多个服务占用，且组内至少一个属于「本次要拉起」→ 整批拒绝；
+   组内全是在线/被跳过的服务不算冲突（这次本来就没有启动动作）。 */
+let svcAllBusy = false;
+const SVC_SKIP_LABEL = { up: '已在线', 'no-command': '缺当前平台的启动命令' };
+
+function syncSvcAllButtons(){
+  const start = $('#svc-start-all'), stop = $('#svc-stop-all');
+  const off = !API_BASE;
+  if (start) start.disabled = off;
+  if (stop) stop.disabled = off;
+  if (start) start.title = off
+    ? '未连接服务：需在 DSH 或本地服务里打开面板'
+    : '所有项目：先检测端口冲突，有冲突则一个都不拉；已在线的服务跳过';
+  if (stop) stop.title = off
+    ? '未连接服务：需在 DSH 或本地服务里打开面板'
+    : '所有项目：按端口结束监听进程（含终端里手动起的）';
+}
+
+/** 批量请求中：两个按钮锁住，拉起按钮顺带显示当前阶段 */
+function setSvcAllBusy(on, hint){
+  svcAllBusy = !!on;
+  const start = $('#svc-start-all'), stop = $('#svc-stop-all');
+  [start, stop].forEach((b) => {
+    if (!b) return;
+    b.disabled = !!on || !API_BASE;
+    if (on) b.setAttribute('aria-busy', 'true'); else b.removeAttribute('aria-busy');
+  });
+  if (start) start.textContent = on ? (hint || '处理中…') : '拉起全部服务';
+}
+
+async function postSvcAll(path, body){
+  const headers = { 'content-type': 'application/json' };
+  if (RUN_CFG && RUN_CFG.token) headers['x-rotation-token'] = RUN_CFG.token;
+  const res = await fetch(api(path), { method: 'POST', headers, body: JSON.stringify(body || {}) });
+  const j = await res.json().catch(() => ({}));
+  return { status: res.status, j };
+}
+
+function svcConflictHtml(conflicts){
+  const rows = (conflicts || []).map((c) => {
+    const owners = (c.services || []).map((s) => `${esc(s.projectName || s.projectId || '?')} · ${esc(s.serviceName || s.serviceId || '?')}`);
+    return `<div class="detail-row"><dt class="mono">:${esc(String(c.port == null ? '?' : c.port))}</dt><dd>${owners.join('<br>')}</dd></div>`;
+  }).join('');
+  return `<div class="mnote">下面这些端口同时被多个服务配置占用。按「有冲突就一个都不拉」的规则，<b>本次没有启动任何服务</b>。</div>${rows}
+    <div class="mnote">改掉其中一个服务的 url 端口，或先关掉重复的那条 services，再重试。</div>`;
+}
+
+function svcBatchResultHtml(started, skipped, failed){
+  const row = (label, tone, text) => `<div class="detail-row"><dt style="color:${tone}">${label}</dt><dd>${text}</dd></div>`;
+  const head = (n) => `<div class="info-k" style="margin:10px 0 4px">${n}</div>`;
+  const startedHtml = started.length
+    ? head('已拉起') + started.map((s) => row('启动', 'var(--green)',
+        `${esc(s.projectName || s.projectId || '?')} · ${esc(s.serviceName || s.serviceId || '?')} <span class="mono" style="color:var(--tx4)">pid ${esc(String(s.pid == null ? '–' : s.pid))}</span>`)).join('')
+    : '';
+  const skippedHtml = skipped.length
+    ? head('跳过') + skipped.map((s) => row('跳过', 'var(--amber)',
+        `${esc(s.projectName || s.projectId || '?')} · ${esc(s.serviceName || s.serviceId || '?')} — ${esc(SVC_SKIP_LABEL[s.reason] || s.reason || '')}`)).join('')
+    : '';
+  const failedHtml = failed.length
+    ? head('失败') + failed.map((s) => row('失败', 'var(--red)',
+        `${esc(s.projectName || s.projectId || '?')} · ${esc(s.serviceName || s.serviceId || '?')} — ${esc(s.error || '启动失败')}`)).join('')
+    : '';
+  if (!startedHtml && !skippedHtml && !failedHtml) return '<div class="mnote">没有配置 services 的服务。</div>';
+  return startedHtml + skippedHtml + failedHtml;
+}
+
+/** 一键拉起：host 端先做端口冲突预检，409 就把冲突摊给用户，一个都不拉起 */
+async function startAllServices(){
+  if (svcAllBusy) return;
+  if (!API_BASE) return toast('未连接服务：需在 DSH 或本地服务里打开面板');
+  if (!PROJECTS.length) return toast('还没有项目');
+  setSvcAllBusy(true, '检测端口…');
+  try {
+    const { status, j } = await postSvcAll('/services/start-all');
+    if (status === 409 || (j.conflicts && j.conflicts.length)){
+      askInfo('端口冲突 · 已阻止拉起', svcConflictHtml(j.conflicts));
+      return;
+    }
+    if (!j.ok) return toast('拉起失败：' + (j.error || `HTTP ${status}`));
+    const started = j.started || [], skipped = j.skipped || [], failed = j.failed || [];
+    toast(started.length
+      ? `已拉起 ${started.length} 个服务${failed.length ? ` · ${failed.length} 个失败` : ''}`
+      : (skipped.length ? '没有需要拉起的服务（都在线或缺启动命令）' : '没有可拉起的服务'));
+    askInfo('全部服务 · 拉起结果', svcBatchResultHtml(started, skipped, failed));
+    setTimeout(refreshServices, 600);   // 探活要几秒，先出结果弹窗再刷新卡片
+  } catch (e){
+    toast('拉起失败：' + (e.message || '请求异常'));
+  } finally {
+    setSvcAllBusy(false);
+  }
+}
+
+/** 服务行 → hostname（新宿主带 host，旧宿主从 url 兜底解析） */
+function svcHostOf(row){
+  if (row && row.host) return String(row.host);
+  try { return new URL(String((row && row.url) || '')).hostname; } catch { return ''; }
+}
+/** 只杀本机回环端口的监听：远程域名 / 局域网 IP 上的端口不属于本机进程，一律跳过 */
+function isLocalServiceHost(host){
+  const h = String(host || '').replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
+  if (!h) return false;
+  if (h === 'localhost' || h === '::1' || h === '::' || h === '0.0.0.0') return true;
+  return /^127\./.test(h);
+}
+
+/** 一键关闭：先列出端口与数量让用户确认（会连终端里手动起的进程一起关） */
+async function stopAllServices(){
+  if (svcAllBusy) return;
+  if (!API_BASE) return toast('未连接服务：需在 DSH 或本地服务里打开面板');
+  setSvcAllBusy(true, '读取端口…');
+  let info = null;
+  try { const r = await fetch(api('/services/all?probe=0')); if (r.ok) info = await r.json(); } catch {}
+  setSvcAllBusy(false);
+  const list = (info && info.services) || [];
+  const local = list.filter((s) => isLocalServiceHost(svcHostOf(s)));
+  const remoteCount = list.length - local.length;
+  const ports = [...new Set(local.map((s) => s.port).filter((p) => Number.isInteger(p)))];
+  askConfirm('一键关闭全部服务',
+    `<div class="detail-row"><dt>服务</dt><dd>${list.length} 个（跨全部项目）</dd></div>
+     <div class="detail-row"><dt>本机端口</dt><dd class="mono">${ports.length ? ports.map((p) => ':' + p).join(' ') : '（没有可解析的本机端口）'}</dd></div>
+     ${remoteCount ? `<div class="detail-row"><dt>远程地址</dt><dd>${remoteCount} 个服务不是本机地址，不参与关闭（不会去杀远程端口）</dd></div>` : ''}
+     <div class="mnote">按端口结束监听进程：<b>包括终端里手动起的</b>，不只是本面板拉起的；端口空闲会跳过。</div>
+     <div class="mnote">关闭后卡片状态要多点几次刷新（探活有 1.2s 超时）才会全变回「未启动」。</div>`,
+    '全部关闭', async () => {
+      setSvcAllBusy(true, '关闭中…');
+      try {
+        const { j } = await postSvcAll('/services/stop-all');
+        if (!j.ok) return toast('关闭失败：' + (j.error || '服务未响应'));
+        const killed = j.killed || [], failed = j.failed || [];
+        const pidCount = killed.reduce((n, k) => n + ((k.pids || []).length), 0);
+        toast(pidCount ? `已关闭 ${pidCount} 个进程 · ${killed.length} 个端口` : '没有进程占用这些端口');
+        if (failed.length){
+          const html = failed.map((f) => `<div class="detail-row"><dt class="mono">:${esc(String(f.port))}</dt><dd style="color:var(--red)">${esc(f.error || '关闭失败')}</dd></div>`).join('');
+          askInfo('关闭结果 · 有端口失败', `${html}<div class="mnote">这些端口上的进程还在（可能权限不够）。到终端手动关：Windows 用 taskkill，mac/linux 用 kill。</div>`);
+        }
+        setTimeout(refreshServices, 800);
+      } catch (e){
+        toast('关闭失败：' + (e.message || '请求异常'));
+      } finally {
+        setSvcAllBusy(false);
+      }
+    });
+}
 function askConfirm(title, bodyHtml, okLabel, onOk){
   $('#ask-title').textContent = title;
   $('#ask-body').innerHTML = bodyHtml;
@@ -4719,6 +4875,12 @@ function askConfirm(title, bodyHtml, okLabel, onOk){
   $('#ask-cancel').style.display = '';    // 候选池空态会临时藏掉「取消」，每次开窗都还原
   askCb = onOk;
   showModal($('#ask'));
+}
+/** 只读信息弹窗：没有可取消的动作，藏掉「取消」只留「知道了」 */
+function askInfo(title, bodyHtml){
+  askConfirm(title, bodyHtml, '知道了', null);
+  const cancel = $('#ask-cancel');
+  if (cancel) cancel.style.display = 'none';
 }
 let askCb = null;
 
@@ -4858,6 +5020,9 @@ $('#btn-refresh').addEventListener('click', async ()=>{
   toast(ok ? `已刷新 · ${PROJECTS.length} 个项目` : '刷新失败：连不上本地服务');
 });
 $('#export-json').addEventListener('click', () => exportCard());
+// 全部服务：跨项目批量拉起 / 按端口批量关闭（host 端做端口冲突预检）
+$('#svc-start-all').addEventListener('click', () => startAllServices());
+$('#svc-stop-all').addEventListener('click', () => stopAllServices());
 // 嵌在 DSH 主区 iframe 里时：不需要「返回」，并启用紧凑工具栏
 let EMBEDDED = false;
 try { EMBEDDED = window.self !== window.top; } catch { EMBEDDED = true; }
@@ -5403,6 +5568,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
 
 (async function boot(){
   await resolveApiBase();
+  syncSvcAllButtons();   // 未连接服务时锁住「全部服务」两个按钮
   let source = 'mock';
   if (API_BASE){
     try {

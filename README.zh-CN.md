@@ -61,6 +61,9 @@
 - **服务就在同一条泳道里**：每个项目列出自己依赖的服务，每 5s 探活，一键拉起时按当前平台
   （`mac` / `windows` / `linux`）挑对应命令。AI 可以读项目自动收集服务——
   结果是草稿，探活、改完、确认后才写回。
+- **跨项目一键拉起 / 一键关闭**：工具栏上有两个批量按钮。**拉起全部**先做端口冲突预检——
+  两个服务配了同一端口就整批拒绝、一个都不拉，并把冲突列清楚（fail closed）；已在线的服务跳过。
+  **关闭全部**按端口结束监听进程（包括你在终端里手动起的），单端口失败只记录、不打断整批。
 - **指标可复算**：收敛健康度、关闭跨度、关闭速率、在途时长、超期数、ETA 全部由树算出，
   不靠手填。公式见 [rotation-card-spec.md](rotation-card-spec.md)。
 
@@ -170,6 +173,9 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 | `POST` | `/rotation/api/service/start` · `/rotation/api/service/stop` | 一键拉起 / 停止 |
 | `POST` | `/rotation/api/services/probe` · `/rotation/api/services/collect` | 服务探活 / AI 收集（草稿 → 预览 → 写回） |
 | `GET` | `/rotation/api/services/collect?file=` | 某张卡的待确认服务草稿 |
+| `GET` | `/rotation/api/services/all` | 全部项目的服务、端口与冲突（`?probe=0` 不探活） |
+| `POST` | `/rotation/api/services/start-all` | 拉起全部离线服务；`409` + conflicts 表示一个都没拉 |
+| `POST` | `/rotation/api/services/stop-all` | 按端口结束本机监听进程；远程地址记进 skipped |
 
 面板还会调几个只在界面里用的接口（`/rotation/api/sessions`、`/session`、`/workspaces`、
 `/pick-directory`、`/candidates/*`、`/fill`、`/splits`），这些不算稳定契约——要基于它们开发请读
@@ -223,6 +229,10 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 - 只监听回环、不鉴权，这是设计取舍（见上）。
 - UI 文案目前只有中文；数据模型与接口是中性的。
 - prompt 里的 Markdown 是纯文本，这是故意的——DSH 聊天气泡不渲染 markdown。
+- 「关闭全部」按端口找监听进程：Windows 先走 `Get-NetTCPConnection`，再回退 `netstat` + `taskkill`；
+  macOS 依赖系统自带的 `lsof`；Linux 回退 `ss` / `netstat`。URL 不是本机回环地址
+  （`localhost`、`127.0.0.0/8`、`::1`）的服务记进 skipped、绝不按端口杀——配置里写
+  `https://example.com` 不该把本机 `:443` 上的进程带走。
 
 ## 开发
 
@@ -233,9 +243,9 @@ npm run check          # 对着正在跑的 DSH 验 health / panel / registry
 ```
 
 单独跑：`npm run lint:plugin`、`mock:client`、`mock:session`、`mock:action`、`mock:prompt`、
-`mock:idea-lock`、`mock:closure`、`mock:registry`、`mock:services`、`mock:stale-run`、
-`validate:samples`。旧卡迁移：`migrate`、`migrate:single-idea`、`migrate:blockers`、
-`migrate:milestone`——默认干跑，加 `--write` 才写盘。
+`mock:idea-lock`、`mock:closure`、`mock:registry`、`mock:services`、`mock:services-batch`、
+`mock:stale-run`、`validate:samples`。旧卡迁移：`migrate`、`migrate:single-idea`、
+`migrate:blockers`、`migrate:milestone`——默认干跑，加 `--write` 才写盘。
 
 架构、事件流与目录说明见 [docs/architecture.md](docs/architecture.md)。
 
