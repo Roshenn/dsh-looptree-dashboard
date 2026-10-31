@@ -628,9 +628,10 @@
   .cand-main{flex:1;min-width:0;transition:opacity 200ms var(--ease-out)}
   .cand-title{font-size:12px;color:var(--tx1);font-weight:500}
   /* 候选行瘦身：序号 + 重要性徽标 + 标题 + 承接能力闭环一行；其它字段走 #cand-tip 悬浮卡 */
-  .cand-idx{flex:0 0 18px;padding-top:1px;text-align:right;font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums}
-  .cand-imp{flex:0 0 auto;min-width:20px;height:18px;display:inline-grid;place-items:center;border-radius:5px;
-    font-size:10px;color:var(--tx3);border:1px solid var(--b2);background:var(--l3);font-variant-numeric:tabular-nums}
+  /* 行首只留一个数字：重要度（排序靠位置表达）；名次不再显示，避免两个数字叠在一起 */
+  .cand-imp{flex:0 0 auto;height:18px;display:inline-flex;align-items:center;padding:0 6px;border-radius:5px;
+    font-size:10px;color:var(--tx3);border:1px solid var(--b2);background:var(--l3);
+    white-space:nowrap;font-variant-numeric:tabular-nums}
   .cand-imp[data-imp="4"],.cand-imp[data-imp="5"]{color:var(--amber);
     border-color:color-mix(in srgb,var(--amber) 42%,transparent);background:color-mix(in srgb,var(--amber) 12%,transparent)}
   .cand-sup{font-size:10.5px;color:var(--tx4);margin-top:3px;line-height:1.45;
@@ -4338,7 +4339,7 @@ const candImpOf = (c) => {
 };
 
 /** 候选行瘦身：序号 + 重要性 + 标题 + 承接条目 + 模块徽标；其余字段都在悬浮卡里 */
-const candRowHtml = (c, p0, n0, idx) => {
+const candRowHtml = (c, p0, n0) => {
   const uid = candUid(c);
   const imp = candImpOf(c);
   const sup = String((c && c.capability) || '').trim();
@@ -4347,9 +4348,8 @@ const candRowHtml = (c, p0, n0, idx) => {
   const modText = mod || mode || '模块未标注';
   return `
     <div class="cand-row" data-cand-row="${uid}" tabindex="0">
-      <span class="cand-idx mono">${idx + 1}</span>
-      <span class="cand-imp" data-imp="${imp}" title="${imp ? '重要性 ' + imp + ' / 5' : '重要性未生成'}"
-        aria-label="${imp ? '重要性 ' + imp + ' / 5' : '重要性未生成'}">${imp || '–'}</span>
+      <span class="cand-imp" data-imp="${imp}" title="${imp ? '重要度 ' + imp + ' / 5（5 = 最该先做）' : '重要度未生成'}"
+        aria-label="${imp ? '重要度 ' + imp + ' / 5' : '重要度未生成'}">重要度 ${imp || '–'}</span>
       <div class="cand-main">
         <div class="cand-title">${esc(c.title || '（未命名）')}</div>
         <div class="cand-sup" title="${esc(sup || '承接能力闭环未生成')}">${esc(sup || '承接能力闭环未生成')}</div>
@@ -4445,11 +4445,11 @@ const candEmptyHtml = (added) => `<div class="cand-empty">${added
 
 const candNoteText = () => {
   if (!CAND_META.list.length) return '';
-  return '点「添加」写入为能力闭环子节点；悬停候选行或 Tab 聚焦可看模块归属 / 缺失影响 / 协同面。';
+  return '一条主要能力闭环对应一条候选（1:1，条数由能力闭环决定）；点「添加」写入为子节点，悬停候选行或 Tab 聚焦可看模块归属 / 缺失影响 / 协同面。';
 };
 
 const candPoolBody = () => CAND_META.list.length
-  ? `<div class="cand-list">${CAND_META.list.map((c, i) => candRowHtml(c, CAND_META.p0, CAND_META.n0, i)).join('')}</div>
+  ? `<div class="cand-list">${CAND_META.list.map((c) => candRowHtml(c, CAND_META.p0, CAND_META.n0)).join('')}</div>
     <div class="mnote">${candNoteText()}</div>`
   : `<div class="cand-list">${candEmptyHtml(CAND_META.added)}</div>`;
 
