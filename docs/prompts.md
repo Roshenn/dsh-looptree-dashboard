@@ -43,7 +43,6 @@
 - 项目：<name>（<workspace>）
 - 里程碑：<title>
   - 里程碑愿景：<vision>
-  - 核心指标：<metrics>
   - 重要支撑：<supports>
 - 支撑项：<title>
   - 承接支撑项：<support>
@@ -120,7 +119,6 @@
 |---|---|---|
 | `project.vision`（项目愿景） | 里程碑「生成」的 `背景`（裁剪 160 字） | 这个项目最终要变成什么样；项目愿景是里程碑愿景的上位参照，只进里程碑补全，进其它节点会稀释当下任务 |
 | `milestone.vision`（里程碑愿景） | `背景` 一行（裁剪 200 字） | 这个里程碑之后项目/用户变成什么样；补全时要求 3–6 句宏大叙事、≤1000 字、不写功能清单；拆解/候选时只注入前 300 字（超长标「全文见卡片」） |
-| `milestone.metrics`（里程碑核心指标） | `背景` 一行（裁剪 200 字）；补全时为「约束」+「质量要求」块 | 从里程碑标题与里程碑愿景反推的 2–5 条「愿景达成的证据」，一条一行；只写结果状态，不写测试命令 / 用例名 / 执行步骤；**衡量愿景是否达成** |
 | `milestone.supports`（重要支撑） | `背景` 一条一行（`supportLines`）；补全/拆解时为「约束」+「质量要求」块 | 3–5 条「要什么才能让愿景成立」，按重要性排序、从第一性原理写；候选生成的唯一输入，为空时拒绝生成候选（`409 SUPPORTS_REQUIRED`） |
 | `support.support`（承接的重要支撑条目） | `背景`（只读） | 照抄 `milestone.supports` 的一条原文，≤80 字；候选采纳时写入，人不改 |
 | `support.necessity`（必要性） | `背景`（只读） | 为什么这条支撑能帮里程碑达成；候选生成产出，采纳后不改 |
@@ -176,7 +174,7 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 
 入口：`POST /rotation/api/fill` `{file, nodeId}`，由节点卡「生成 N 项」触发。只补缺项：
 
-- **里程碑**（缺 `vision` / `metrics` / `supports`）：先项目愿景、再里程碑愿景、再重要支撑、最后核心指标。
+- **里程碑**（缺 `vision` / `supports`）：先项目愿景、再里程碑愿景、再重要支撑（里程碑不再有核心指标）。
 - **支撑项**（缺 `metric` / `approach`）：核心指标 + 实现思路。
 
 输出契约：
@@ -199,7 +197,7 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 
 入口：里程碑卡的 **+ 支撑项 → AI 拆出重要支撑**（走 `POST /api/run` 的拆解模板，草稿存 `~/.dsh/rotation/splits/`，预览勾选后写回 `milestone.supports`）。
 
-- 输入：项目愿景 + 里程碑愿景 + 里程碑核心指标（若有）。
+- 输入：项目愿景 + 里程碑愿景 + 已有重要支撑。
 - 输出契约：
 
 ```json

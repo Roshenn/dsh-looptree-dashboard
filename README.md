@@ -56,10 +56,10 @@ did the work. The panel is the view; DSH is the engine.
   the project should *become*, then 3–5 **important supports**: what must exist for that vision to hold,
   ordered by importance and derived from first principles. The **确认达成** gate is **at least one support
   child + every child closed** — it no longer depends on whether the supports list is filled.
-- **Two kinds of core metric.** `milestone.metrics` (2–5 lines) measure whether the **vision** was
-  reached; each support's own `metric` measures whether **that support** holds the milestone up and at
-  what point it counts as enough. The project vision sits above both: `project.vision` (≤ 1000 chars) is
-  edited from the project name's `⋯ → Project info` dialog.
+- **One core metric, on the support.** Each support's own `metric` states what it must reach for that
+  support to hold the milestone up — there is no milestone-level metric any more. The project vision
+  sits above everything: `project.vision` (≤ 1000 chars) is edited from the project name's
+  `⋯ → Project info` dialog.
 - **Candidate pool with reasoning, sorted by importance.** A milestone generates candidate supports that
   carry support / necessity / causal / evidence / importance (1–5); they are stored in descending
   importance order and each row reveals a hover card. Adopting writes only the **read-only trio**

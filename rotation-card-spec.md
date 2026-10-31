@@ -1,7 +1,8 @@
 # 里程碑树卡 · 数据规范 v1（`rotation/v1`）
 
 > 一句话：**每个工作区一个 `.dsh/rotation.json`，里面是一棵 `milestone → support → exec` 的树；
-> 项目用**项目愿景**说清最终要变成什么，里程碑用**里程碑愿景**说它把项目带到哪，用**核心指标**说清怎么看出愿景达成，
+> 项目用**项目愿景**说清最终要变成什么，里程碑用**里程碑愿景**说它把项目带到哪，用**重要支撑**说清要什么才成立，
+> 核心指标只挂在支撑项上（做到什么程度算撑住里程碑），
 > 用**重要支撑**说清「要什么才能让愿景成立」；每条支撑项再带自己的**核心指标**（到什么程度算撑住里程碑）与
 > **实现思路**，落地过程写成执行记录；关闭只能自下而上、由人确认。**
 
@@ -10,7 +11,7 @@
 - **文件位置**：`<workspace>/.dsh/rotation.json` —— 跟项目走，进 git，换机器/换分支不丢。
 - **树根**：`milestone` 节点唯一，代表「当前里程碑」；一个工作区同一时间只有一个活跃里程碑。
 - **节点类型**：`milestone` / `support` / `exec`，三类对应面板三列（里程碑 / 支撑项 / 执行验证反馈）。
-  - `milestone`：深度 1，唯一；承载里程碑愿景、核心指标与重要支撑；
+  - `milestone`：深度 1，唯一；承载里程碑愿景与重要支撑（核心指标不在这里，在支撑项上）；
   - `support`（支撑项）：深度 2，只挂在里程碑下；是「要什么才能让愿景成立」的承载，后面由它开计划与执行；
   - `exec`（执行验证反馈记录）：深度 3+，只挂在支撑项下；一次会话一条。
   （2026-10-31 由 `milestone → goal → idea → exec` 四层收敛而来：`goal` / `idea` 两种 kind 退役，
@@ -25,7 +26,7 @@
   「子节点」分两类：工作子节点（milestone → support）与执行记录（`exec`）；
   支撑项的状态看记录：
   - `未开始`：只有标题，没有任何内容字段；
-  - `规划中`：有内容（里程碑愿景 / 核心指标 / 重要支撑 / 支撑项核心指标 / 实现思路任一非空），
+  - `规划中`：有内容（里程碑愿景 / 重要支撑 / 支撑项核心指标 / 实现思路任一非空），
     但还没有工作子节点 / 执行记录（支撑项只生成过计划、没执行过，仍算规划中）；
   - `进行中`：里程碑有支撑项未全部关闭；或支撑项已出现过执行记录、记录还没全闭环；
   - `待确认达成`：里程碑的子项已全部关闭但人还没确认（**不会自动关闭**）；
@@ -41,9 +42,6 @@
   入口是面板项目名右侧 **⋯ → 项目信息**，弹窗里就地编辑；只进里程碑「生成」的 prompt 背景，不进其它节点。
 - **里程碑愿景字段**：`milestone.vision` —— 里程碑的**第一字段、最重要的信息**：这个里程碑之后项目/用户变成什么样
   （3–6 句宏大叙事，≤1000 字；不写功能清单、不写工期、不写实现手段）。
-- **里程碑核心指标字段**：`milestone.metrics` —— 从里程碑标题与里程碑愿景反推的 2–5 条「愿景达成的证据」，
-  一条一行、共 ≤300 字。它衡量**愿景是否达成**（可观察的数值 / 覆盖率 / 状态），不写测试命令、用例名、执行步骤。
-  数量只做软提示（超 5 条给 warning），不进「确认达成」闸门。注意与 `support.metric` 的区别，见下一节。
 - **重要支撑字段**：`milestone.supports` —— 回答「要什么才能让这个里程碑愿景成立」：3–5 条、一条一行、共 ≤300 字，
   **按重要性排序**，从第一性原理写必需要素（不是待办清单、不是功能清单）。
   它是候选生成与「拆出重要支撑」的唯一输入；为空时不能生成候选支撑项（`409 SUPPORTS_REQUIRED`）。
@@ -57,17 +55,14 @@
   - `children[]`：只放 `exec` 执行记录。
   「只读三件套 + 可写两项」的分工：`support` / `necessity` / `causal` 是候选生成（或拆解）给出的**论证**，
   采纳后不改；`metric` / `approach` 是人的**判断**，采纳时留空，用「生成 2 项」补齐后才能「生成计划」。
-- **两个「核心指标」不是一回事**：
-  - `milestone.metrics` 衡量**愿景**：这个里程碑达成后，从外部能观察到什么（覆盖率、时延、状态）；
-  - `support.metric` 衡量**这条支撑**：它做到什么程度算把里程碑撑住了（这一条特有的判据）。
-  两者都不写测试命令；执行层面的验证命令归 `exec.verify`。
+- **核心指标只在支撑项上**（2026-10-31 从里程碑下移）：`support.metric` 衡量**这条支撑**——它做到什么程度算把里程碑撑住了。
+  里程碑层不再有指标：里程碑是否达成由「重要支撑全部闭环」表达。核心指标不写测试命令；执行层面的验证命令归 `exec.verify`。
 - **执行记录字段**：`exec` 不变——`action`（plan / exec / reflect）、`verify`（怎么验，一条可运行命令优先）、
   `proof`（关闭时必填的证据）、`issues[]`（问题反馈，`resolved_at` 非空才算处置）、`session`。
   只有支撑项能「生成计划 / 执行计划」：plan 前置核心指标 + 实现思路（`409 FILL_REQUIRED`）、
   exec 前置 `support.plan`（`409 PLAN_MISSING`）；执行完自动反馈提炼，把经验写进 `milestone.lessons`。
-- **退役字段**：`scenario` / `constraints` / `acceptance` 已退役（2026-10-31 按愿景驱动收敛）。
-  它们**允许留在 JSON 里**——校验器只给警告、面板不显示、不校验、不进 prompt；业务语义改用
-  里程碑核心指标 + 支撑项 `metric` / `approach` 表达。`goal` / `idea` 两种 kind 同样退役，旧卡读入即折叠成 `support`。
+- **退役字段**：`scenario` / `constraints` / `acceptance` / `milestone.metrics` 已退役（2026-10-31 按愿景驱动收敛，
+  核心指标只留支撑项 `metric`）。它们**允许留在 JSON 里**——校验器只给警告、面板不显示、不校验、不进 prompt。`goal` / `idea` 两种 kind 同样退役，旧卡读入即折叠成 `support`。
 - **候选池**：`~/.dsh/rotation/candidates/<卡片文件>__<节点 id>.json`（运行时数据，不进项目 git）。
   形状 `[{ title, support, necessity, causal, importance, evidence }]`，落盘按 `importance`（1–5）降序稳定排序。
   只有里程碑能生成「候选支撑项」；采纳只写只读三件套（`support` / `necessity` / `causal`），
@@ -91,7 +86,6 @@
     "kind": "milestone",
     "title": "三层情节图成为唯一生产视图",
     "vision": "打开项目就能看到三层情节图，不用读代码；作者改一段情节，视觉与结构同时更新，评审不再截图对稿。",
-    "metrics": "1)三层情节图都能在首屏打开\n2)改一章情节后图在 1 秒内更新",
     "supports": "1)章节→情节索引\n2)三层联动渲染\n3)首屏性能 ≤ 800ms",
     "started_at": "2026-10-31T09:10:00+08:00",
     "status": "doing",
@@ -142,7 +136,6 @@
 | `started_at` | 全部 | ➖ | 进入执行时写；面板用它算「在途时长」与超期 |
 | `project.vision` | 卡根 | ➖ | **项目愿景**：这个项目最终要变成什么样，≤1000 字；里程碑愿景要能挂上来 |
 | `vision` | milestone | ✅ | **里程碑愿景**（第一字段）：这个里程碑之后项目/用户变成什么样，3–6 句宏大叙事，≤1000 字，不写功能清单与手段 |
-| `metrics` | milestone | ➖ | **里程碑核心指标**：2–5 条「愿景达成的证据」，一条一行、共 ≤300 字；衡量愿景是否达成，不承担执行判据 |
 | `supports` | milestone | ➖ | **重要支撑**：3–5 条「要什么才能让愿景成立」，一条一行、共 ≤300 字，按重要性排序，从第一性原理写 |
 | `support` | support | ➖ | **承接的重要支撑条目**：照抄 `milestone.supports` 的一条原文，≤80 字，只读 |
 | `necessity` | support | ➖ | **必要性**：为什么这条支撑能帮里程碑达成，≤200 字，只读 |
@@ -173,14 +166,14 @@
   `--write` 才写盘）。写盘前先把**原卡整张**追加进 `<卡片>.supports-backup.json`，再原子写回；幂等——
   已经是三层支撑项结构、且没有 `blockers` / `goal` / `idea` 的卡片直接跳过。
 - **`--write` 之后**：退役字段不会被删（`scenario` / `constraints` / `acceptance` 仍在 JSON 里），
-  校验器只警告。需要按新口径重写时，用里程碑「生成」补 `metrics` / `supports`、用支撑项「生成 2 项」补
-  `metric` / `approach`，旧文本从备份文件里取。
+  校验器只警告。需要按新口径重写时，用里程碑「生成」补 `supports`、用支撑项「生成 2 项」补
+  `metric` / `approach`，旧文本（含已退役的 `metrics`）从备份文件里取。
 - 更旧的 `migrate:milestone` / `migrate:blockers` / `migrate:single-idea` 保留给 0.13 之前的卡，
   正常顺序是先跑旧脚本再跑 `migrate:supports`。
 
 ### 列表字段的「一条一行」口径
 
-`metrics` / `supports` 都是**列表字段**：一个语义单位占一行，行首带 `1) 2) 3)` 这类序号。
+`supports` 是**列表字段**：一个语义单位占一行，行首带 `1) 2) 3)` 这类序号。
 三条链路共用这一条口径：
 
 - **生成端**：`composeFillPrompt` 对这些字段的输出契约是 **JSON 字符串数组**
@@ -287,7 +280,7 @@
 
 ```json
 "prompt_context": {
-  "fields": ["project", "milestone", "milestone.vision", "milestone.metrics", "milestone.supports",
+  "fields": ["project", "milestone", "milestone.vision", "milestone.supports",
              "support", "support.necessity", "support.causal", "support.metric", "support.approach",
              "siblings", "node"],
   "siblings": 3,
@@ -298,7 +291,7 @@
 | 字段键 | 落在哪段 | 内容 |
 |---|---|---|
 | `project` | 上下文 | 项目名 |
-| `milestone` / `milestone.vision` / `milestone.metrics` | 上下文 | 里程碑标题 / 里程碑愿景 / 里程碑核心指标 |
+| `milestone` / `milestone.vision` / `milestone.supports` | 上下文 | 里程碑标题 / 里程碑愿景 / 重要支撑 |
 | `milestone.supports` | 上下文 | 重要支撑（一条一行） |
 | `support` / `support.necessity` / `support.causal` | 上下文 | 当前支撑项 / 必要性 / 因果 |
 | `support.metric` / `support.approach` | 上下文 | 支撑项核心指标 / 实现思路 |
@@ -325,10 +318,10 @@
 6. `exec` 的 `verify` 不能为空（`action: plan/reflect` 的记录例外）；`closed_at` 非空时 `proof` 不能为空。
 7. `milestone` 必须有人类的第一字段 `vision`；`support` 的 `title` 必填。退役的 `scenario` / `constraints` / `acceptance` 不再必填。
 8. `issues` 只能出现在 `exec` 上。
-9. 字段归属：`vision` / `metrics` / `supports` / `lessons` 只能挂在 `milestone`；
+9. 字段归属：`vision` / `supports` / `lessons` 只能挂在 `milestone`；
    `support` / `necessity` / `causal` / `metric` / `approach` / `plan` 只能挂在 `support`；
    `verify` / `proof` / `action` 只能挂在 `exec`。挂错只警告并忽略。
-   长度超限只警告：`vision` >1000 字、`supports` / `metrics` / `metric` / `approach` >300 字、`necessity` / `causal` >200 字、`support` >80 字。
+   长度超限只警告：`vision` >1000 字、`supports` / `metric` / `approach` >300 字、`necessity` / `causal` >200 字、`support` >80 字。
 10. 退役字段（`scenario` / `constraints` / `acceptance`）与旧名字（`blockers` / `blocker` / `goal` / `idea`）：
     读入即改名或给警告，不阻断保存。
 11. `started_at` 必须是 ISO 或 `null`，且**不能晚于** `closed_at`（否则在途为负）。
@@ -359,7 +352,7 @@
 | 深度 ≥ 4 | 第 3 列卡片内的缩进折叠行 |
 | `closed_at` 非空 | 卡片变灰 + 「重开」按钮；同级的已闭环支撑项默认折叠成「▸ 已闭环 N」；显示风格打开「隐藏已闭环」后**整颗不渲染、折叠行也不再出现**，被藏掉的数量上提成卡片 chips「已闭环 N」（已达成里程碑仍留主管）。跳转过去的那一颗临时放行（`revealedClosed`） |
 | 可关闭 | 支撑项：记录全闭环自动收口；没有记录时卡上有「完成」。里程碑：「确认达成」固定在卡片 footer **左端**，与右侧「生成候选 / 候选池」同屏但分开；**都不会自动关闭** |
-| 缺描述字段（`vision` / `metrics` / `supports`；支撑项 `metric` / `approach`） | 「生成 N 项」紧跟「确认达成 / 完成」按钮**右侧**（同一 lead 组）：**缺项 > 0 就高亮**（描边强调，不是实底橙——别和「生成候选」抢焦点），补完变灰「无缺项」。里程碑缺 3 项、支撑项缺 2 项；标题是唯一必需项，占位名（待命名）时按钮灰、只能先写标题；执行记录没有可补字段，整颗按钮不出现。详情卡同一按钮放在底部动作行 |
+| 缺描述字段（`vision` / `supports`；支撑项 `metric` / `approach`） | 「生成 N 项」紧跟「确认达成 / 完成」按钮**右侧**（同一 lead 组）：**缺项 > 0 就高亮**（描边强调，不是实底橙——别和「生成候选」抢焦点），补完变灰「无缺项」。里程碑缺 2 项、支撑项缺 2 项；标题是唯一必需项，占位名（待命名）时按钮灰、只能先写标题；执行记录没有可补字段，整颗按钮不出现。详情卡同一按钮放在底部动作行 |
 | 从没衍生过子节点（`children` 为空） | 里程碑「确认达成」**置灰不可点**（点一下只弹 toast 说明原因）：没有支撑项就没有可收口的分支；想结束里程碑请先进详情页删子节点。支撑项没有执行记录时显示「完成」，允许人直接结束 |
 | 里程碑子项全关闭但自身未确认 | 状态「待确认达成」+ 泳道头 CTA；**闸门 = 至少 1 个支撑项子节点 + 子项全部闭环**，与 `supports` 是否非空无关 |
 | `milestone.closed_at` 非空 | **留在主泳道**，lane 头显示「已达成」；菜单/泳道头可「里程碑历史 / 开新里程碑 / 重开」 |
