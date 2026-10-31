@@ -1690,11 +1690,17 @@ function convergeBtnMarkup(n, tone){
   // 灰态：视觉上不可点，点一下只用 toast 说清为什么、该走哪条路（disabled 的按钮发不出 toast）
   return `<button class="tbtn is-locked" data-close="${n.id}" aria-disabled="true" title="${esc(g.tip)}">${g.label}</button>`;
 }
-/** 支撑项的「记录全闭环」判据：子记录全部关闭；没有子记录时返回 false（交给「完成」按钮手动收口） */
+/**
+ * 支撑项的「记录全闭环」判据（与 host 的 supportRecordsDone 同口径）：
+ * 子记录全部关闭，且至少出现过一条 exec 与一条 reflect。
+ * 只生成过计划、没执行过 → 仍算规划中；没有子记录 → false，交给「完成」按钮手动收口。
+ */
 function supportRecordsDone(n){
   if (!n || n.kind !== 'support') return false;
   const kids = n.children || [];
-  return kids.length > 0 && kids.every(k => k.closed);
+  if (!kids.length || !kids.every(k => k.closed)) return false;
+  const actions = kids.map(k => recordActionOf(k));
+  return actions.includes('exec') && actions.includes('reflect');
 }
 function deriveState(node){
   const n = (node && node.src) || node;   // 折叠克隆会丢掉已闭环子节点，状态必须按原节点算
