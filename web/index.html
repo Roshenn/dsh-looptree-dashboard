@@ -4367,7 +4367,7 @@ function candTipHtml(c){
   const imp = candImpOf(c);
   return `<div class="ct-head">
       <span class="ct-title">${esc(norm(c && c.title) || '（未命名）')}</span>
-      <span class="ct-imp">重要性 ${imp ? esc(String(imp) + ' / 5') : '（未生成）'}</span>
+      <span class="ct-imp">重要度 ${imp ? esc(String(imp) + ' / 5（越大越先做）') : '（未评分）'}</span>
     </div>
     <dl class="ct-list">
       ${row('承接能力闭环', norm(c && c.capability))}
@@ -4445,7 +4445,7 @@ const candEmptyHtml = (added) => `<div class="cand-empty">${added
 
 const candNoteText = () => {
   if (!CAND_META.list.length) return '';
-  return '一条主要能力闭环对应一条候选（1:1，条数由能力闭环决定）；点「添加」写入为子节点，悬停候选行或 Tab 聚焦可看模块归属 / 缺失影响 / 协同面。';
+  return '一条主要能力闭环对应一条候选（1:1，条数由能力闭环决定）；重要度 5 最高、1 最低，未评分显示「–」。点「添加」写入为子节点，悬停候选行或 Tab 聚焦可看模块归属 / 缺失影响 / 协同面。';
 };
 
 const candPoolBody = () => CAND_META.list.length
