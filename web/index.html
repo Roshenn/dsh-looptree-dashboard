@@ -2125,9 +2125,9 @@ function nodeMarkup(n, p){
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
   const isContainer = n.kind === 'milestone';
-  // 支撑项：有执行记录时保持自动关闭（记录全闭环自动收口），没有记录时给「完成」手动收口；
-  // 里程碑：支撑项全关闭后由人「确认达成」
-  const recordOpen = n.kind === 'support' && (n.children || []).length > 0;
+  // 支撑项：有未闭环的执行记录时不给关（父节点关闭会 422）；记录全闭环由 autoCloseTree 自动收口，
+  // 但「记录都关了却没凑齐 exec+reflect」时留一个手动「完成」出口，避免节点永远关不掉
+  const recordOpen = n.kind === 'support' && (n.children || []).some(k => !k.closed);
   const leafCanClose = !isContainer && !n.closed && !recordOpen;
   // 达成按钮（只有里程碑有）独占 footer 左端；支撑项「完成」仍在原来的按钮组位置
   const closeBtn = isContainer ? convergeBtnMarkup(n, 'primary-converge') : '';
@@ -3815,9 +3815,10 @@ function detailMarkup(p, n){
         }).join('')}
       </div></div>`
     : '';
-  // 里程碑：支撑项全关闭后由人确认；支撑项：有执行记录时自动关闭、没有记录时可手动「完成」
+  // 里程碑：支撑项全关闭后由人确认；支撑项：记录全闭环自动收口，记录都关了但没凑齐
+  // exec+reflect 时仍可手动「完成」（有未闭环记录时不给关，否则父节点关闭会 422）
   const detailContainer = n.kind === 'milestone';
-  const detailRecordOpen = n.kind === 'support' && (n.children || []).length > 0;
+  const detailRecordOpen = n.kind === 'support' && (n.children || []).some(k => !k.closed);
   // 里程碑与节点卡共用 convergeGate：卡片上灰掉的，详情页不会突然变可点
   const canClose = !detailContainer && !n.closed && !detailRecordOpen;
   const childKind = { milestone: 'support', support: 'exec' }[n.kind] || null;
