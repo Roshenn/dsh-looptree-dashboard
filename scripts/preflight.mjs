@@ -58,6 +58,10 @@ try {
   await run(npm, ['run', 'mock:list-fields']);
   console.log('── mock:candtip ──');
   await run(npm, ['run', 'mock:candtip']);
+  console.log('── mock:refresh ──');
+  await run(npm, ['run', 'mock:refresh']);
+  console.log('── mock:stamp ──');
+  await run(npm, ['run', 'mock:stamp'], { PORT: String(Number(port) + 4) });
   console.log('── validate:samples ──');
   await run(npm, ['run', 'validate:samples']);
   console.log('── verify:package ──');
