@@ -30,6 +30,8 @@ DSH 进程
 |---|---|---|
 | 项目注册表 | `~/.dsh/rotation/registry.json` | host（POST /api/projects、迁移脚本） |
 | 卡片真身 | `<workspace>/.dsh/rotation.json` | host（PUT /api/cards）、可手改 |
+| 卡片 mtime 戳 | 由 `GET /api/cards/stamp` 现算（`stat`，不解析卡片） | 面板每 10s 比对，发现别处改动 |
+
 | 候选池 | `~/.dsh/rotation/candidates/<卡片文件>__<节点 id>.json` | host（`/api/candidates/generate` 写、`/adopt`/`/delete` 删）；按 `importance` 降序 |
 | 里程碑历史 | 同一卡片的 `closed_milestones[]`（压缩快照，≤10） | 面板「确认达成」时随整卡写回 |
 | 运行状态 | 进程内（内存） | runner；结束写回卡片的 `session` 字段 |

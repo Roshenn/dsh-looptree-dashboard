@@ -65,6 +65,9 @@ did the work. The panel is the view; DSH is the engine.
   (brownfield or greenfield)** / **integration surface** / evidence / importance (1–5); they are stored in
   descending importance order, each row shows a module badge and reveals a hover card. Adopting keeps
   those fields read-only; the core metric and approach stay empty and are filled with **Generate 2 items**.
+- **Live updates without tab-hopping.** Finishing a session refreshes the board in place within ~2 s and the
+  touched nodes get a **新** badge that stays until you open them; idle polling compares card mtimes so edits
+  from another window or machine land too, without stealing focus.
 - **Plan, execute, reflect from the capability.** Fill the core metric and approach to enable **Generate
   plan** (`409 FILL_REQUIRED`); when a plan exists, **Execute plan** (`409 PLAN_MISSING`). Generate plan
   sends `/plan`; execute runs `/plan off` then `/goal <objective>` in the *same* session. When the record

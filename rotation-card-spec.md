@@ -396,6 +396,21 @@
 - 字段缺失时给降级文案（例如「暂无证据」），不空白、不报错。
 - 采纳后写入全部只读项（`capability` / `necessity` / `causal` / `gap` / `module` / `module_mode` / `collaboration`，空值不伪造），`metric` / `approach` 留空。
 
+## 自动刷新与「已更新」标记
+
+面板不再依赖「切走插件再切回来」才更新卡片（2026-10-31 用户反馈）：
+
+- **会话完成即刷新**：面板每 2s 拉 `/api/runs`，一旦某个 run **首次进入终态**（`done` / `failed` / `cancelled`）
+  且 `settling=false`（宿主已把结果写进卡片），就重拉 `/api/cards` 并重绘；同一 run 只触发一次。
+  run 的身份是 `key|startedAt|sessionId`（同一节点会连续起多次会话，只按 key 会串）。
+- **「新」标记**：受影响的节点打 `data-updated="ok"`（暖色描边 + 右上角「新」）或 `fail`（红色 + `!`），
+  **保留到点开该节点**（或点页脚「已更新 N →」跳过去）才清除；重绘后标记还在。
+- **页脚「已更新 N」**：`0` 时隐藏；点击跳到下一个有新内容的节点并标记已读。
+- **外部改动**：`GET /api/cards/stamp` 只回每张卡的 `mtime`；面板空闲每 10s 比一次，变了就静默重拉
+  （不带「新」标记，因为它不是本面板会话的结果）。自己 `PUT` 写盘后立即对齐基线，不会自触发。
+- **不打断输入**：字段编辑器打开时推迟重绘；面板在后台时只记待刷新，`visibilitychange` / `focus`
+  回到前台再统一刷新；重绘保留滚动位置、折叠状态与当前详情节点。
+
 ## 面板如何读取（原型已接通）
 
 1. `node scripts/build-cards.mjs` 扫描 `samples/*.rotation.json`，生成 `cards.js`（`window.ROTATION_CARDS`）。
