@@ -123,7 +123,7 @@ check('悬浮卡含「缺失影响」', tip.includes('缺失影响'), '');
 check('悬浮卡含「功能模块」与改造/新增', tip.includes('功能模块') && tip.includes('改造现有'), '');
 check('悬浮卡含「协同面」', tip.includes('协同面'), '');
 check('悬浮卡含「证据」', tip.includes('证据'), '');
-check('悬浮卡显示重要性 4 / 5', tip.includes('重要性') && tip.includes('4 / 5'), tip.slice(0, 120));
+check('悬浮卡显示重要度 4 / 5（并写明越大越先做）', tip.includes('重要度') && tip.includes('4 / 5') && tip.includes('越大越先做'), tip.slice(0, 140));
 check('缺失影响与模块原文都进了卡', tip.includes('缺它三层图没有数据源') && tip.includes('src/plot/index.ts'), '');
 
 /* ── 2. XML 转义：标签不会原样进 HTML ── */
@@ -146,7 +146,7 @@ check('& 与引号也被转义', nastyTip.includes('&amp;') && nastyTip.includes
 /* ── 3. 空字段降级：「（未生成）」── */
 const sparse = api.candTipHtml({ title: '只有标题' });
 check('空字段降级成「（未生成）」', (sparse.match(/（未生成）/g) || []).length >= 4, String((sparse.match(/（未生成）/g) || []).length));
-check('重要性缺失降级', /重要性\s*（未生成）/.test(sparse), sparse.slice(0, 120));
+check('重要度缺失降级成「（未评分）」', /重要度\s*（未评分）/.test(sparse), sparse.slice(0, 120));
 check('只传空对象也不崩', api.candTipHtml(null).includes('（未生成）') && api.candTipHtml({}).includes('（未命名）'), api.candTipHtml(null).slice(0, 80));
 
 /* ── 4. 候选行：瘦身 + 不再含退役字段 ── */

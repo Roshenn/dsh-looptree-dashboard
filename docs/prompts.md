@@ -174,7 +174,8 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 ]
 ```
 
-- `importance` 1–5（5 = 最该先做）；host 解析时**按 importance 降序稳定排序**后落盘，条数不再截断。
+- `importance` **越大越重要**（5 = 最该先做，1 = 最不重要）；host 解析时按降序稳定排序后落盘，条数不再截断。
+  模型没给分数的候选保留 0：排在已评分之后、面板显示「重要度 –」，不按位置编假分数。
 - `module_mode` 只能是 `existing`（改造现有）/ `new`（新增）；`existing` 必须能在项目里指到模块。
 - 缺 `necessity` / `causal` / `gap` / `module` 的候选在解析时丢弃——这四项答不出「缺了会怎样、落在哪」。
 - 采纳（`POST /candidates/adopt`）把 `title` / `capability` / `necessity` / `causal` / `gap` /
