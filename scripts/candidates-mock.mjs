@@ -104,7 +104,6 @@ card.milestone = {
   title: '3 情节层渲染可视化',
   vision: '打开项目就能看到三层情节图，不用读代码。',
   supports: '1)章节→情节两层索引\n2)分层 SVG 绘制\n3)章节 id 缓存与首屏测量',
-  metrics: '1)首屏渲染 < 800ms\n2)三层图各 ≥8 节点，可折叠',
   status: 'plan',
   closed_at: null,
   children: [],

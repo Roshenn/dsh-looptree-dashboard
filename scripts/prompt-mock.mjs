@@ -166,19 +166,18 @@ try { composeCandidatePrompt({ ...fxArgs, nodeId: 'sw-i1' }); } catch (error) { 
 check('支撑项不能再生成候选（NOT_MILESTONE）', !!candOnSupport && candOnSupport.code === 'NOT_MILESTONE', String(candOnSupport && candOnSupport.code));
 
 /* ── 3.7 补全：里程碑出 supports，支撑项只出 metric + approach ── */
-const msFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-loop', fields: ['vision', 'supports', 'metrics'] });
+const msFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-loop', fields: ['vision', 'supports'] });
 check('里程碑补全带愿景规则', msFill.includes('里程碑愿景 3–6 句'), '');
 check('里程碑补全愿景上限 1000', msFill.includes('里程碑愿景 ≤1000 字'), '');
 check('里程碑补全愿景要宏大叙事', msFill.includes('宏大叙事') && msFill.includes('不写功能清单'), '');
 check('里程碑补全要重要支撑 3–5 条', msFill.includes('重要支撑 3–5 条'), '');
 check('重要支撑按第一性原理', msFill.includes('从第一性原理') && msFill.includes('必须有哪些东西存在'), '');
 check('重要支撑按重要性排序', msFill.includes('按重要性排序'), '');
-check('重要支撑要「证据要求」块', msFill.includes('\n证据要求\n') && msFill.includes('确实没有'), '');
-check('里程碑补全要核心指标 2–5 条', msFill.includes('核心指标 2–5 条'), '');
-check('核心指标不写测试命令', msFill.includes('不写测试命令'), '');
+check('重要支撑要「证据要求」块', msFill.includes('\n证据要求\n') && msFill.includes('确实不存在'), '');
+check('里程碑补全不再要核心指标', !msFill.includes('核心指标 2–5 条') && !msFill.includes('"metrics"'), '');
 check('里程碑补全不再产出阻碍项 / 验收', !msFill.includes('阻碍项 3–5 条') && !msFill.includes('验收 3–5 条'), '');
-check('里程碑补全 JSON 契约：愿景字符串、列表字段数组',
-  msFill.includes('"vision": "…"') && msFill.includes('"supports": ["…", "…"]') && msFill.includes('"metrics": ["…", "…"]'),
+check('里程碑补全 JSON 契约：愿景字符串、重要支撑数组',
+  msFill.includes('"vision": "…"') && msFill.includes('"supports": ["…", "…"]'),
   msFill.split('\n').filter((x) => x.includes('supports')).join(' | '));
 check('列表字段写明「一条一个元素」', msFill.includes('一条一个元素'), '');
 check('列表字段禁止符号前缀', msFill.includes('行首不要加 ○ · • 这类符号'), '');
@@ -202,11 +201,11 @@ check('prompt_context.refs 生效', ctxText.includes('- 引用：') && ctxText.i
 withCtx.prompt_context = { fields: ['node', 'siblings'], siblings: 1 };
 const sibText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
 check('siblings 条数生效', sibText.includes('- 同级支撑项：') && sibText.includes('分层 SVG 绘制'), sibText.split('\n').find((l) => l.includes('同级')) || '');
-withCtx.prompt_context = { fields: ['milestone', 'milestone.vision', 'milestone.supports', 'milestone.metrics'] };
+withCtx.prompt_context = { fields: ['milestone', 'milestone.vision', 'milestone.supports', 'milestone.metrics'] };  // 旧键保留只为不报未知字段
 const msCtxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
 check('里程碑愿景进上下文', msCtxText.includes('- 里程碑愿景：'), '');
 check('重要支撑进上下文', msCtxText.includes('- 重要支撑：') && msCtxText.includes('章节→情节两层索引'), '');
-check('核心指标进上下文', msCtxText.includes('- 核心指标：') && msCtxText.includes('三层图各 ≥8 节点'), '');
+check('里程碑核心指标已退役：旧键不再注入', !msCtxText.includes('里程碑核心指标') && !msCtxText.includes('三层图各 ≥8 节点'), '');
 withCtx.prompt_context = { fields: ['support', 'support.necessity', 'support.causal', 'support.metric', 'support.approach'] };
 const supCtxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-e1', taskId: 'plan' });
 check('支撑项三件套 + 指标思路进下级上下文',

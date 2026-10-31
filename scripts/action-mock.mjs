@@ -247,7 +247,6 @@ try {
   card.milestone.title = '动作链路烟测';
   card.milestone.vision = '验证生成计划 → 执行计划 → 反馈提炼';
   card.milestone.supports = '1)动作链路可跑通\n2)命令服务不可用时能回退';
-  card.milestone.metrics = '1)计划 / 执行 / 反馈三条记录全部写入并关闭\n2)前置缺失时返回 409';
   delete card.milestone.acceptance;
   card.milestone.children = [{
     id: 'am-s1', kind: 'support', title: '支撑项动作与记录列', support: '动作链路可跑通',

@@ -99,16 +99,16 @@ const { genBtnMarkup, GEN_FIELDS_CLIENT } = api;
 
 const node = (kind, raw = {}, title = '示例节点') => ({ id: 'n1', kind, title, raw });
 const p = { id: 'p1' };
-const msFull = { vision: '愿景', supports: '1)重要支撑', metrics: '1)指标' };
+const msFull = { vision: '愿景', supports: '1)重要支撑' };
 const supportFull = { support: '承接支撑项', necessity: '必要性', causal: '因果', metric: '指标', approach: '思路' };
 const recordNode = (action, raw = {}) => ({ id: 'r1', kind: 'exec', title: '执行', raw: { action, ...raw } });
 
 /* 1. 缺项 → 「生成 N 项」+ 高亮 */
 const msEmpty = genBtnMarkup(p, node('milestone', {}));
-check('里程碑全空 → 生成 3 项', msEmpty.includes('生成 3 项'), msEmpty);
+check('里程碑全空 → 生成 2 项', msEmpty.includes('生成 2 项'), msEmpty);
 check('有缺项 → 高亮（is-hot）', msEmpty.includes('genbtn is-hot'), msEmpty);
 check('有缺项 → 可点（不带 disabled）', !msEmpty.includes('disabled'), msEmpty);
-check('里程碑缺项顺序 = 里程碑愿景 / 重要支撑 / 核心指标', /里程碑愿景、重要支撑、核心指标/.test(msEmpty), msEmpty);
+check('里程碑缺项顺序 = 里程碑愿景 / 重要支撑（不再有核心指标）', /里程碑愿景、重要支撑/.test(msEmpty) && !/核心指标/.test(msEmpty), msEmpty);
 const supHalf = genBtnMarkup(p, node('support', { metric: '指标' }));
 check('支撑项缺 1 项 → 生成 1 项且高亮', supHalf.includes('生成 1 项') && supHalf.includes('is-hot'), supHalf);
 check('支撑项全空 → 生成 2 项', genBtnMarkup(p, node('support', {})).includes('生成 2 项'), genBtnMarkup(p, node('support', {})));
@@ -129,7 +129,7 @@ const noTitle = genBtnMarkup(p, { id: 'n1', kind: 'support', title: '新支撑�
 check('标题是占位名 → 灰「生成」', noTitle.includes('>生成<') && noTitle.includes('disabled'), noTitle);
 check('未知 kind 没有可补字段 → 不出按钮', genBtnMarkup(p, node('idea', {})) === '', genBtnMarkup(p, node('idea', {})));
 check('字段表：里程碑 3 项 / 支撑项 2 项 / 执行记录 1 项',
-  GEN_FIELDS_CLIENT.milestone.join() === 'vision,supports,metrics'
+  GEN_FIELDS_CLIENT.milestone.join() === 'vision,supports'
   && GEN_FIELDS_CLIENT.support.join() === 'metric,approach'
   && GEN_FIELDS_CLIENT.exec.join() === 'verify', JSON.stringify(GEN_FIELDS_CLIENT));
 check('字段表不再有 goal / idea', !('goal' in GEN_FIELDS_CLIENT) && !('idea' in GEN_FIELDS_CLIENT), JSON.stringify(GEN_FIELDS_CLIENT));

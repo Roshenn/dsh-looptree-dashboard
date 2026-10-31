@@ -31,7 +31,6 @@
    "milestone",
    "milestone.vision",
    "milestone.supports",
-   "milestone.metrics",
    "support",
    "support.necessity",
    "support.causal",
@@ -242,7 +241,6 @@
    }
   ],
   "vision": "打开项目就能看到三层情节图，不用读代码",
-  "supports": "1)章节→情节两层索引（src/plot/index.ts，三层图的数据底座）\n2)分层 SVG 绘制（每层一个 <g>，独立更新且叠加对齐）\n3)章节 id 缓存与首屏测量（首屏 < 800ms 的瓶颈在这里）\n4)既有地图图层复用（省掉节点对齐成本）",
-  "metrics": "1)三层图各 ≥8 节点，可折叠\n2)首屏渲染 < 800ms\n3)点任一情节节点，能定位到对应章节原文"
+  "supports": "1)章节→情节两层索引（src/plot/index.ts，三层图的数据底座）\n2)分层 SVG 绘制（每层一个 <g>，独立更新且叠加对齐）\n3)章节 id 缓存与首屏测量（首屏 < 800ms 的瓶颈在这里）\n4)既有地图图层复用（省掉节点对齐成本）"
  }
 }

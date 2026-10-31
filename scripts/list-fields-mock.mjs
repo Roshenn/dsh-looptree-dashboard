@@ -7,7 +7,7 @@
  * 背景（2026-10-30 用户反馈）：补全列表字段时，模型用 `○` 前缀 + 单换行写了 5 条，
  * 而条目编辑器只认「1) / A. / -」这类标记，认不出 `○` 就退回 plain 模式（只按空行切），
  * 整段被当成一条融合块。两处一起修：
- *   生成端：列表字段（重要支撑 supports / 核心指标 metrics 等）改 JSON 数组契约，
+ *   生成端：列表字段（重要支撑 supports 等）改 JSON 数组契约，
  *           host 侧 normalizeListValue() 拼成「一条一行、每行带序号」
  *   编辑端：ITEM_RE 扩到 ○ ◯ · • ▪ ◦ ①②③，打开编辑器就能把旧融合块拆开（不改存量数据）
  */
@@ -61,7 +61,7 @@ const { parseItems, serializeItems } = new Function(`${src}
 return { parseItems, serializeItems };`)();
 
 /* ── 1. 生成端：列表字段 → 一条一行、每行带序号 ── */
-check('列表字段清单含重要支撑 supports 与核心指标 metrics', LIST_FIELDS.has('supports') && LIST_FIELDS.has('metrics'), JSON.stringify([...LIST_FIELDS]));
+check('列表字段清单含重要支撑 supports、不再含里程碑 metrics', LIST_FIELDS.has('supports') && !LIST_FIELDS.has('metrics'), JSON.stringify([...LIST_FIELDS]));
 
 const arr = ['缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」', '缺章节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」'];
 check('数组 → 一条一行且补序号', normalizeListValue(arr) === '1)缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」\n2)缺章节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」', normalizeListValue(arr));
