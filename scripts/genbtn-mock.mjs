@@ -144,7 +144,8 @@ const actsBlock = script.slice(actsAt, script.indexOf("].filter(Boolean).join(''
 check('详情卡动作行保留「生成」按钮（紧跟确认）',
   actsBlock.includes('convergeBtnMarkup') && actsBlock.includes('genBtn,')
   && actsBlock.indexOf('convergeBtnMarkup') < actsBlock.indexOf('genBtn,'), actsBlock.slice(0, 140));
-check('节点卡只给容器卡挂这个按钮', script.includes('const genBtn = (isContainer && p) ? genBtnMarkup(p, n) : \'\''), '');
+check('节点卡把生成按钮挂到 footer 左下角（里程碑 + 能力闭环都要）',
+  script.includes('const genBtn = p ? genBtnMarkup(p, n)') && script.includes('const leadKids = [closeBtn, genBtn]'), '');
 check('高亮样式 .genbtn.is-hot 已定义', /\.genbtn\.is-hot\{/.test(html), '');
 
 /* 5. 生成完成后按钮换挡：generateMissing 写卡片后会整页 render()，按钮按新字段重算 */

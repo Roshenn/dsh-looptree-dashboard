@@ -2183,7 +2183,9 @@ function nodeMarkup(n, p){
     ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>`
     : '';
   // 「生成 N 项」紧跟确认达成右侧（按钮位置沿用 2026-10-30 的约定）
-  const genBtn = (isContainer && p) ? genBtnMarkup(p, n) : '';
+  // 「生成 N 项」挂在节点卡 footer 左下角（lead 组最左）：里程碑跟「确认达成」一组，
+  // 能力闭环没有收敛按钮，它就是左下角那一颗；执行记录没有可补字段，genBtnMarkup 自己返回空串
+  const genBtn = p ? genBtnMarkup(p, n) : '';
   // 候选池只留给里程碑：候选是「主要能力闭环」的候选；能力闭环改用「生成计划 / 执行计划」
   const poolCount = (isContainer && p) ? candidateCount(p, n) : 0;
   const genTitle = poolCount ? '候选池还有未处理的候选'

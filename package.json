@@ -1,6 +1,6 @@
 {
   "name": "dsh-looptree-dashboard",
-  "version": "0.16.2",
+  "version": "0.16.3",
   "description": "Looptree Dashboard for DSH: one swimlane per project (project vision → milestone → capability loop → execution records) with node sessions, structured prompts and one-click service control",
   "license": "MIT",
   "author": "jrri",
