@@ -87,7 +87,7 @@
 
   /* ───────── matrix ───────── */
   .scroll{flex:1 1 auto;overflow:auto;scrollbar-color:var(--l4) transparent;scrollbar-width:thin}
-  .matrix{display:grid;grid-template-columns:var(--lane-head) repeat(4,minmax(228px,1fr)) var(--info-col);min-width:1440px;row-gap:12px}
+  .matrix{display:grid;grid-template-columns:var(--lane-head) repeat(3,minmax(228px,1fr)) var(--info-col);min-width:1200px;row-gap:12px}
   .stage-head{position:sticky;top:0;z-index:6;padding:10px 14px 9px;display:flex;align-items:center;gap:8px;
     background:var(--base);border-bottom:1px solid var(--b2);font-size:12px}
   .stage-head.corner{color:var(--tx4);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
@@ -311,6 +311,24 @@
   .addmenu .am-danger:hover{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
   .addmenu .am-danger .am-sub{color:color-mix(in srgb,var(--red) 55%,var(--tx4))}
   @media (prefers-reduced-motion: reduce){ .addmenu{transition:none} }
+  /* 候选池悬浮详情卡：body 级单例（.cand-row overflow:hidden、.modal backdrop-filter 都容不下它） */
+  #cand-tip{position:fixed;z-index:51;pointer-events:auto;max-height:60vh;overflow:auto;
+    width:min(300px,86vw);padding:10px 11px;border-radius:10px;
+    background:var(--l2);border:1px solid var(--b2);box-shadow:var(--shadow-pop);
+    opacity:0;transform:translateY(-3px) scale(.98);transform-origin:top left;
+    transition:opacity 130ms var(--ease-out),transform 160ms var(--ease-out)}
+  #cand-tip[data-show="true"]{opacity:1;transform:none}
+  #cand-tip[data-flip="1"]{transform-origin:bottom left}
+  #cand-tip .ct-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+  #cand-tip .ct-title{font-size:12.5px;line-height:1.45;font-weight:500;color:var(--tx1)}
+  #cand-tip .ct-imp{margin-left:auto;flex:0 0 auto;font-size:10px;color:var(--amber);
+    border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);border-radius:5px;padding:1px 6px;white-space:nowrap}
+  #cand-tip .ct-list{margin:0;display:flex;flex-direction:column;gap:5px}
+  #cand-tip .ct-row{display:flex;gap:8px;font-size:11.5px;line-height:1.55;align-items:flex-start}
+  #cand-tip .ct-row dt{flex:0 0 66px;color:var(--tx4);white-space:nowrap;padding-top:1px}
+  #cand-tip .ct-row dd{margin:0;color:var(--tx2);word-break:break-word;white-space:pre-wrap}
+  #cand-tip .ct-empty{color:var(--tx4)}
+  @media (prefers-reduced-motion: reduce){ #cand-tip{transition:none} }
   /* AI 拆目标的预览行（ask 弹窗内） */
   .gsel{display:flex;gap:8px;padding:8px 6px}
   .gsel + .gsel{border-top:1px solid var(--b1)}
@@ -424,7 +442,7 @@
     border:1px solid var(--b2);color:var(--tx3);font-size:11px;background:var(--l2)}
 
   /* ───────── focus view ───────── */
-  .focus-wrap{padding:14px 16px 20px;min-width:1420px}
+  .focus-wrap{padding:14px 16px 20px;min-width:1120px}
   .focus-summary{display:flex;gap:9px;margin-bottom:12px;flex-wrap:wrap}
   .sumbox{flex:1 1 220px;min-width:200px;border:1px solid var(--b1);border-radius:10px;corner-shape:var(--corner);background:var(--l2);padding:10px 12px}
   .sumbox .k{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx4)}
@@ -502,9 +520,9 @@
   .editval:hover{background:var(--hover);color:var(--tx1)}
   .editval.empty{color:var(--tx4);border:1px dashed var(--b2);text-align:center;font-size:11px}
   .editval{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  /* 愿景 / 阻碍项都是多行内容，默认 2 行只剩开头一半 → 单独放宽 */
+  /* 愿景 / 重要支撑都是多行内容，默认 2 行只剩开头一半 → 单独放宽 */
   .editval[data-edit="vision"]{-webkit-line-clamp:5}
-  .editval[data-edit="blockers"]{-webkit-line-clamp:4}
+  .editval[data-edit="supports"]{-webkit-line-clamp:4}
   .detail-row .fielddd{display:flex;gap:6px;align-items:flex-start}
   .detail-row .fielddd .editval{flex:1;min-width:0}
   /* 卡片下缘 / 详情动作行的「生成 N 项」：按标题补齐缺失字段 */
@@ -591,9 +609,15 @@
   .cand-empty{padding:16px 4px 10px;text-align:center;font-size:11.5px;color:var(--tx4);line-height:1.6}
   .cand-main{flex:1;min-width:0;transition:opacity 200ms var(--ease-out)}
   .cand-title{font-size:12px;color:var(--tx1);font-weight:500}
-  .cand-acc{font-size:10.5px;color:var(--tx4);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-  .cand-str{font-size:10.5px;color:var(--tx3);margin-top:4px;line-height:1.5;
-    padding-left:7px;border-left:2px solid color-mix(in srgb,var(--brand) 40%,transparent)}
+  /* 候选行瘦身：序号 + 重要性徽标 + 标题 + 承接支撑项一行；其它字段走 #cand-tip 悬浮卡 */
+  .cand-idx{flex:0 0 18px;padding-top:1px;text-align:right;font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums}
+  .cand-imp{flex:0 0 auto;min-width:20px;height:18px;display:inline-grid;place-items:center;border-radius:5px;
+    font-size:10px;color:var(--tx3);border:1px solid var(--b2);background:var(--l3);font-variant-numeric:tabular-nums}
+  .cand-imp[data-imp="4"],.cand-imp[data-imp="5"]{color:var(--amber);
+    border-color:color-mix(in srgb,var(--amber) 42%,transparent);background:color-mix(in srgb,var(--amber) 12%,transparent)}
+  .cand-sup{font-size:10.5px;color:var(--tx4);margin-top:3px;line-height:1.45;
+    overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;
+    padding-left:7px;border-left:2px solid color-mix(in srgb,var(--brand) 36%,transparent)}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -753,7 +777,7 @@
       <button class="chip" data-filter="open" aria-pressed="false">未关闭</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="density" aria-pressed="true">紧凑</button>
-      <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的目标 / 构思（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
+      <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的支撑项 / 执行记录（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="back-to-dsh" hidden title="返回到 DSH">← 返回</button>
       <button class="chip" id="add-project">+ 项目</button>
@@ -768,7 +792,7 @@
     </div>
     <div class="grow"></div>
     <div id="focus-switch" class="chipbar" hidden></div>
-    <span class="hint" id="toolbar-hint">里程碑 → 目标 → 构思 → 执行；里程碑的阻碍项清空后点「确认达成」，目标点「确认收敛」，构思记录全闭环自动收口</span>
+    <span class="hint" id="toolbar-hint">里程碑 → 支撑项 → 执行记录；支撑项记录全闭环自动完成，支撑项全部关闭后点「确认达成」</span>
   </div>
 
   <main class="scroll" id="stage">
@@ -889,6 +913,8 @@
 
 <div class="addmenu" id="addmenu" hidden role="menu" aria-label="添加子节点"></div>
 <div class="addmenu" id="prjmenu" hidden role="menu" aria-label="项目菜单"></div>
+<!-- 候选池悬浮详情卡：body 级单例，绝不放进 #ask / 行内（见 CSS 注释） -->
+<div id="cand-tip" role="tooltip" aria-hidden="true" hidden></div>
 
 <div class="toast" id="toast" role="status"><span class="dot"></span><span id="toast-text"></span></div>
 
@@ -896,18 +922,17 @@
 <script>
 /* ─────────── 常量 ─────────── */
 const STAGES = [
-  { key:'milestone', label:'里程碑',            en:'MILESTONE', color:'var(--brand)' },
-  { key:'goal', label:'目标',              en:'Goal', color:'var(--blue-300)' },
-  { key:'idea', label:'构思',              en:'Idea', color:'var(--amber)' },
-  { key:'exec', label:'执行验证反馈记录',   en:'Records', color:'var(--green)' },
+  { key:'milestone', label:'里程碑',         en:'MILESTONE', color:'var(--brand)' },
+  { key:'support',   label:'支撑项',         en:'Support',   color:'var(--blue-300)' },
+  { key:'exec',      label:'执行验证反馈记录', en:'Records',   color:'var(--green)' },
 ];
-const KIND = { milestone:'里程碑', goal:'目标', idea:'构思', exec:'执行' };
+const KIND = { milestone:'里程碑', support:'支撑项', exec:'执行' };
 /** 执行记录按 action 区分显示（计划 / 执行 / 反馈）；老记录没有 action 仍显示「执行」 */
 const ACTION_LABEL = { plan:'计划', exec:'执行', reflect:'反馈' };
 const isRecord = (n) => !!(n && n.kind === 'exec' && n.raw && n.raw.action);
 const recordActionOf = (n) => ((n && isRecord(n)) ? n.raw.action : '');
 const kindLabel = (n) => isRecord(n) ? (ACTION_LABEL[n.raw.action] || '执行') : (KIND[n.kind] || n.kind);
-const KIND_TONE = { milestone:'var(--brand)', goal:'var(--blue-300)', idea:'var(--amber)', exec:'var(--green)' };
+const KIND_TONE = { milestone:'var(--brand)', support:'var(--blue-300)', exec:'var(--green)' };
 const STATUS = {
   doing:{ label:'执行中', tone:'var(--brand-2)' },
   ready:{ label:'就绪',   tone:'var(--tx3)' },
@@ -926,39 +951,62 @@ const MOCK_PROJECTS = [
     sessions:[
       {id:'sw-s1',title:'情节层数据结构设计',at:'22:41',live:true},
       {id:'sw-s2',title:'三层叠渲染管线拆解',at:'21:07'},
-      {id:'sw-s3',title:'地图渲染完成验收',at:'10:24'},
+      {id:'sw-s3',title:'地图图层复用验收',at:'10:24'},
     ],
     trail:[
-      {at:'22:41',status:'doing',act:'执行：情节层数据结构设计',note:'回合 3'},
-      {at:'21:07',status:'doing',act:'拆解：三层叠渲染管线',note:'新增 4 个执行项'},
-      {at:'19:32',status:'ready',act:'构思定稿：章节 → 情节两层索引',note:'备选方案保留'},
-      {at:'10:24',status:'done',act:'目标关闭：地图渲染完成',note:'子项全关后收敛'},
+      {at:'22:41',status:'doing',act:'执行记录：情节层数据结构设计',note:'回合 3'},
+      {at:'21:07',status:'doing',act:'支撑项：三层叠渲染管线',note:'新增 3 条执行记录'},
+      {at:'19:32',status:'ready',act:'重要支撑定稿：章节 → 情节两层索引',note:'备选方案保留'},
+      {at:'10:24',status:'done',act:'支撑项完成：地图图层复用',note:'执行记录全闭环后自动收口'},
     ],
-    root: N('sw-loop','milestone','3 情节层渲染可视化', { vision:'打开项目就能看到三层情节图，不用读代码；作者改一段情节，视觉与结构同时更新，评审不用再截图对稿。', blockers:'1)缺章节→情节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」\n2)缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」', children:[
-      N('sw-g1','goal','情节数据模型可用', { children:[
-        N('sw-i1','idea','章节 → 情节两层索引', { children:[
-          N('sw-e1','exec','索引构建 + 校验通过', { closed:true, status:'done', meta:'证据：4 个测试用例' }),
-        ]}),
-        N('sw-i2','idea','分层 SVG 绘制', { children:[
-          N('sw-e2','exec','单层渲染 100 节点', { status:'done', meta:'实测 210ms' }),
-        ]}),
-      ]}),
-      N('sw-g2','goal','三层叠渲染管线', { children:[
-        N('sw-i3','idea','分层绘制 + 缓存', { children:[
-          N('sw-e3','exec','首屏 3 层 < 800ms', { status:'doing', meta:'实测 1.1s', children:[
-            N('sw-e3a','exec','拆解：层缓存命中率', { status:'doing' }),
-            N('sw-e3b','exec','拆解：首屏测量埋点', { status:'plan' }),
-          ]}),
-          N('sw-e4','exec','章节切换不闪烁', { status:'blocked', meta:'待定位',
-             issues:['切换时旧层未清空，出现残影'] }),
-        ]}),
-      ]}),
-      N('sw-g3','goal','地图渲染完成', { closed:true, children:[
-        N('sw-i4','idea','复用既有地图图层', { children:[
-          N('sw-e5','exec','图层复用接入', { closed:true, status:'done' }),
-        ]}),
-      ]}),
-    ]}),
+    root: N('sw-loop','milestone','3 情节层渲染可视化', {
+      vision:'打开项目就能看到三层情节图，不用读代码；作者改一段情节，视觉与结构同时更新，评审不用再截图对稿。',
+      supports:'章节 → 情节两层索引\n三层叠渲染管线\n地图图层复用',
+      metrics:'三层图首屏 < 800ms\n章节切换无残影\n索引构建 4 个测试用例通过',
+      lessons:[
+        {text:'先做索引再画图，返工少一半',at:'2026-10-25T10:00:00.000Z'},
+        {text:'渲染性能先量再优化，别猜',at:'2026-10-26T09:12:00.000Z'},
+      ],
+      children:[
+        N('sw-s1','support','情节数据模型可用', {
+          support:'章节 → 情节两层索引',
+          necessity:'没有索引，情节无法定位到章节，三层图无从画起',
+          causal:'索引一乱，情节渲染与结构树同时对不上',
+          metric:'索引构建 4 个测试用例通过',
+          approach:'先建章节 → 情节两层 Map，再按层采样渲染',
+          children:[
+            N('sw-r1','exec','计划：索引数据结构', { action:'plan', closed:true, status:'done', verify:'node scripts/index.mjs --dry' }),
+            N('sw-r2','exec','执行：索引构建 + 校验', { action:'exec', closed:true, status:'done', verify:'4 个测试用例通过', proof:'4/4 passed' }),
+            N('sw-r3','exec','反馈：采样粒度再细一档', { action:'reflect', closed:true, status:'done' }),
+          ],
+        }),
+        N('sw-s2','support','三层叠渲染管线', {
+          support:'三层叠渲染首屏可用',
+          necessity:'三层图必须一次画完，逐层加载会让人等三次',
+          causal:'渲染管线一慢，前面索引做得再准也看不出效果',
+          metric:'首屏 3 层 < 800ms',
+          approach:'分层绘制 + 缓存，先粗后细',
+          children:[
+            N('sw-r4','exec','计划：分层绘制 + 缓存', { action:'plan', closed:true, status:'done' }),
+            N('sw-r5','exec','执行：首屏 3 层 < 800ms', { action:'exec', status:'doing', verify:'实测 1.1s', proof:'' }),
+            N('sw-r6','exec','反馈：缓存命中率偏低', { action:'reflect', status:'plan' }),
+          ],
+        }),
+        N('sw-s3','support','地图图层复用', {
+          closed:true,
+          support:'复用既有地图图层',
+          necessity:'重画一套地图要两周，复用现成图层一天就能接上',
+          causal:'图层不复用，地图与情节会各画一套坐标系',
+          metric:'图层复用接入后地图加载 < 300ms',
+          approach:'直接接旧地图渲染器，只换数据源',
+          children:[
+            N('sw-r7','exec','计划：复用既有地图图层', { action:'plan', closed:true, status:'done' }),
+            N('sw-r8','exec','执行：图层复用接入', { action:'exec', closed:true, status:'done', verify:'地图加载 280ms' }),
+            N('sw-r9','exec','反馈：坐标系一致，无需转换', { action:'reflect', closed:true, status:'done' }),
+          ],
+        }),
+      ],
+    }),
   },
   {
     id:'chunks', name:'词块', tag:'Word Chunks · 双轨', session:'session-8ea2…31cc',
@@ -967,22 +1015,39 @@ const MOCK_PROJECTS = [
       {id:'ck-s2',title:'双轨学习状态机草稿',at:'20:12'},
     ],
     trail:[
-      {at:'22:58',status:'doing',act:'执行：COCA 六万词顺序',note:'采样 1.2 万句'},
-      {at:'20:40',status:'ready',act:'构思：语料词频现场计算',note:'主选方案'},
+      {at:'22:58',status:'doing',act:'执行记录：COCA 六万词顺序',note:'采样 1.2 万句'},
+      {at:'20:40',status:'ready',act:'重要支撑：语料词频现场计算',note:'主选方案'},
       {at:'17:05',status:'plan',act:'立项：双轨学习里程碑',note:'教 / 学两条路径'},
     ],
-    root: N('ck-loop','milestone','双轨学习里程碑', { vision:'教与学两条路径都能用同一套词块数据跑通，换教材不用重排词表。', blockers:'1)缺采样脚本 → 挡在「词频驱动词块顺序」', children:[
-      N('ck-g1','goal','教学轨可用', { children:[
-        N('ck-i1','idea','词频驱动词块顺序', { children:[
-          N('ck-e1','exec','COCA 前 6000 命中 ≥ 90%', { status:'doing', meta:'采样中' }),
-        ]}),
-      ]}),
-      N('ck-g2','goal','学习轨可用', { children:[
-        N('ck-i2','idea','语料词频现场计算', { children:[
-          N('ck-e2','exec','采样 1.2 万句完成', { status:'ready', meta:'待接 UI' }),
-        ]}),
-      ]}),
-    ]}),
+    root: N('ck-loop','milestone','双轨学习里程碑', {
+      vision:'教与学两条路径都能用同一套词块数据跑通，换教材不用重排词表。',
+      supports:'教学轨可用\n学习轨可用',
+      metrics:'COCA 前 6000 命中 ≥ 90%\n采样 1.2 万句完成',
+      children:[
+        N('ck-s1','support','教学轨可用', {
+          support:'教学轨能用词频驱动词块顺序',
+          necessity:'教材词表顺序不靠谱，学生先学的词用不上',
+          causal:'词频顺序错了，后面的复习计划全部要重排',
+          metric:'COCA 前 6000 命中 ≥ 90%',
+          approach:'先算 COCA 词频，再按频段切词块',
+          children:[
+            N('ck-r1','exec','计划：词频驱动词块顺序', { action:'plan', closed:true, status:'done' }),
+            N('ck-r2','exec','执行：COCA 前 6000 命中 ≥ 90%', { action:'exec', status:'doing', verify:'采样 3000/6000', proof:'' }),
+          ],
+        }),
+        N('ck-s2','support','学习轨可用', {
+          support:'学习轨能用同一套词块数据',
+          necessity:'教学与学习共用一份数据，才不用维护两套词表',
+          causal:'数据分叉会让两条轨道的进度对不上',
+          metric:'采样 1.2 万句完成',
+          approach:'语料词频现场计算，按会话缓存结果',
+          children:[
+            N('ck-r3','exec','计划：语料词频现场计算', { action:'plan', closed:true, status:'done' }),
+            N('ck-r4','exec','执行：采样 1.2 万句完成', { action:'exec', status:'ready', verify:'采样 1.2 万句', proof:'' }),
+          ],
+        }),
+      ],
+    }),
   },
   {
     id:'needsfinder', name:'NeedsFinder', tag:'需求发现里程碑', session:'session-bd07…a4e1',
@@ -992,22 +1057,38 @@ const MOCK_PROJECTS = [
     ],
     trail:[
       {at:'23:12',status:'blocked',act:'标记阻塞：登录态 6h 失效',note:'需人工扫码'},
-      {at:'22:46',status:'doing',act:'目标：端到端 10 条真实需求',note:'验收从 5 条提到 10 条'},
+      {at:'22:46',status:'doing',act:'支撑项：端到端 10 条真实需求',note:'验收从 5 条提到 10 条'},
       {at:'19:02',status:'plan',act:'立项：NeedsFinder 需求里程碑',note:'来源：小红书搜索'},
     ],
-    root: N('nf-loop','milestone','需求发现里程碑', { vision:'每天自动从小红书捞出真实需求，按痛点排序，选题不再靠猜。', blockers:'1)缺登录态保活 → 挡在「抓取 → 聚类 → 打分」', children:[
-      N('nf-g1','goal','小红书链路跑通', { status:'blocked', children:[
-        N('nf-i1','idea','抓取 → 聚类 → 打分', { children:[
-          N('nf-e1','exec','登录态保活 6h', { status:'blocked', meta:'扫码后失效',
-             issues:['扫码登录 6 小时后失效，抓取链路中断'] }),
-        ]}),
-      ]}),
-      N('nf-g2','goal','端到端产出 10 条需求', { children:[
-        N('nf-i2','idea','需求去重', { children:[
-          N('nf-e2','exec','需求去重率 < 20%', { status:'plan' }),
-        ]}),
-      ]}),
-    ]}),
+    root: N('nf-loop','milestone','需求发现里程碑', {
+      vision:'每天自动从小红书捞出真实需求，按痛点排序，选题不再靠猜。',
+      supports:'小红书链路跑通\n端到端产出 10 条需求',
+      metrics:'登录态保活 ≥ 6h\n去重后需求 ≥ 10 条',
+      children:[
+        N('nf-s1','support','小红书链路跑通', {
+          support:'抓取 → 聚类 → 打分整条链路可跑',
+          necessity:'链路跑不通就没有需求来源，后面全是空转',
+          causal:'登录态一失效，抓取、聚类、打分同时中断',
+          metric:'登录态保活 6h',
+          approach:'先做登录态保活，再串抓取 / 聚类 / 打分',
+          children:[
+            N('nf-r1','exec','计划：抓取 → 聚类 → 打分', { action:'plan', closed:true, status:'done' }),
+            N('nf-r2','exec','执行：登录态保活 6h', { action:'exec', status:'blocked', verify:'', issues:['扫码登录 6 小时后失效，抓取链路中断'] }),
+          ],
+        }),
+        N('nf-s2','support','端到端产出 10 条需求', {
+          support:'去重后仍有 10 条真实需求',
+          necessity:'少于 10 条说明样本不够，排序结论不可信',
+          causal:'需求不去重，同一条会被算成多条，排序失真',
+          metric:'去重率 < 20%，需求 ≥ 10 条',
+          approach:'先按标题 + 关键词聚类去重，再人工抽检',
+          children:[
+            N('nf-r3','exec','计划：需求去重', { action:'plan', closed:true, status:'done' }),
+            N('nf-r4','exec','执行：需求去重率 < 20%', { action:'exec', status:'plan', verify:'', proof:'' }),
+          ],
+        }),
+      ],
+    }),
   },
   {
     id:'shadowing', name:'shadowing', tag:'跟读 · youtube', session:'session-2f93…77b0',
@@ -1016,39 +1097,83 @@ const MOCK_PROJECTS = [
       {id:'sh-s2',title:'字幕抓取链路打通',at:'18:44'},
     ],
     trail:[
-      {at:'22:20',status:'doing',act:'执行：自动字幕时间轴兜底',note:'需人工字幕兜底'},
-      {at:'18:44',status:'done',act:'目标关闭：素材入库',note:'40 条视频'},
+      {at:'22:20',status:'doing',act:'执行记录：自动字幕时间轴兜底',note:'需人工字幕兜底'},
+      {at:'18:44',status:'done',act:'支撑项完成：素材入库',note:'40 条视频'},
     ],
-    root: N('sh-loop','milestone','youtube 跟读里程碑', { vision:'任意 YouTube 视频粘链接就能逐句跟读，练完进度可恢复。', blockers:'1)缺自动字幕成功率 → 挡在「素材入库」', children:[
-      N('sh-g1','goal','素材入库', { closed:true, children:[
-        N('sh-i1','idea','链接解析 + 落盘', { children:[
-          N('sh-e1','exec','入库 40 条视频', { closed:true, status:'done' }),
-        ]}),
-      ]}),
-      N('sh-g2','goal','词幕加载展示', { children:[
-        N('sh-i2','idea','字幕抓取 + 时间轴对齐', { children:[
-          N('sh-e2','exec','对齐误差 < 120ms', { status:'doing', meta:'实测 180ms' }),
-          N('sh-e3','exec','自动字幕缺时间轴', { status:'blocked', meta:'待人工兜底',
-             issues:['长视频无自动字幕，需人工时间轴'] }),
-        ]}),
-      ]}),
-    ]}),
+    root: N('sh-loop','milestone','youtube 跟读里程碑', {
+      vision:'任意 YouTube 视频粘链接就能逐句跟读，练完进度可恢复。',
+      supports:'素材入库\n字幕加载与时间轴对齐',
+      metrics:'入库 40 条视频\n对齐误差 < 120ms',
+      children:[
+        N('sh-s1','support','素材入库', {
+          closed:true,
+          support:'链接解析 + 落盘',
+          necessity:'没有本地素材，每次跟读都要重新联网拉视频',
+          causal:'素材不全，后面字幕对齐没有可练的对象',
+          metric:'入库 40 条视频',
+          approach:'解析链接后直接落盘，按视频 id 去重',
+          children:[
+            N('sh-r1','exec','计划：链接解析 + 落盘', { action:'plan', closed:true, status:'done' }),
+            N('sh-r2','exec','执行：入库 40 条视频', { action:'exec', closed:true, status:'done', verify:'40/40 落盘' }),
+            N('sh-r3','exec','反馈：按视频 id 去重够用', { action:'reflect', closed:true, status:'done' }),
+          ],
+        }),
+        N('sh-s2','support','字幕加载与时间轴对齐', {
+          support:'字幕抓取 + 时间轴对齐',
+          necessity:'没有逐句时间轴，跟读只能整段播，练不了单句',
+          causal:'对齐误差一大，跟读就会落后半句，体验直接崩',
+          metric:'对齐误差 < 120ms',
+          approach:'优先用自动字幕；缺时间轴时退到人工字幕兜底',
+          children:[
+            N('sh-r4','exec','计划：字幕抓取 + 时间轴对齐', { action:'plan', closed:true, status:'done' }),
+            N('sh-r5','exec','执行：对齐误差 < 120ms', { action:'exec', status:'doing', verify:'实测 180ms', proof:'' }),
+            N('sh-r6','exec','执行：自动字幕缺时间轴', { action:'exec', status:'blocked', verify:'', issues:['长视频无自动字幕，需人工时间轴'] }),
+          ],
+        }),
+      ],
+    }),
   },
   {
     id:'graph', name:'竞品知识图谱', tag:'已归档 · 2026-10-18', session:'session-71bd…0c33',
     sessions:[{id:'kg-s1',title:'竞品图谱四款数据入库',at:'10-18'}],
     trail:[
-      {at:'10-18',status:'done',act:'里程碑达成：竞品知识图谱',note:'2/2 目标关闭'},
-      {at:'10-16',status:'done',act:'目标关闭：图谱交互',note:'4 款竞品可切换'},
+      {at:'10-18',status:'done',act:'里程碑达成：竞品知识图谱',note:'2/2 支撑项关闭'},
+      {at:'10-16',status:'done',act:'支撑项完成：图谱交互',note:'4 款竞品可切换'},
     ],
-    root: N('kg-loop','milestone','竞品知识图谱里程碑', { closed:true, convergedAt:'2026-10-18 16:40', vision:'四款竞品的知识图谱可查可看，选型对比一屏完成。', children:[
-      N('kg-g1','goal','四款竞品数据入库', { closed:true, children:[
-        N('kg-i1','idea','官网 + 文档抓取', { children:[ N('kg-e1','exec','入库 4 款竞品', { closed:true, status:'done' }) ]}),
-      ]}),
-      N('kg-g2','goal','图谱交互可用', { closed:true, children:[
-        N('kg-i2','idea','节点连线 + 过滤', { children:[ N('kg-e2','exec','切换 4 款不卡顿', { closed:true, status:'done' }) ]}),
-      ]}),
-    ]}),
+    root: N('kg-loop','milestone','竞品知识图谱里程碑', {
+      closed:true, convergedAt:'2026-10-18 16:40',
+      vision:'四款竞品的知识图谱可查可看，选型对比一屏完成。',
+      supports:'四款竞品数据入库\n图谱交互可用',
+      metrics:'入库 4 款竞品\n切换 4 款不卡顿',
+      lessons:[{text:'数据先结构化成节点，图谱交互就是纯前端活',at:'2026-10-18T16:40:00.000Z'}],
+      children:[
+        N('kg-s1','support','四款竞品数据入库', {
+          closed:true,
+          support:'官网 + 文档抓取',
+          necessity:'没有结构化数据，图谱没有可展示的节点',
+          causal:'入库字段一乱，后面的连线与过滤全要重做',
+          metric:'入库 4 款竞品',
+          approach:'官网与文档分别抓，统一成同一套节点 schema',
+          children:[
+            N('kg-r1','exec','计划：官网 + 文档抓取', { action:'plan', closed:true, status:'done' }),
+            N('kg-r2','exec','执行：入库 4 款竞品', { action:'exec', closed:true, status:'done', verify:'4/4 入库' }),
+          ],
+        }),
+        N('kg-s2','support','图谱交互可用', {
+          closed:true,
+          support:'节点连线 + 过滤',
+          necessity:'只有节点没有交互，选型对比还是得来回翻文档',
+          causal:'交互卡顿会让人放弃使用，图谱等于没做',
+          metric:'切换 4 款不卡顿',
+          approach:'节点连线用 SVG，过滤只做前端切数据',
+          children:[
+            N('kg-r3','exec','计划：节点连线 + 过滤', { action:'plan', closed:true, status:'done' }),
+            N('kg-r4','exec','执行：切换 4 款不卡顿', { action:'exec', closed:true, status:'done', verify:'切换 60fps' }),
+            N('kg-r5','exec','反馈：过滤条件别超过 3 个', { action:'reflect', closed:true, status:'done' }),
+          ],
+        }),
+      ],
+    }),
   },
 ];
 
@@ -1079,9 +1204,60 @@ function summarizeField(text, label){
   return `${label}：${snippet}`;
 }
 
+/**
+ * 载入兜底：把旧卡片（goal / idea / blockers）折叠成三列契约，幂等。
+ * 只在传入 card 的深拷贝上操作，不回写原对象引用；折叠后的结果就是写盘用的 card。
+ *   blockers → supports（里程碑文本）
+ *   深 2 goal → support；goal.blocker → support.support
+ *   goal 下的 idea → 折进支撑项：approach / plan 空时补，idea.children 上提为执行记录
+ */
+function foldLegacyKinds(card){
+  const out = JSON.parse(JSON.stringify(card || {}));
+  const ms = out.milestone;
+  if (!ms || typeof ms !== 'object') return out;
+  ms.kind = 'milestone';
+  if (!String(ms.supports || '').trim() && String(ms.blockers || '').trim()) ms.supports = ms.blockers;
+  delete ms.blockers;
+  delete ms.scenario; delete ms.constraints; delete ms.acceptance;
+  const foldSupport = (node) => {
+    node.kind = 'support';
+    if (!String(node.support || '').trim() && String(node.blocker || '').trim()) node.support = node.blocker;
+    delete node.blocker;
+    delete node.scenario; delete node.constraints; delete node.acceptance;
+    const kept = [];
+    for (const kid of (Array.isArray(node.children) ? node.children : [])){
+      if (!kid || typeof kid !== 'object') continue;
+      if (kid.kind === 'idea'){
+        // 构思折进支撑项：没有实现思路就借构思标题，计划对象空着就继承
+        if (!String(node.approach || '').trim()) node.approach = String(kid.approach || kid.title || '').trim();
+        if (!node.plan && kid.plan) node.plan = kid.plan;
+        (kid.children || []).forEach((c) => { if (c && typeof c === 'object' && c.kind === 'exec') kept.push(c); });
+        continue;
+      }
+      kept.push(kid);
+    }
+    const execs = kept.filter((k) => k && k.kind === 'exec');
+    if (execs.length) node.children = execs; else delete node.children;
+    return node;
+  };
+  const supports = [];
+  for (const child of (Array.isArray(ms.children) ? ms.children : [])){
+    if (!child || typeof child !== 'object') continue;
+    if (child.kind === 'support' || child.kind === 'goal') supports.push(foldSupport(child));
+    else if (child.kind === 'idea') supports.push(foldSupport({ id: child.id, title: child.title, children: child.children }));
+    else if (child.kind === 'exec') supports.push(foldSupport({ id: child.id + '-s', title: child.title, children: [child] }));
+    else supports.push(foldSupport(child));
+  }
+  if (supports.length) ms.children = supports; else delete ms.children;
+  return out;
+}
+
 function cardToProject(card, file){
+  // 载入（含「载入 JSON」与 host 读入）先兜底折叠一次旧 kind；幂等，已折叠的卡片原样通过
+  card = foldLegacyKinds(card);
   const ws = card.project && card.project.workspace ? card.project.workspace : '';
   const tail = ws.split('/').filter(Boolean).slice(-2).join('/');
+  const lineCount = (v) => String(v || '').trim().split('\n').filter((line) => line.trim()).length;
   const conv = (n) => {
     // 执行记录（计划 / 执行 / 反馈）只是会话日志：卡片上不再铺验证、证据这类字段摘要
     const isRec = n.kind === 'exec' && !!n.action;
@@ -1092,27 +1268,20 @@ function cardToProject(card, file){
     title: n.title,
     status: n.status || 'plan',
     closed: !!n.closed_at,
-    metaFull: isRec ? '' : (n.kind === 'exec' ? (n.verify || '') : (n.kind === 'milestone' ? (n.vision || '') : (n.scenario ? `场景 ${countSteps(n.scenario)} 步 · ${n.acceptance || ''}` : (n.acceptance || '')))),
+    metaFull: isRec ? '' : (n.kind === 'exec' ? (n.verify || '') : (n.kind === 'milestone' ? (n.vision || '') : (n.support || n.necessity || ''))),
     chips: (() => {
-      const kids = n.children || [];
-      const byKind = { goal: 0, idea: 0, exec: 0 };
-      kids.forEach((k) => { if (byKind[k.kind] !== undefined && !(k.kind === 'exec' && k.action)) byKind[k.kind] += 1; });
+      if (isRec) return [];
       const out = [];
-      if (byKind.goal) out.push(`${byKind.goal} 目标`);
-      if (byKind.idea) out.push(`${byKind.idea} 构思`);
-      if (byKind.exec) out.push(`${byKind.exec} 执行`);
-      const accItems = n.kind === 'milestone' ? 0 : countItems(n.acceptance);
-      if (accItems >= 3) out.push(`验收 ${accItems} 项`);
       if (n.kind === 'milestone') {
-        // 核心指标按行数算：一行一条，不要求带编号标记
-        const metricItems = String(n.metrics || '').trim().split('\n').filter((line) => line.trim()).length;
+        // 核心指标 / 重要支撑都按行数算：一行一条，不要求带编号标记
+        const metricItems = lineCount(n.metrics);
         if (metricItems) out.push(`核心指标 ${metricItems} 项`);
-        const blk = String(n.blockers || '').trim().split('\n').filter((line) => line.trim()).length;
-        if (blk) out.push(`阻碍 ${blk} 条`);
-      }
-      if (n.kind === 'goal') {
-        const steps = countSteps(n.scenario);
-        if (steps) out.push(`场景 ${steps} 步`);
+        const supItems = lineCount(n.supports);
+        if (supItems) out.push(`重要支撑 ${supItems} 条`);
+      } else if (n.kind === 'support') {
+        out.push(`核心指标${String(n.metric || '').trim() ? '有' : '无'}`);
+        const recCount = (n.children || []).filter((k) => k && k.kind === 'exec').length;
+        if (recCount) out.push(`子记录 ${recCount}`);
       }
       return out;
     })(),
@@ -1120,13 +1289,13 @@ function cardToProject(card, file){
       ? summarizeField(n.verify, '验证')
       : (n.kind === 'milestone'
         ? summarizeField(n.vision, '里程碑愿景')
-        : summarizeField(n.acceptance, '验收'))),
+        : summarizeField(n.support || n.necessity, '承接支撑项'))),
     issues: (n.issues || []).filter(i => !i.resolved_at).map(i => i.text),
     children: (n.children || []).map(conv),
     };
   };
   const root = conv(card.milestone);
-  autoCloseTree(root);   // 旧数据里「构思记录全闭环但没关」的，进入面板时先按结构补正（只补构思）
+  autoCloseTree(root);   // 旧数据里「执行记录全闭环但没关」的支撑项，进入面板时先按结构补正
   if (card.milestone.closed_at) root.convergedAt = new Date(card.milestone.closed_at).toLocaleString('sv-SE').slice(0,16);
   const proj = {
     id: 'card-' + root.id,
@@ -1155,7 +1324,8 @@ function countExecItems(root){
 /** 历史快照只保留回看需要的字段：结构完整，不背 session / 计划全文 */
 function compactMilestoneSnapshot(node){
   if (!node || typeof node !== 'object') return null;
-  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','vision','metrics','acceptance','blockers','blocker','verify','proof','action','lessons'];
+  // 新旧字段都留着：老快照只读回看，新快照要能完整还原支撑项
+  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','vision','supports','metrics','support','necessity','causal','metric','approach','acceptance','blockers','blocker','verify','proof','action','lessons'];
   const out = {};
   KEEP.forEach((k) => { if (node[k] != null) out[k] = node[k]; });
   if (Array.isArray(node.issues) && node.issues.length){
@@ -1180,7 +1350,8 @@ function pushClosedMilestone(p, root, at){
     title: raw.title || root.title || '未命名里程碑',
     closed_at: raw.closed_at || at || new Date().toISOString(),
     archived_at: new Date().toISOString(),
-    goals: (raw.children || []).filter((k) => k && k.kind === 'goal').length,
+    // 字段名沿用历史 schema 的 goals，口径换成支撑项（closed_milestones 随卡片走 git，不改键）
+    goals: (raw.children || []).filter((k) => k && (k.kind === 'support' || k.kind === 'goal')).length,
     execs: countExecItems(root),
     snapshot: compactMilestoneSnapshot(raw),
   };
@@ -1245,7 +1416,7 @@ function staticRun(n){
 function runFor(p, n){
   const direct = runMap.get(runKey(p, n));
   if (direct) return direct;
-  // 动作会话的 nodeId 是构思 id、recordId 是记录 id：构思卡与记录卡都要认领同一个 run
+  // 动作会话的 nodeId 是支撑项 id、recordId 是记录 id：支撑项卡与记录卡都要认领同一个 run
   for (const r of runMap.values()){
     if (r.nodeId === n.id || (r.recordId && r.recordId === n.id)) return r;
   }
@@ -1275,7 +1446,7 @@ function activeAncestorOf(p, n){
  * 这里不新增规则、不新增字段，只把同一条判定翻过来用于渲染：没在跑、祖先也没在跑的就高亮。
  * 注意：卡片跨机器同步来的 running 已被 staticRun 降级成 stale，所以旧快照不会被算成「忙」。
  */
-const IDLE_KINDS = ['milestone', 'goal', 'idea'];   // 执行记录是日志，不算分支
+const IDLE_KINDS = ['milestone', 'support'];   // 执行记录是日志，不算分支
 /**
  * 项目内的可开工分支模型（纯函数：isBusy / isBlocked 外部注入，mock 直接抽这段跑断言）。
  *   running            = 自身有 live run
@@ -1459,20 +1630,9 @@ function nodeIssues(n){ return (n.raw && n.raw.issues) || n.issues || []; }
 function hasIssues(n){ return nodeIssues(n).length > 0; }
 function anyBlocked(n){ let h=false; walk(n, x=>{ if(hasIssues(x) && !x.closed) h=true; }); return h; }
 function blockCount(n){ let c=0; walk(n, x=>{ if(hasIssues(x) && !x.closed) c++; }); return c; }
-// 里程碑的阻碍项：现在就达成这个里程碑，哪一步跑不通、缺哪个模块/功能才跑通。
-// 非空时不允许「确认达成」——阻碍项就是「现在通不过的地方」。
-function blockersOf(n){
-  return (n && n.kind === 'milestone' && n.raw) ? String(n.raw.blockers || '').trim() : '';
-}
-function blockerCountOf(n){
-  const text = blockersOf(n);
-  return text ? text.split('\n').filter(line => line.trim()).length : 0;
-}
-function blockerGate(n){ return !!n && n.kind === 'milestone' && !n.closed && !!blockersOf(n); }
-function blockerGateTip(n){ return `还有 ${blockerCountOf(n)} 条阻碍项：先在「阻碍项」里清空或消除后才能确认达成`; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
-// 构思没有「方案」字段（2026-10-29 退役），所以这里也不再拿它判「有内容」
-const INFO_FIELDS = ['vision','metrics','scenario','blockers','constraints','acceptance','verify','proof'];
+// 三列口径：里程碑看愿景 / 重要支撑 / 核心指标；支撑项看承接支撑项 / 核心指标 / 实现思路 / 必要性 / 因果；记录看验证与证据
+const INFO_FIELDS = ['vision','metrics','supports','support','metric','approach','necessity','causal','verify','proof'];
 // 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
 const PLACEHOLDER_RE = /^[（(]待补[）)]/;
 function isFilled(v){
@@ -1486,7 +1646,7 @@ function hasInfo(n){
 /* 五种状态，全部由结构派生（不再手改）：
    未开始 = 只有标题；规划中 = 有内容但还没执行；进行中 = 有工作子节点/执行记录未全闭环；
    待确认 = 里程碑「待确认达成」/ 目标「待确认收敛」，等人工确认；已闭环 = 人工确认过
-   （里程碑叫「已达成」，构思与目标叫「已闭环」，由 stateOf 按 kind 换词） */
+   （里程碑叫「已达成」，支撑项 / 执行记录叫「已闭环」，由 stateOf 按 kind 换词） */
 const STATE_DEF = {
   todo:   { label:'未开始', tone:'var(--tx4)' },
   plan:   { label:'规划中', tone:'var(--tx3)' },
@@ -1494,37 +1654,29 @@ const STATE_DEF = {
   review: { label:'待确认收敛', tone:'var(--amber)' },
   closed: { label:'已闭环', tone:'var(--green)' },
 };
-/** 关闭按钮文案：里程碑「确认达成」，目标「确认收敛」，记录/叶子「完成」 */
+/** 关闭按钮文案：里程碑「确认达成」，支撑项 / 执行记录「完成」 */
 function closeLabelOf(n){
   if (!n) return '完成';
   if (n.kind === 'milestone') return '确认达成';
-  if (n.kind === 'goal') return '确认收敛';
   return '完成';
 }
 /**
- * 收敛 / 达成的闸门：目标「确认收敛」、里程碑「确认达成」都必须真的衍生出过工作子节点。
- * 没衍生出去就没有可收口的分支——按钮置灰，想结束它进详情页点「删除节点」。
- * 判据取原节点 (n.src)：折叠克隆会把已闭环子节点藏掉，看可见 kids 会把正常收敛路径一起灰掉。
+ * 达成闸门：只对里程碑生效——至少 1 个支撑项子节点 + 支撑项全部闭环（不再看 supports 文本是否非空）。
+ * 判据取原节点 (n.src)：折叠克隆会把已闭环子节点藏掉，看可见 kids 会把正常达成路径一起灰掉。
  * 返回 { state, label, tip }：
- *   ready  可点（子节点全关闭）
- *   locked 灰（阻碍项没清）
- *   no-kids 灰（从来没衍生过子节点）
- *   hidden 不显示（叶子 / 构思 / 已闭环 / 子节点还没关完）
+ *   ready   可点（支撑项全关闭）
+ *   no-kids 灰（还没有支撑项）
+ *   hidden  不显示（支撑项 / 执行记录 / 已闭环 / 子项还没关完）
  */
 function convergeGate(n){
   if (!n || n.closed) return { state: 'hidden', label: '', tip: '' };
   const src = n.src || n;
-  if (src.kind !== 'goal' && src.kind !== 'milestone') return { state: 'hidden', label: '', tip: '' };
+  if (src.kind !== 'milestone') return { state: 'hidden', label: '', tip: '' };
   const label = closeLabelOf(src);
   const kids = workKids(src);
   if (!kids.length){
-    const childKind = src.kind === 'goal' ? '构思' : '目标';
-    const how = src.kind === 'goal'
-      ? '想结束它，进详情页点「删除节点」'
-      : '里程碑根节点不能删：先给它加目标，或从项目列表移除这张卡';
-    return { state: 'no-kids', label, tip: `还没有${childKind}子节点，没衍生出去就没有可收口的分支。${how}` };
+    return { state: 'no-kids', label, tip: '还没有支撑项子节点，没衍生出去就没有可收口的分支。里程碑根节点不能删：先给它加支撑项，或从项目列表移除这张卡' };
   }
-  if (blockerGate(src)) return { state: 'locked', label, tip: blockerGateTip(src) };
   if (!kids.every(k => k.closed)) return { state: 'hidden', label, tip: '' };
   return { state: 'ready', label, tip: '' };
 }
@@ -1538,12 +1690,11 @@ function convergeBtnMarkup(n, tone){
   // 灰态：视觉上不可点，点一下只用 toast 说清为什么、该走哪条路（disabled 的按钮发不出 toast）
   return `<button class="tbtn is-locked" data-close="${n.id}" aria-disabled="true" title="${esc(g.tip)}">${g.label}</button>`;
 }
-/** 构思的「记录全闭环」判据：计划 / 执行 / 反馈都关闭，且至少有一次执行（只出计划不算完成） */
-function ideaRecordsDone(n){
-  if (!n || n.kind !== 'idea') return false;
+/** 支撑项的「记录全闭环」判据：子记录全部关闭；没有子记录时返回 false（交给「完成」按钮手动收口） */
+function supportRecordsDone(n){
+  if (!n || n.kind !== 'support') return false;
   const kids = n.children || [];
-  if (!kids.length || !kids.every(k => k.closed)) return false;
-  return kids.some(k => recordActionOf(k) === 'exec') && kids.some(k => recordActionOf(k) === 'reflect');
+  return kids.length > 0 && kids.every(k => k.closed);
 }
 function deriveState(node){
   const n = (node && node.src) || node;   // 折叠克隆会丢掉已闭环子节点，状态必须按原节点算
@@ -1552,13 +1703,13 @@ function deriveState(node){
   const wk = workKids(n);
   if (wk.length){
     const allClosed = wk.every(k => k.closed);
-    // 目标 / 里程碑不自动收口：子项全关闭后停在「待确认」，等人工确认
-    if (n.kind === 'milestone' || n.kind === 'goal') return allClosed ? 'review' : 'doing';
+    // 里程碑不自动收口：支撑项全关闭后停在「待确认」，等人工确认
+    if (n.kind === 'milestone') return allClosed ? 'review' : 'doing';
     return allClosed ? 'closed' : 'doing';
   }
-  // 构思的子节点全是会话记录：有计划但没执行 = 规划中，执行过 = 进行中，记录全闭环 = 已闭环
-  if (n.kind === 'idea'){
-    if (ideaRecordsDone(n)) return 'closed';
+  // 支撑项的子节点全是执行记录：有执行过 = 进行中，记录全闭环 = 已闭环（autoCloseTree 会落 closed）
+  if (n.kind === 'support'){
+    if (supportRecordsDone(n)) return 'closed';
     if ((n.children || []).some(k => recordActionOf(k) === 'exec')) return 'doing';
     return (hasInfo(n) || (n.raw && n.raw.plan)) ? 'plan' : 'todo';
   }
@@ -1570,7 +1721,7 @@ function deriveState(node){
 function stateOf(n){
   const key = deriveState(n);
   const d = STATE_DEF[key];
-  // 里程碑用「达成」，目标 / 构思保持「闭环 / 收敛」
+  // 里程碑用「达成」，支撑项 / 执行记录保持「闭环」
   const label = n && n.kind === 'milestone'
     ? (key === 'review' ? '待确认达成' : key === 'closed' ? '已达成' : d.label)
     : d.label;
@@ -1584,14 +1735,14 @@ function nodeTone(n){
   return KIND_TONE[n.kind];
 }
 /**
- * 自动收口**只作用于构思**（记录全闭环 / 旧数据的工作子节点全闭环）。
- * 目标与里程碑必须由人确认（目标「确认收敛」、里程碑「确认达成」），不再自动收口——否则分支会凭空消失。
+ * 自动收口**只作用于支撑项**：执行记录全部闭环 → 支撑项自动完成。
+ * 没有执行记录的支撑项不自动收口，给它「完成」按钮手动收口；里程碑必须由人「确认达成」。
  */
 function autoCloseTree(root){
   walk(root, (x)=>{
     const kids = x.children || [];
-    if (x.closed || x.kind !== 'idea' || !kids.length || !kids.every(k => k.closed)) return;
-    if (!(workKids(x).length > 0 || ideaRecordsDone(x))) return;
+    if (x.closed || x.kind !== 'support' || !kids.length || !kids.every(k => k.closed)) return;
+    if (!supportRecordsDone(x)) return;
     x.closed = true;
     if (x.raw) x.raw.closed_at = new Date().toISOString();
   });
@@ -1614,13 +1765,13 @@ function syncRawStatus(root){
     if (n.closed){ n.raw.status = 'done'; return; }
     const wk = workKids(n);
     if (wk.length){
-      // 目标/里程碑：子项全关闭只是「待确认」，status 不能写 done（closed_at 才是关闭）
-      if (n.kind === 'milestone' || n.kind === 'goal'){ n.raw.status = 'doing'; return; }
+      // 里程碑：子项全关闭只是「待确认」，status 不能写 done（closed_at 才是关闭）
+      if (n.kind === 'milestone'){ n.raw.status = 'doing'; return; }
       n.raw.status = wk.every(k => k.closed) ? 'done' : 'doing';
       return;
     }
-    // 构思：记录里有执行就算 doing，只出计划/还没动作算 plan
-    if (n.kind === 'idea'){
+    // 支撑项：执行记录里有执行就算 doing，只出计划/还没动作算 plan
+    if (n.kind === 'support'){
       n.raw.status = (n.children || []).some(k => recordActionOf(k) === 'exec') ? 'doing' : 'plan';
       return;
     }
@@ -1687,10 +1838,10 @@ function laneServices(p){
 
 /* ─────────── 项目统计 ─────────── */
 function projectStats(p){
-  // 执行记录不是工作项：节点数 / 完成度 / 风险 / 趋势都不把它算进来
+  // 三列口径：里程碑 / 支撑项 / 执行记录都算节点（执行列现在就是记录本身）
   const all = [];
-  walk(p.root, n => { if (!isRecord(n)) all.push(n); });
-  const kind = { milestone:0, goal:0, idea:0, exec:0 };
+  walk(p.root, n => { all.push(n); });
+  const kind = { milestone:0, support:0, exec:0 };
   const stat = { doing:0, review:0, plan:0, todo:0, blocked:0, closed:0 };
   let issues = 0, noVerify = 0, noProof = 0, folded = 0;
   const closedAt = [];
@@ -1709,9 +1860,9 @@ function projectStats(p){
     if (n.raw && n.depth < 3 && (n.children || []).length) folded += 0;
     if (n.closed && n.raw && n.raw.closed_at) closedAt.push(Date.parse(n.raw.closed_at));
   });
-  const goals = p.root.children || [];
-  const goalClosed = goals.filter(g => g.closed).length;
-  const execs = all.filter(n => n.kind === 'exec' && !isRecord(n));
+  const supports = p.root.children || [];
+  const supportsClosed = supports.filter(g => g.closed).length;
+  const execs = all.filter(n => n.kind === 'exec');
   const execDone = execs.filter(n => n.closed).length;
 
   closedAt.sort((a,b)=>a-b);
@@ -1742,7 +1893,7 @@ function projectStats(p){
     .sort((a, b) => b.days - a.days);
   const avgInflight = inflight.length ? inflight.reduce((a, x) => a + x.days, 0) / inflight.length : null;
   const overdue = inflight.filter(x => x.days > 7).length;
-  return { all, kind, stat, issues, noVerify, noProof, goals, goalClosed, execs, execDone, closedNodes: closedAt.length, blockedExec,
+  return { all, kind, stat, issues, noVerify, noProof, supports, supportsClosed, execs, execDone, closedNodes: closedAt.length, blockedExec,
            inflight, avgInflight, overdue,
            spanDays, rate, remain, etaDays, conf, score, health, lastClosed: closedAt.length ? closedAt[closedAt.length-1] : null };
 }
@@ -1760,7 +1911,6 @@ function trendData(p, days = 14){
   const byKey = new Map(buckets.map(b => [b.key, b]));
   let closedInWindow = 0, execTotal = 0, execClosedTotal = 0;
   walk(p.root, (n) => {
-    if (isRecord(n)) return;   // 记录不参与收敛趋势
     if (n.kind === 'exec') execTotal++;
     if (!n.closed || !n.raw || !n.raw.closed_at) return;
     if (n.kind === 'exec') execClosedTotal++;
@@ -1821,14 +1971,13 @@ const fmtDays = (d) => d == null ? '—' : (d >= 1 ? d.toFixed(1) + ' 天' : (d 
 function laneStats(p){
   const s0 = projectStats(p);
   const nodes = s0.all.length;
-  const goalPct = s0.goals.length ? Math.round(s0.goalClosed / s0.goals.length * 100) : 0;
   const execPct = s0.execs.length ? Math.round(s0.execDone / s0.execs.length * 100) : 0;
   return `<div class="lane-stats" data-stats="${esc(p.id)}">
     <div class="info-sec">
       <div class="info-k">收敛健康度</div>
       <div class="health" style="--tone:${s0.health.tone}">
         <span class="num">${s0.score}</span>
-        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.goalClosed}/${s0.goals.length} 目标</span>
+        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.supportsClosed}/${s0.supports.length} 支撑项</span>
       </div>
       <div class="ibar" title="完成度 / 进行中 / 阻塞">
         <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(s0.stat.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(s0.stat.blocked / (s0.execs.length||1) * 100)}%"></i>
@@ -1836,8 +1985,8 @@ function laneStats(p){
     </div>
     <div class="info-sec">
       <div class="info-k">节点</div>
-      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>里程碑 / 目标<b>${s0.kind.milestone} / ${s0.kind.goal}</b></div>
-      <div class="info-row"><span class="d" style="--tone:var(--amber)"></span>构思 / 执行<b>${s0.kind.idea} / ${s0.kind.exec}</b></div>
+      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>里程碑 / 支撑项<b>${s0.kind.milestone} / ${s0.kind.support}</b></div>
+      <div class="info-row"><span class="d" style="--tone:var(--green)"></span>执行记录<b>${s0.kind.exec}</b></div>
       <div class="info-row"><span class="d" style="--tone:var(--tx4)"></span>合计<b>${nodes}</b></div>
       <div class="info-row" style="font-size:11px">进行中 ${s0.stat.doing} · 待确认 ${s0.stat.review} · 规划中 ${s0.stat.plan} · 未开始 ${s0.stat.todo} · 阻塞 ${s0.stat.blocked} · 已关闭 ${s0.stat.closed}</div>
     </div>
@@ -1847,7 +1996,7 @@ function laneStats(p){
 function laneTime(p){
   const s0 = projectStats(p);
   const etaTxt = s0.remain === 0 && s0.execs.length
-    ? '执行项已全部完成，等待人工「确认收敛」'
+    ? '执行记录全部闭环，等待人工「确认达成」'
     : s0.etaDays == null
       ? (s0.closedNodes < 2 ? '样本不足：需 ≥2 个已关闭节点' : '关闭集中在 1 小时内，暂不估算')
       : `约 ${fmtDays(s0.etaDays)} 后收敛 <em>置信 ${s0.conf}</em>`;
@@ -1867,11 +2016,10 @@ function laneTime(p){
 function infoMarkup(p){
   const s0 = projectStats(p);
   const nodes = s0.all.length;
-  const goalPct = s0.goals.length ? Math.round(s0.goalClosed / s0.goals.length * 100) : 0;
   const execPct = s0.execs.length ? Math.round(s0.execDone / s0.execs.length * 100) : 0;
   const risk = s0.stat.blocked + s0.issues + s0.noVerify + s0.noProof;
   const etaTxt = s0.remain === 0 && s0.execs.length
-    ? '执行项已全部完成，等待人工「确认收敛」'
+    ? '执行记录全部闭环，等待人工「确认达成」'
     : s0.etaDays == null
       ? (s0.closedNodes < 2 ? '样本不足：需 ≥2 个已关闭节点' : '关闭集中在 1 小时内，暂不估算')
       : `约 ${fmtDays(s0.etaDays)} 后收敛 <em>置信 ${s0.conf}</em>`;
@@ -1882,7 +2030,7 @@ function infoMarkup(p){
     : `<div class="info-empty">执行记录完成后自动提炼</div>`;
   const guideHtml = guide.length
     ? guide.slice(0,2).map(g => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:11.5px">${g.text}</span></div>`).join('')
-    : `<div class="info-empty">无待办 · 子项都已关闭时，点「确认达成」收口</div>`;
+    : `<div class="info-empty">无待办 · 支撑项全部关闭时，点「确认达成」收口</div>`;
   return `<div class="info">
     ${laneStats(p)}
 
@@ -1897,8 +2045,8 @@ function infoMarkup(p){
       <div class="info-k">风险</div>
       <div class="info-row">阻塞执行项<b style="color:${s0.blockedExec?'var(--red)':'var(--tx2)'}">${s0.blockedExec}</b></div>
       <div class="info-row">未处置反馈<b>${s0.issues}</b></div>
-      <div class="info-row">缺验收 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
-      <div class="hub-note" style="display:none">${goalPct}</div>
+      <div class="info-row">缺验证 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
+      <div class="hub-note" style="display:none">${execPct}</div>
     </div>
 
     <div class="info-sec">
@@ -1917,7 +2065,8 @@ function infoMarkup(p){
 
 /* ─────────── 节点 ─────────── */
 function foldedMarkup(n){
-  if (n.depth !== 3) return '';
+  // 三列：exec（depth 2）再往下的记录折叠进卡片，不再开第 4 列
+  if (n.depth !== 2) return '';
   const kids = n.children || [];
   if (!kids.length) return '';
   return `<div class="folded">${kids.map(k=>{
@@ -1948,19 +2097,11 @@ function runBadge(p, n){
     <i class="rdot"></i>${RUN_LABEL[r.status] || r.status}${el ? ' · ' + el : ''}</span></div>`;
 }
 
-/* 一个目标只能有一个构思：目标下出现了 idea 子节点即锁定，生成/采纳都拦在这一层 */
-function ideaKidOf(n){ return ((n && n.children) || []).find(k => k && k.kind === 'idea') || null; }
-function ideaLocked(n){ return !!(n && n.kind === 'goal' && ideaKidOf(n)); }
-function ideaLockTip(n){
-  const k = ideaKidOf(n);
-  return `该目标已有构思「${(k && k.title) || k && k.id || ''}」，一个目标只能有一个构思`;
-}
-
-/** 卡片与详情卡共用的会话 id：运行中的优先，其次卡片落盘的 session，最后构思的计划会话 */
+/** 卡片与详情卡共用的会话 id：运行中的优先，其次卡片落盘的 session，最后支撑项的计划会话 */
 function sessionIdOf(p, n){
   const r = p ? runFor(p, n) : null;
   const cardSess = n && n.raw && n.raw.session;
-  const planSess = n && n.kind === 'idea' && n.raw && n.raw.plan && n.raw.plan.session;
+  const planSess = n && n.kind === 'support' && n.raw && n.raw.plan && n.raw.plan.session;
   return (r && r.sessionId) || (cardSess && cardSess.id)
     || (typeof planSess === 'string' ? planSess : (planSess && planSess.id)) || '';
 }
@@ -1983,40 +2124,31 @@ function nodeMarkup(n, p){
   const chips = cardChips(n);   // 隐藏已闭环时，被藏掉的数量作为一条 chip 上提
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
-  const isIdea = n.kind === 'idea';
-  const isContainer = n.kind === 'milestone' || n.kind === 'goal';
-  // 目标/里程碑：子项全关闭后由人确认；构思：记录还有未闭环的也不给关（否则校验 422）
-  const recordOpen = isIdea && (n.children || []).some(k => !k.closed);
-  // 容器卡（目标 / 里程碑）走收敛闸门：从没衍生过子节点就置灰，不再凭空收口。
-  // 叶子与构思保持原来的「完成」判据（记录没全闭环不给关），位置也不动
+  const isContainer = n.kind === 'milestone';
+  // 支撑项：有执行记录时保持自动关闭（记录全闭环自动收口），没有记录时给「完成」手动收口；
+  // 里程碑：支撑项全关闭后由人「确认达成」
+  const recordOpen = n.kind === 'support' && (n.children || []).length > 0;
   const leafCanClose = !isContainer && !n.closed && !recordOpen;
-  // 收敛 / 达成（只有容器卡有）独占 footer 左端；叶子「完成」仍在原来的按钮组位置
-  const closeBtn = isContainer
-    ? convergeBtnMarkup(n, n.kind === 'milestone' ? 'primary-converge' : 'primary')
-    : '';
+  // 达成按钮（只有里程碑有）独占 footer 左端；支撑项「完成」仍在原来的按钮组位置
+  const closeBtn = isContainer ? convergeBtnMarkup(n, 'primary-converge') : '';
   const leafCloseBtn = leafCanClose
     ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>`
     : '';
-  // 「生成 N 项」紧跟确认收敛 / 确认达成右侧（2026-10-30 用户要求：按钮从详情标题行挪到卡片下缘）。
-  // 收敛按钮在隐藏态（子节点没关完 / 从没衍生）时，它顶到 footer 左端，位置不变
+  // 「生成 N 项」紧跟确认达成右侧（按钮位置沿用 2026-10-30 的约定）
   const genBtn = (isContainer && p) ? genBtnMarkup(p, n) : '';
-  const addKind = n.kind==='milestone' ? 'goal' : n.kind==='goal' ? 'idea' : n.kind==='idea' ? 'exec' : null;
-  // 「生成候选 / 候选池」与详情卡同一套动作，直接放在节点下缘，两处都能点
-  // 构思卡不再抽候选：改为「生成计划 / 执行计划」，目标卡与里程碑卡保持候选池
-  const locked = ideaLocked(n);
-  const poolCount = (!isIdea && addKind && p) ? candidateCount(p, n) : 0;
-  const genTitle = locked ? ideaLockTip(n)
-    : poolCount ? '候选池还有未处理的候选'
-      : `让会话给出若干候选${KIND[addKind]}，挑完再写入卡片`;
-  const candGen = (!isIdea && addKind)
-    ? `<button class="tbtn primary${locked ? ' is-locked' : ''}" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${locked ? 'aria-disabled="true"' : poolCount ? 'disabled' : ''}
+  // 候选池只留给里程碑：候选是「重要支撑」的候选；支撑项改用「生成计划 / 执行计划」
+  const poolCount = (isContainer && p) ? candidateCount(p, n) : 0;
+  const genTitle = poolCount ? '候选池还有未处理的候选'
+      : `让会话给出若干候选${KIND.support}，挑完再写入卡片`;
+  const candGen = isContainer
+    ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
          title="${esc(genTitle)}">生成候选</button>`
     : '';
-  const candPool = (!isIdea && addKind)
+  const candPool = isContainer
     ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
-  const ideaActs = isIdea ? ideaActionButtons(p, n, 'card') : '';
+  const planActs = n.kind === 'support' && p ? supportActionButtons(p, n, 'card') : '';
   // 「查看会话」放卡片下缘：点它直接切到 DSH 里这条会话的对话页（独立打开时退化为看全文）
   const sessId = p ? sessionIdOf(p, n) : '';
   const viewSess = sessId
@@ -2032,7 +2164,7 @@ function nodeMarkup(n, p){
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     leafCloseBtn,
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    candGen, candPool, ideaActs, viewSess,
+    candGen, candPool, planActs, viewSess,
   ].filter(Boolean).join('');
   // 收敛 / 达成落在 footer 左端；「生成 N 项」紧跟其右侧（同一组 lead），右侧留给「继续生成」那组动作
   const leadKids = [closeBtn, genBtn].filter(Boolean).join('');
@@ -2116,8 +2248,8 @@ function treeLayout(root){
   (function rec(n, depth){
     n.depth = depth;
     const kids = n.children || [];
-    // 死守 4 列：第 4 列再往下不再开新列，子节点折叠进卡片
-    if (!kids.length || depth >= 3){ n.row = row++; }
+    // 死守 3 列：执行记录（第 3 列）再往下不再开新列，子记录折叠进卡片
+    if (!kids.length || depth >= 2){ n.row = row++; }
     else { kids.forEach(k=>rec(k, depth+1)); n.row = (kids[0].row + kids[kids.length-1].row) / 2; }
     nodes.push(n);
   })(root, 0);
@@ -2161,7 +2293,7 @@ function layoutCanvas(project, canvas, cols){
   svg.setAttribute('viewBox', `0 0 ${canvas.clientWidth} ${canvas.clientHeight}`);
   let out = '';
   const anchors = [];
-  const SW = { milestone:2.2, goal:1.7, idea:1.4, exec:1.2 };
+  const SW = { milestone:2.2, support:1.8, exec:1.2 };
 
   const rootNode = nodes.find(n=>n.depth===0);
   if (rootNode){
@@ -2171,7 +2303,7 @@ function layoutCanvas(project, canvas, cols){
 
   for (const n of nodes){
     const kids = n.children||[];
-    if (!kids.length || n.depth >= 3) continue;
+    if (!kids.length || n.depth >= 2) continue;
     const px = n.x + cols[Math.min(n.depth, cols.length-1)].w;
     const py = n.y + n.h/2;
     const tone = KIND_TONE[n.kind];
@@ -2222,7 +2354,7 @@ function matrixCols(){
 }
 function focusCols(canvas){
   const w = canvas.clientWidth - 24, gap = 14;
-  const cw = (w - gap*3) / 4;
+  const cw = (w - gap*2) / 3;
   return STAGES.map((_, i) => ({ x: 12 + i*(cw+gap), w: cw }));
 }
 
@@ -2231,16 +2363,13 @@ function laneMarkup(p){
   const pr = progressOf(p.root);
   const rootState = stateOf(p.root);
   const closed = !!p.root.closed;
-  const gated = blockerGate(p.root);      // 阻碍项没清：不能确认收敛
-  const canConverge = !closed && rootState.key === 'review';
+  const canConverge = !closed && rootState.key === 'review';   // 支撑项全关闭 → 可确认达成
   const dotCls = closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
   const stateChip = `<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>`;
   const headerActs = closed
     ? `<button class="mini" data-act="history" data-id="${esc(p.id)}">里程碑历史</button>
        <button class="mini" data-act="new-loop" data-id="${esc(p.id)}">开新里程碑</button>`
-    : gated
-      ? `<button class="mini primary-converge is-locked" data-close="${esc(p.root.id)}" disabled title="${esc(blockerGateTip(p.root))}">确认达成</button>`
-      : (canConverge ? `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认达成</button>` : '');
+    : (canConverge ? `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认达成</button>` : '');
   const laneLive = laneLiveMarkup(p.idle);
   const laneLiveKind = p.idle && p.idle.idle.length ? 'idle' : (p.idle && p.idle.running.length ? 'running' : 'none');
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}" data-live="${laneLiveKind}">
@@ -2249,7 +2378,7 @@ function laneMarkup(p){
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-live mono" data-lane-live${laneLive ? '' : ' hidden'}>${laneLive}</div>
-      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 目标${closed ? ' · 已达成' : gated ? ` · 阻碍 ${blockerCountOf(p.root)} 条未清` : (canConverge ? ' · 待确认达成' : '关闭')}</div>
+      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 支撑项${closed ? ' · 已达成' : (canConverge ? ' · 待确认达成' : '关闭')}</div>
       ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
       ${laneServices(p)}
       ${laneTime(p)}
@@ -2338,13 +2467,12 @@ function renderFocus(){
   const focusLive = laneLiveMarkup(p.idle);
   const focusLiveKind = p.idle && p.idle.idle.length ? 'idle' : (p.idle && p.idle.running.length ? 'running' : 'none');
   const rootState = stateOf(p.root);
-  const gated = blockerGate(p.root);
   const canConverge = !p.root.closed && rootState.key === 'review';
   const dotCls = p.root.closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
   wrap.innerHTML = `
     <div class="focus-summary">
       <div class="sumbox"><div class="k">当前里程碑</div><div class="v">${p.root.title}</div></div>
-      <div class="sumbox"><div class="k">达成进度</div><div class="v">${pr.closed}/${pr.kids} 目标闭环 · ${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div></div>
+      <div class="sumbox"><div class="k">达成进度</div><div class="v">${pr.closed}/${pr.kids} 支撑项闭环 · ${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div></div>
       <div class="sumbox" data-tone="${st.key==='closed'?'ok':(st.key==='review'?'review':(hasBlocked(p)?'issue':''))}"><div class="k">里程碑状态</div><div class="v">${st.label}</div></div>
       <div class="sumbox" data-tone="${hasBlocked(p)?'issue':''}"><div class="k">阻断项</div><div class="v">${hasBlocked(p)?'存在阻塞，需先处置':'无'}</div></div>
     </div>
@@ -2360,9 +2488,7 @@ function renderFocus(){
           ${(p.root.closed || canConverge) ? `<div class="lane-actions">
             ${p.root.closed
               ? `<button class="mini" data-act="history" data-id="${esc(p.id)}">里程碑历史</button><button class="mini" data-act="new-loop" data-id="${esc(p.id)}">开新里程碑</button>`
-              : gated
-                ? `<button class="mini primary-converge is-locked" data-close="${esc(p.root.id)}" disabled title="${esc(blockerGateTip(p.root))}">确认达成</button>`
-                : `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认达成</button>`}
+              : `<button class="mini primary-converge" data-close="${esc(p.root.id)}">确认达成</button>`}
           </div>` : ''}
           ${laneServices(p)}
           ${laneTime(p)}
@@ -2421,8 +2547,8 @@ function render(){
   const src = $('#data-src');
   if (src) src.textContent = USING_REAL ? `数据源：${CARDS.length} 张 rotation/v1 卡` : '数据源：内置 mock';
   $('#toolbar-hint').textContent = state.view==='matrix'
-    ? '里程碑 → 目标 → 构思 → 执行；里程碑的阻碍项清空后点「确认达成」，目标点「确认收敛」，构思记录全闭环自动收口'
-    : '聚焦单项目：从执行项开始，一层层确认关闭，直到里程碑达成';
+    ? '里程碑 → 支撑项 → 执行记录；支撑项记录全闭环自动完成，支撑项全部关闭后点「确认达成」'
+    : '聚焦单项目：从执行记录开始，一层层确认关闭，直到里程碑达成';
   focusSwitch();
   const emptyEl = $('#empty'), matrixEl = $('#matrix'), focusEl = $('#focus');
   const isEmpty = PROJECTS.length === 0;
@@ -2631,7 +2757,6 @@ function doClose(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
   if (!n) return;
-  if (blockerGate(n)) return toast(blockerGateTip(n));
   const parent = findParent(p.root, id);
   const now = new Date().toISOString();
   n.closed = true;
@@ -2639,20 +2764,20 @@ function doClose(id){
     n.raw.closed_at = now;
     if (n.raw.kind === 'exec' && !n.raw.proof) n.raw.proof = '（面板关闭，未附证据）';
   }
-  // 只补构思（记录全闭环自动收口）；目标/里程碑不再级联，由人确认
+  // 只补支撑项（执行记录全闭环自动收口）；里程碑不再级联，由人确认达成
   autoCloseTree(p.root);
   if (n.kind === 'milestone'){
     p.root.convergedAt = now.slice(0, 16).replace('T', ' ');
     pushClosedMilestone(p, n, now);          // 收进项目里程碑历史
     toast(`「${n.title}」已达成 · 项目留在泳道，可从 ⋯ 查看里程碑历史或开新里程碑`);
-  } else if (n.kind === 'goal'){
+  } else if (n.kind === 'support'){
     toast(state.hideClosed
-      ? `「${n.title}」已闭环 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
-      : `「${n.title}」已闭环 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`);
+      ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
+      : `「${n.title}」已完成 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`);
   } else {
     toast(state.hideClosed
       ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
-      : `「${n.title}」已完成 · 已折叠进上级的「已闭环 N」`);
+      : `「${n.title}」已完成 · 已折叠进支撑项的「已闭环 N」`);
   }
   render();
   pulseFoldChip(parent && parent.id);
@@ -2685,14 +2810,13 @@ function addChild(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
   const wasRootClosed = !!p.root.closed;
-  const kind = n.kind==='milestone' ? 'goal' : n.kind==='goal' ? 'idea' : 'exec';
-  if (kind === 'idea' && ideaLocked(n)) return toast(ideaLockTip(n));
-  const title = kind==='goal' ? '新目标（待命名）' : kind==='idea' ? '新构思（待命名）' : '新执行项（待命名）';
+  const kind = n.kind==='milestone' ? 'support' : n.kind==='support' ? 'exec' : null;
+  if (!kind) return toast('执行记录不能再往下加');
+  const title = kind==='support' ? '新支撑项（待命名）' : '新执行记录（待命名）';
   n.children = n.children || [];
   const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null };
-  if (kind === 'exec') rawChild.issues = [];
-  if (kind === 'goal') rawChild.acceptance = '（待补）验收方式';
-  if (kind === 'exec') rawChild.verify = '（待补）验证命令';
+  if (kind === 'support'){ rawChild.support = ''; rawChild.necessity = ''; rawChild.causal = ''; rawChild.metric = ''; rawChild.approach = ''; }
+  if (kind === 'exec'){ rawChild.issues = []; rawChild.verify = '（待补）验证命令'; }
   n.children.push({ id: rawChild.id, kind, title, status:'plan', closed:false, raw: rawChild, children:[] });
   n.raw.children = n.raw.children || [];
   n.raw.children.push(rawChild);
@@ -2706,27 +2830,25 @@ function addChild(id){
   persist(p);
 }
 
-/* ─────────── 「+ 目标」二级菜单 + AI 拆目标 ─────────── */
-const SPLIT_TASK = 'split-goals';
+/* ─────────── 加法菜单 + AI 拆重要支撑 ─────────── */
+const SPLIT_TASK = 'split-goals';   // 沿用 host 已注册的拆分任务 id（契约未改 taskId）
 let addMenuCtx = null;              // { pid, nid, btn }
 
 function openAddMenu(btn){
   const id = btn.dataset.addmenu;
   const p = findProjectByNode(id), n = p && findNode(p.root, id);
-  if (!p || !n) return;
+  if (!p || !n || n.kind === 'exec') return;
   const menu = $('#addmenu');
-  const isGoal = n.kind === 'goal';
-  const locked = ideaLocked(n);
-  // 锁定态用 aria-disabled：入口仍可点，点一下由 addChild / aiSplitIdeas 统一 toast 原因
-  const lockCls = locked ? ' is-locked' : '';
-  const lockAttr = locked ? 'aria-disabled="true"' : '';
-  const aiTip = locked ? '已有构思，一个目标只能有 1 个' : '生成 3 条，选 1 条写入';
-  menu.innerHTML = `
-    <button type="button" class="am-ai${lockCls}" data-aim="ai" role="menuitem" ${lockAttr}>
-      <span>${isGoal ? 'AI 拆出构思' : 'AI 拆出目标'}</span><span class="am-sub">${aiTip}</span>
-    </button>
-    <div class="am-sep"></div>
-    <button type="button" class="${lockCls.trim()}" data-aim="manual" role="menuitem" ${lockAttr}><span>${isGoal ? '手动添加构思' : '手动添加目标'}</span></button>`;
+  const isMilestone = n.kind === 'milestone';
+  // 里程碑：AI 拆出重要支撑（写进 milestone.supports）/ 手动添加支撑项
+  // 支撑项：执行记录由「生成计划 / 执行计划」产生，这里只留手动添加
+  menu.innerHTML = isMilestone
+    ? `<button type="button" class="am-ai" data-aim="ai" role="menuitem">
+        <span>AI 拆出重要支撑</span><span class="am-sub">生成 3 条，勾选后写进「重要支撑」</span>
+      </button>
+      <div class="am-sep"></div>
+      <button type="button" data-aim="manual" role="menuitem"><span>手动添加支撑项</span></button>`
+    : `<button type="button" data-aim="manual" role="menuitem"><span>手动添加执行记录</span></button>`;
   addMenuCtx = { pid: p.id, nid: n.id, btn };
   btn.setAttribute('aria-expanded', 'true');
   menu.hidden = false;
@@ -2758,7 +2880,7 @@ function chooseAddMenu(which){
   if (which === 'manual') return addChild(ctx.nid);
   if (which === 'ai'){
     const p = PROJECTS.find(x => x.id === ctx.pid), n = p && findNode(p.root, ctx.nid);
-    return (n && n.kind === 'goal') ? aiSplitIdeas(ctx.pid, ctx.nid) : aiSplitGoals(ctx.pid, ctx.nid);
+    return (n && n.kind === 'milestone') ? aiSplitSupports(ctx.pid, ctx.nid) : toast('只有里程碑能拆重要支撑');
   }
 }
 
@@ -2853,7 +2975,8 @@ function removeProjectConfirm(p){
 }
 
 /* ─────────── 里程碑历史（只读回看） ─────────── */
-const HISTORY_KIND = { milestone:'里程碑', goal:'目标', idea:'构思', exec:'执行' };
+// 历史快照是只读回看：老快照里的 goal / idea 仍按旧标签显示，不参与新树
+const HISTORY_KIND = { milestone:'里程碑', support:'支撑项', goal:'目标', idea:'构思', exec:'执行' };
 let historyCtx = null;   // { pid, list, view }
 function fmtHistTime(iso){
   try { return new Date(iso).toLocaleString('sv-SE').slice(0, 16); } catch { return iso || '—'; }
@@ -2885,12 +3008,12 @@ function openProjectHistory(p){
         <div class="hist-row" role="button" tabindex="0" data-hist-view="${i}" aria-label="查看里程碑历史 ${esc(e.title || e.id)}">
           <div class="hist-main">
             <span class="hist-title">${esc(e.title || e.id)}</span>
-            <span class="hist-meta">收敛于 ${esc(fmtHistTime(e.closed_at))} · ${e.goals || 0} 目标 · ${e.execs || 0} 执行项</span>
+            <span class="hist-meta">收敛于 ${esc(fmtHistTime(e.closed_at))} · ${e.goals || 0} 支撑项 · ${e.execs || 0} 执行记录</span>
           </div>
           <span class="tbtn">查看</span>
         </div>`).join('')}</div>
        <div class="mnote">历史随项目卡片（<code>.dsh/rotation.json</code> 的 <code>closed_milestones</code>）一起走 git，最多保留 10 条。</div>`
-    : `<div class="hist-empty">还没有已达成的里程碑。<br>目标全部闭环、阻碍项清空后，在泳道头点「确认达成」就会收进这里。</div>`;
+    : `<div class="hist-empty">还没有已达成的里程碑。<br>支撑项全部闭环后，在泳道头点「确认达成」就会收进这里。</div>`;
   showModal($('#history'));
 }
 function openHistorySnapshot(entry){
@@ -3182,150 +3305,26 @@ async function putServices(p, list){
   }
 }
 
-/** 从模型输出里抠出 ideas 数组（标题 + 优势；优势只用于候选对比，不写进卡片） */
-function parseIdeas(text){
+/** 从模型输出里抠出重要支撑数组（标题 / 必要性 / 因果；容忍 ```json 围栏与多余文字） */
+function parseSupports(text){
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const cand = fenced ? fenced[1] : (raw.match(/\{[\s\S]*\}/) || [])[0];
   let data = null;
   try { data = cand ? JSON.parse(cand) : null; } catch { data = null; }
   if (!data){ try { data = JSON.parse(raw); } catch { return []; } }
-  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.ideas) ? data.ideas : null);
+  const arr = Array.isArray(data) ? data
+    : (data && Array.isArray(data.supports) ? data.supports
+      : (data && Array.isArray(data.goals) ? data.goals : null));   // 老 prompt 仍可能吐 goals 键
   if (!arr) return [];
   return arr.map(x => ({
-    title: String((x && (x.title || x.name)) || '').trim(),
-    strength: String((x && (x.strength || x.edge || x.advantage)) || '').trim(),
+    title: String((x && (x.title || x.name || x.support)) || '').trim(),
+    necessity: String((x && (x.necessity || x.why)) || '').trim(),
+    causal: String((x && (x.causal || x.causality)) || '').trim(),
   })).filter(x => x.title).slice(0, 3);
 }
 
-/** 发起 AI 拆构思会话 → 轮询到结束 → 弹预览 */
-async function aiSplitIdeas(pid, nid, opts = {}){
-  const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
-  if (!p || !n) return;
-  if (ideaLocked(n)) return toast(ideaLockTip(n));
-  if (!p.file) return toast('该项目没有可写回的卡片文件');
-  if (!API_BASE) return toast('未连接服务，AI 拆构思不可用');
-  if (!opts.skipDraft){
-    const draft = await fetchSplitDraft(p.file, n.id);
-    const ideas = draft ? parseIdeas(draft.result) : [];
-    if (ideas.length){
-      toast('已恢复上次未确认的构思');
-      return openIdeasPreview(pid, nid, ideas, draft);
-    }
-  }
-  let run = null;
-  try {
-    const res = await fetch(api('/run'), {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file: p.file, nodeId: n.id, taskId: 'split-ideas' }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
-    run = j.run;
-  } catch (error) { return toast('发起失败：' + error.message); }
-  const key = (run && run.key) || (p.file + '::' + n.id);
-  toast('已发起 AI 拆构思（约 10–30 秒），结果先给你挑');
-  const deadline = Date.now() + 180000;
-  while (Date.now() < deadline){
-    await new Promise(r => setTimeout(r, 1800));
-    let runs = [];
-    try { runs = (await fetch(api('/runs')).then(r => r.json())).runs || []; } catch { continue; }
-    runs.forEach(r => runMap.set(r.key, r));
-    paintRunBadges();
-    const hit = runs.find(r => r.key === key);
-    if (!hit) continue;
-    if (hit.status === 'done'){
-      const ideas = parseIdeas(hit.result);
-      if (!ideas.length) return toast('AI 没返回可用的构思，可再点一次或手动添加');
-      return openIdeasPreview(pid, nid, ideas);
-    }
-    if (hit.status === 'failed' || hit.status === 'cancelled') return toast('AI 拆构思失败：' + (hit.error || hit.status));
-  }
-  toast('AI 拆构思超时（3 分钟）：可在节点「会话」里看进展');
-}
-
-/** 预览：单选 1 条（一个目标一个构思），标题可改，确认后才写卡片（构思只有标题，没有方案字段） */
-let lastIdeaCtx = null;
-function openIdeasPreview(pid, nid, ideas, draft = null){
-  const p0 = PROJECTS.find(x => x.id === pid);
-  lastIdeaCtx = p0 ? { pid, nid, file: p0.file } : null;
-  const rows = ideas.map((g, i) => `
-    <label class="gsel">
-      <input type="radio" name="idea-pick" data-ipick="${i}" ${i === 0 ? 'checked' : ''}>
-      <span class="gsel-main">
-        <input class="gsel-title" data-ititle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
-        ${g.strength ? `<span class="gsel-str"><b>优势：</b>${esc(g.strength)}</span>` : ''}
-      </span>
-    </label>`).join('');
-  const recovered = draft
-    ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
-         <button type="button" class="tbtn" id="idea-regen" style="margin-left:2px">重新生成</button></div>`
-    : '';
-  askConfirm('AI 拆出的构思', `${rows}${recovered}<div class="mnote">单选：只写入 1 条（一个目标只保留一个构思）；标题能直接改。对比时先看「优势」。</div>`, '写入选中的', () => {
-    let picked = null;
-    ideas.forEach((g, i) => {
-      const box = document.querySelector(`#ask-body [data-ipick="${i}"]`);
-      if (!box || !box.checked) return;
-      const titleEl = document.querySelector(`#ask-body [data-ititle="${i}"]`);
-      const title = titleEl ? titleEl.value.trim() : '';
-      if (title) picked = { title };
-    });
-    if (!picked) return toast('请先选中 1 条构思');
-    applyIdeas(pid, nid, [picked]);
-  });
-  const regen = $('#idea-regen');
-  if (regen) regen.addEventListener('click', () => {
-    hideModal($('#ask'));
-    if (lastIdeaCtx) dropSplitDraft(lastIdeaCtx.file, lastIdeaCtx.nid).then(() => aiSplitIdeas(pid, nid, { skipDraft: true }));
-  });
-}
-
-/** 把选中的构思写进卡片（单选：调用方只传 1 条） */
-function applyIdeas(pid, nid, ideas){
-  const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
-  if (!p || !n) return;
-  if (ideaLocked(n)) return toast(ideaLockTip(n));
-  n.children = n.children || [];
-  n.raw.children = n.raw.children || [];
-  const stamp = Date.now().toString(36);
-  ideas.forEach((g, i) => {
-    // 构思只留标题：不再写「（待补）方案要点」占位（方案字段已退役）
-    const rawChild = {
-      id: `${n.id}-i${stamp}${i}`, kind: 'idea', title: g.title,
-      status: 'plan', closed_at: null,
-    };
-    n.children.push({ id: rawChild.id, kind: 'idea', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
-    n.raw.children.push(rawChild);
-  });
-  reopenChain(p.root, n.id);
-  render();
-  persist(p).then(res => {
-    if (!res.ok) return toast('写入失败：' + res.error);
-    toast(`已写入 ${ideas.length} 个构思`);
-    dropSplitDraft(p.file, n.id);
-    reloadProjects();
-  });
-}
-
-/** 从模型输出里抠出 goals 数组（容忍 ```json 围栏与多余文字） */
-function parseGoals(text){
-  const raw = String(text || '');
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const cand = fenced ? fenced[1] : (raw.match(/\{[\s\S]*\}/) || [])[0];
-  let data = null;
-  try { data = cand ? JSON.parse(cand) : null; } catch { data = null; }
-  if (!data){ try { data = JSON.parse(raw); } catch { return []; } }
-  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.goals) ? data.goals : null);
-  if (!arr) return [];
-  return arr.map(g => ({
-    title: String((g && (g.title || g.name)) || '').trim(),
-    acceptance: String((g && (g.acceptance || g.verify)) || '').trim(),
-    // 对应哪条阻碍项（短名）：拆目标强制对应阻碍，采纳时落盘到 goal.blocker
-    blocker: String((g && g.blocker) || '').trim().slice(0, 80),
-  })).filter(g => g.title).slice(0, 3);
-}
-
-/** 读一条「AI 拆目标」草稿（host 侧落盘，面板切走/关掉也能捞回） */
+/** 读一条拆分草稿（host 侧落盘，面板切走/关掉也能捞回） */
 async function fetchSplitDraft(file, nodeId){
   if (!API_BASE || !file) return null;
   try {
@@ -3347,23 +3346,24 @@ async function notifyPendingSplits(){
   try {
     const j = await fetch(api('/splits')).then(r => r.json());
     const n = (j.drafts || []).length;
-    if (n) toast(`有 ${n} 条 AI 拆解结果待确认：点「+ 目标」→「AI 拆出目标」查看`);
+    if (n) toast(`有 ${n} 条 AI 拆解结果待确认：点里程碑卡的添加菜单 →「AI 拆出重要支撑」查看`);
   } catch { /* 忽略 */ }
 }
 
-/** 发起 AI 拆目标会话 → 轮询到结束 → 弹预览 */
-async function aiSplitGoals(pid, nid, opts = {}){
+/** 发起 AI 拆重要支撑会话 → 轮询到结束 → 弹预览（预览确认后写进 milestone.supports） */
+async function aiSplitSupports(pid, nid, opts = {}){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
   if (!p || !n) return;
+  if (n.kind !== 'milestone') return toast('只有里程碑能拆重要支撑');
   if (!p.file) return toast('该项目没有可写回的卡片文件');
-  if (!API_BASE) return toast('未连接服务，AI 拆目标不可用');
+  if (!API_BASE) return toast('未连接服务，AI 拆重要支撑不可用');
   // 先看有没有上次没确认的草稿：有就直接恢复，不重复烧一次会话
   if (!opts.skipDraft){
     const draft = await fetchSplitDraft(p.file, n.id);
-    const goals = draft ? parseGoals(draft.result) : [];
-    if (goals.length){
+    const list = draft ? parseSupports(draft.result) : [];
+    if (list.length){
       toast('已恢复上次未确认的拆解结果');
-      return openGoalsPreview(pid, nid, goals, draft);
+      return openSupportsPreview(pid, nid, list, draft);
     }
   }
   let run = null;
@@ -3379,7 +3379,7 @@ async function aiSplitGoals(pid, nid, opts = {}){
     return toast('发起失败：' + error.message);
   }
   const key = (run && run.key) || (p.file + '::' + n.id);
-  toast('已发起 AI 拆目标（约 10–30 秒），结果先给你挑');
+  toast('已发起 AI 拆重要支撑（约 10–30 秒），结果先给你挑');
   const deadline = Date.now() + 180000;
   while (Date.now() < deadline){
     await new Promise(r => setTimeout(r, 1800));
@@ -3390,49 +3390,46 @@ async function aiSplitGoals(pid, nid, opts = {}){
     const hit = runs.find(r => r.key === key);
     if (!hit) continue;
     if (hit.status === 'done'){
-      const goals = parseGoals(hit.result);
-      if (!goals.length) return toast('AI 没返回可用的目标，可再点一次或手动添加');
-      return openGoalsPreview(pid, nid, goals);
+      const list = parseSupports(hit.result);
+      if (!list.length) return toast('AI 没返回可用的支撑项，可再点一次或手动添加');
+      return openSupportsPreview(pid, nid, list);
     }
     if (hit.status === 'failed' || hit.status === 'cancelled'){
-      return toast('AI 拆目标失败：' + (hit.error || hit.status));
+      return toast('AI 拆重要支撑失败：' + (hit.error || hit.status));
     }
   }
-  toast('AI 拆目标超时（3 分钟）：可在节点「会话」里看进展');
+  toast('AI 拆重要支撑超时（3 分钟）：可在节点的「会话」里看进展');
 }
 
-/** 预览：默认全选，标题/验收可改，确认后才写卡片 */
+/** 预览：默认全选，标题可改；确认后写进里程碑的「重要支撑」（一行一条），不再造子节点 */
 let lastSplitCtx = null;            // { pid, nid, file }：供「重新生成」用
-function openGoalsPreview(pid, nid, goals, draft = null){
+function openSupportsPreview(pid, nid, list, draft = null){
   const p0 = PROJECTS.find(x => x.id === pid);
   lastSplitCtx = p0 ? { pid, nid, file: p0.file } : null;
-  const rows = goals.map((g, i) => `
+  const rows = list.map((g, i) => `
     <label class="gsel">
       <input type="checkbox" data-gpick="${i}" checked>
       <span class="gsel-main">
-        <input class="gsel-title" data-gtitle="${i}" value="${esc(g.title)}" maxlength="40" spellcheck="false">
-        ${g.blocker ? `<input class="gsel-blk" data-gblk="${i}" value="${esc(g.blocker)}" maxlength="80" spellcheck="false" title="这条目标消除哪条阻碍项（拆目标时写入，可改）">` : ''}
-        <textarea class="gsel-acc" data-gacc="${i}" rows="2" spellcheck="false">${esc(g.acceptance)}</textarea>
+        <input class="gsel-title" data-gtitle="${i}" value="${esc(g.title)}" maxlength="60" spellcheck="false">
+        ${g.necessity ? `<span class="gsel-str"><b>必要性：</b>${esc(g.necessity)}</span>` : ''}
+        ${g.causal ? `<span class="gsel-str"><b>因果：</b>${esc(g.causal)}</span>` : ''}
       </span>
     </label>`).join('');
   const recovered = draft
     ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
          <button type="button" class="tbtn" id="split-regen" style="margin-left:2px">重新生成</button></div>`
     : '';
-  askConfirm('AI 拆出的目标', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。标题与验收都能直接改。</div>`, '写入选中的', () => {
+  askConfirm('AI 拆出的重要支撑', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。写进里程碑的「重要支撑」，一行一条，不造子节点。</div>`, '写入选中的', () => {
     const picked = [];
-    goals.forEach((g, i) => {
+    list.forEach((g, i) => {
       const box = document.querySelector(`#ask-body [data-gpick="${i}"]`);
       if (!box || !box.checked) return;
       const titleEl = document.querySelector(`#ask-body [data-gtitle="${i}"]`);
-      const accEl = document.querySelector(`#ask-body [data-gacc="${i}"]`);
-      const blkEl = document.querySelector(`#ask-body [data-gblk="${i}"]`);
       const title = titleEl ? titleEl.value.trim() : '';
-      const blocker = blkEl ? blkEl.value.trim().slice(0, 80) : '';
-      if (title) picked.push({ title, acceptance: accEl ? accEl.value.trim() : '', blocker });
+      if (title) picked.push(title);
     });
-    if (!picked.length) return toast('没有勾选任何目标');
-    applyGoals(pid, nid, picked);
+    if (!picked.length) return toast('没有勾选任何支撑项');
+    applySupports(pid, nid, picked);
   });
 }
 
@@ -3441,33 +3438,25 @@ function regenSplit(){
   const ctx = lastSplitCtx;
   hideModal($('#ask'));
   if (!ctx) return;
-  dropSplitDraft(ctx.file, ctx.nid).then(() => aiSplitGoals(ctx.pid, ctx.nid, { skipDraft: true }));
+  dropSplitDraft(ctx.file, ctx.nid).then(() => aiSplitSupports(ctx.pid, ctx.nid, { skipDraft: true }));
 }
 
-/** 把选中的目标写进里程碑卡片 */
-function applyGoals(pid, nid, goals){
+/** 把选中的支撑项追加进里程碑的「重要支撑」（一行一条、去重） */
+function applySupports(pid, nid, titles){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
-  if (!p || !n) return;
-  n.children = n.children || [];
-  n.raw.children = n.raw.children || [];
-  const stamp = Date.now().toString(36);
-  goals.forEach((g, i) => {
-    // 只有 exec 才允许带 issues；空数组挂在 goal 上会被校验判错（0.6.9 之前写不进卡片的原因）
-    const rawChild = {
-      id: `${n.id}-g${stamp}${i}`, kind: 'goal', title: g.title,
-      acceptance: g.acceptance || '（待补）验收方式',
-      status: 'plan', closed_at: null,
-    };
-    // 阻碍引用只在拆目标给出时写：目标的「为什么现在做」由它承载
-    if (g.blocker) rawChild.blocker = String(g.blocker).slice(0, 80);
-    n.children.push({ id: rawChild.id, kind: 'goal', title: g.title, status: 'plan', closed: false, raw: rawChild, children: [] });
-    n.raw.children.push(rawChild);
+  if (!p || !n || n.kind !== 'milestone') return;
+  n.raw.supports = n.raw.supports || '';
+  const merged = String(n.raw.supports || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  titles.forEach((t) => {
+    const s = String(t || '').trim();
+    if (s && !merged.includes(s)) merged.push(s);
   });
-  reopenChain(p.root, n.id);   // 给已闭环的节点加目标 → 它和祖先回到进行中
+  n.raw.supports = merged.join('\n');
+  reopenChain(p.root, n.id);
   render();
   persist(p).then(res => {
     if (!res.ok) return toast('写入失败：' + res.error);
-    toast(`已写入 ${goals.length} 个目标`);
+    toast(`已写入 ${titles.length} 条重要支撑`);
     dropSplitDraft(p.file, n.id);   // 已消费掉草稿，避免下次又弹出来
     reloadProjects();
   });
@@ -3480,9 +3469,15 @@ const isBlankTitle = (t) => {
   const s = String(t || '').trim();
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
-/* 可点开直接改的字段：构思只留标题（「方案」2026-10-29 退役），不改描述类字段 */
-const EDIT_FIELDS = { milestone:['vision','blockers','metrics'], goal:['scenario','constraints','acceptance'], idea:[], exec:['verify','proof'] };
-const FIELD_LABEL = { 'title':'标题', vision:'里程碑愿景', blockers:'阻碍项', blocker:'对应阻碍', metrics:'核心指标', constraints:'约束', acceptance:'验收', scenario:'落地场景流程', verify:'验证', proof:'证据' };
+/* 可点开直接改的字段：支撑项的承接支撑项 / 必要性 / 因果只读，核心指标与实现思路可写 */
+const EDIT_FIELDS = { milestone:['vision','supports','metrics'], support:['metric','approach'], exec:['verify','proof'] };
+const FIELD_LABEL = {
+  'title':'标题', vision:'里程碑愿景', supports:'重要支撑', metrics:'核心指标', metric:'核心指标',
+  support:'承接支撑项', necessity:'必要性', causal:'因果', approach:'实现思路',
+  verify:'验证', proof:'证据',
+  // 老快照只读回看用，不再出现在编辑入口
+  blocker:'对应阻碍', blockers:'阻碍项', constraints:'约束', acceptance:'验收', scenario:'落地场景流程',
+};
 /** 段落字段：叙事文本，编辑器里是一个文本框（不拆条目）；其余字段按「一条一块」编辑 */
 const TEXT_EDITOR_FIELDS = new Set(['vision']);
 
@@ -3645,7 +3640,7 @@ function sessionMarkup(p, n, opts){
   const compact = !!(opts && opts.compact);   // 记录卡已有自己的「动作 / 会话 / 状态 / 耗时」，这里只补按钮与就近状态
   const r = runFor(p, n);
   const cardSess = n.raw && n.raw.session;
-  const planSess = n.kind === 'idea' && n.raw && n.raw.plan && n.raw.plan.session;
+  const planSess = n.kind === 'support' && n.raw && n.raw.plan && n.raw.plan.session;
   const sessId = sessionIdOf(p, n);
   const st = r ? (RUN_LABEL[r.status] || r.status) : (sessId ? '已完成（记录在卡片）' : '无会话');
   const tone = r ? (RUN_TONE[r.status] || 'var(--tx3)') : 'var(--tx4)';
@@ -3670,25 +3665,28 @@ function sessionMarkup(p, n, opts){
   </div>`;
 }
 
-/* ─────────── 构思动作与执行记录（action-records/v1） ─────────── */
+/* ─────────── 支撑项动作与执行记录（action-records/v1） ─────────── */
 function fmtElapsed(ms){
   const s = Math.max(0, Math.round((ms || 0) / 1000));
   return s >= 60 ? `${Math.floor(s/60)}m${s%60}s` : `${s}s`;
 }
 
-/** 构思卡 / 构思详情卡的动作按钮：生成计划 → 执行计划；会话进行中两个都禁用 */
-function ideaActionButtons(p, n, where){
-  if (!p || !n || n.kind !== 'idea') return '';
+/** 支撑项卡 / 详情卡的动作按钮：生成计划 → 执行计划；前置条件是「核心指标 + 实现思路」都非空 */
+function supportActionButtons(p, n, where){
+  if (!p || !n || n.kind !== 'support') return '';
   const plan = (n.raw && n.raw.plan) || null;
   const steps = plan && Array.isArray(plan.steps) ? plan.steps.length : 0;
+  const raw = n.raw || {};
+  const hasBasis = !!(String(raw.metric || '').trim() && String(raw.approach || '').trim());
   const r = runFor(p, n);
   const busy = !!(r && (r.status === 'starting' || r.status === 'running'));
   const up = activeAncestorOf(p, n);
-  const dis = busy || !!up;
-  const planBtn = `<button class="tbtn primary" data-idea-act="plan" data-nid="${n.id}" data-proj="${p.id}" ${dis ? 'disabled' : ''}
-      title="${busy ? '会话进行中，等它跑完' : (plan ? '已有计划：再生成一次会覆盖当前计划' : '起会话让 DSH 交计划：目标 / 验证命令 / 步骤')}">${busy && !plan ? '生成中…' : (plan ? '重新生成计划' : '生成计划')}</button>`;
-  const execBtn = `<button class="tbtn primary" data-idea-act="exec" data-nid="${n.id}" data-proj="${p.id}" ${(!plan || dis) ? 'disabled' : ''}
-      title="${!plan ? '先「生成计划」，有目标才能执行' : (busy ? '会话进行中，等它跑完' : '按计划执行，跑完自动提炼经验写进里程碑')}">${busy && plan ? '执行中…' : '执行计划'}</button>`;
+  const dis = busy || !!up || !hasBasis;
+  const basisTip = '先填「核心指标」和「实现思路」，再生成计划';
+  const planBtn = `<button class="tbtn primary" data-support-act="plan" data-nid="${n.id}" data-proj="${p.id}" ${dis ? 'disabled' : ''}
+      title="${!hasBasis ? basisTip : busy ? '会话进行中，等它跑完' : (plan ? '已有计划：再生成一次会覆盖当前计划' : '起会话让 DSH 交计划：目标 / 验证命令 / 步骤')}">${busy && !plan ? '生成中…' : (plan ? '重新生成计划' : '生成计划')}</button>`;
+  const execBtn = `<button class="tbtn primary" data-support-act="exec" data-nid="${n.id}" data-proj="${p.id}" ${(!plan || dis) ? 'disabled' : ''}
+      title="${!hasBasis ? basisTip : !plan ? '先「生成计划」，有目标才能执行' : (busy ? '会话进行中，等它跑完' : '按计划执行，跑完自动提炼经验写进里程碑')}">${busy && plan ? '执行中…' : '执行计划'}</button>`;
   const chip = steps ? `<span class="tchip" title="计划 ${steps} 步">计划 ${steps} 步</span>` : (plan ? `<span class="tchip">已有计划</span>` : '');
   if (where === 'card') return plan ? `${execBtn}${chip}` : planBtn;
   return `${planBtn}${execBtn}${chip}`;
@@ -3706,7 +3704,7 @@ function recordErrorLine(n){
 
 /** 计划书：只读展示目标 / 验证命令 / 步骤（不在这里编辑，改了就失去和会话计划的对应） */
 function planMarkup(p, n){
-  if (!n || n.kind !== 'idea') return '';
+  if (!n || n.kind !== 'support') return '';
   const plan = (n.raw && n.raw.plan) || null;
   if (!plan){
     return `<div class="detail-sec">
@@ -3776,7 +3774,7 @@ function detailMarkup(p, n){
   const rec = isRecord(n);
   const fields = rec ? [] : (EDIT_FIELDS[n.kind] || []);
   // 「生成 N 项」：标题是唯一必需项；有标题就能把其余空字段一次补出来。
-  // 2026-10-30：按钮从详情标题行挪到节点卡下缘（确认收敛右侧），详情卡放进动作行同一顺序
+  // 2026-10-30：按钮从详情标题行挪到节点卡下缘（确认达成右侧），详情卡放进动作行同一顺序
   const genBtn = genBtnMarkup(p, n);
   const editableRows = fields.map((f) => {
     return `<div class="detail-row editable" data-field="${f}" data-nid="${n.id}" data-proj="${p.id}">
@@ -3784,13 +3782,13 @@ function detailMarkup(p, n){
        <dd class="fielddd"><button class="editval${r[f] ? '' : ' empty'}" data-edit="${f}">${r[f] ? esc(r[f]) : '点击填写'}</button></dd>
      </div>`;
   });
-  // 目标的「对应阻碍」：拆目标时写入的阻碍项短名，只读（要改就重新拆目标）
-  // 顺序：落地场景流程 → 对应阻碍 → 约束 → 验收（场景是这个目标唯一的验收依据，排最前）
-  const blockerRow = (n.kind === 'goal' && r.blocker)
-    ? `<div class="detail-row"><dt>对应阻碍</dt><dd>${esc(r.blocker)}</dd></div>`
-    : '';
-  if (blockerRow) editableRows.splice(Math.min(1, editableRows.length), 0, blockerRow);
-  const editable = editableRows.join('');
+  // 支撑项的三个只读来源行：承接支撑项 / 必要性 / 因果（由 AI 拆解或载入折叠时写入，不可改）
+  const readonlyRows = (n.kind === 'support' ? [
+    ['承接支撑项', r.support],
+    ['必要性', r.necessity],
+    ['因果', r.causal],
+  ].map(([k, v]) => `<div class="detail-row"><dt>${k}</dt><dd>${String(v || '').trim() ? esc(v) : '<span class="mnote" style="margin:0;border:0;padding:0">（未生成）</span>'}</dd></div>`).join('') : '');
+  const editable = readonlyRows + editableRows.join('');
   const timeRows = [];
   // 记录自己的时间行在「执行记录」区里给（开始 / 结束 / 耗时），这里不重复
   if (r.started_at && !isRecord(n)) timeRows.push(['开始', fmtTs(r.started_at), true]);
@@ -3817,28 +3815,25 @@ function detailMarkup(p, n){
         }).join('')}
       </div></div>`
     : '';
-  // 目标/里程碑：子项全关闭后由人确认；叶子/构思：可直接完成（记录未全闭环时不给关）
-  const detailContainer = n.kind === 'milestone' || n.kind === 'goal';
-  const detailRecordOpen = n.kind === 'idea' && (n.children || []).some(k => !k.closed);
-  // 容器卡与节点卡共用 convergeGate：卡片上灰掉的，详情页不会突然变可点
+  // 里程碑：支撑项全关闭后由人确认；支撑项：有执行记录时自动关闭、没有记录时可手动「完成」
+  const detailContainer = n.kind === 'milestone';
+  const detailRecordOpen = n.kind === 'support' && (n.children || []).length > 0;
+  // 里程碑与节点卡共用 convergeGate：卡片上灰掉的，详情页不会突然变可点
   const canClose = !detailContainer && !n.closed && !detailRecordOpen;
-  const isIdea = n.kind === 'idea';
-  const childKind = { milestone: 'goal', goal: 'idea', idea: 'exec' }[n.kind];
-  const poolCount = (!isIdea && childKind) ? candidateCount(p, n) : 0;
+  const childKind = { milestone: 'support', support: 'exec' }[n.kind] || null;
+  const poolCount = detailContainer ? candidateCount(p, n) : 0;
   const addBtn = childKind
     ? `<button class="tbtn ghost" data-manual-add="1" data-nid="${n.id}" data-proj="${p.id}">手动添加${KIND[childKind]}</button>`
     : '';
-  // 构思：不再抽候选，改为「生成计划 / 执行计划」；目标与闭环保持候选池
-  const ideaActs = isIdea ? ideaActionButtons(p, n, 'detail') : '';
-  const locked = ideaLocked(n);
-  const candGenTitle = locked ? ideaLockTip(n)
-    : poolCount ? '候选池还有未处理的候选'
-      : `让会话给出若干候选${KIND[childKind]}，挑完再写入卡片`;
-  const candBtn = (!isIdea && childKind)
-    ? `<button class="tbtn primary${locked ? ' is-locked' : ''}" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${locked ? 'aria-disabled="true"' : poolCount ? 'disabled' : ''}
+  // 支撑项：生成计划 / 执行计划；里程碑：候选池（候选 = 重要支撑）
+  const planActs = n.kind === 'support' ? supportActionButtons(p, n, 'detail') : '';
+  const candGenTitle = poolCount ? '候选池还有未处理的候选'
+      : `让会话给出若干候选${KIND.support}，挑完再写入卡片`;
+  const candBtn = detailContainer
+    ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
          title="${esc(candGenTitle)}">生成候选</button>`
     : '';
-  const poolBtn = (!isIdea && childKind)
+  const poolBtn = detailContainer
     ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
@@ -3848,7 +3843,7 @@ function detailMarkup(p, n){
       : (canClose ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>` : ''),
     genBtn,
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    ideaActs, candBtn, poolBtn, addBtn,
+    planActs, candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
     n.kind === 'milestone' ? '' : `<button class="tbtn danger" data-del-node="1" data-nid="${n.id}" data-proj="${p.id}">删除节点</button>`,
   ].filter(Boolean).join('');
@@ -3867,7 +3862,7 @@ function detailMarkup(p, n){
       <div class="detail-row"><dt>状态</dt>
         <dd><span class="st" style="--st-tone:${st.tone}">${st.label}</span>
           ${hasIssues(n) && !n.closed ? '<span class="mnote" style="margin-left:8px;color:var(--red)">· 有未处置问题</span>' : ''}
-          <span class="mnote" style="margin-left:8px">自动流转：有内容→规划中，有子节点→进行中，子节点全关闭→${n.kind === "milestone" ? "待确认达成" : "已闭环"}</span></dd>
+          <span class="mnote" style="margin-left:8px">自动流转：有内容→规划中，有子节点→进行中，子节点全关闭→${n.kind === "milestone" ? "待确认达成" : (n.kind === "support" ? "自动完成 / 无记录时手动完成" : "已关闭")}</span></dd>
       </div>
       ${editable}
       ${rows}
@@ -3938,7 +3933,7 @@ function _openDetail(id, origin){
   const d = $('#detail'), card = d.querySelector('.detail-card');
   card.innerHTML = detailMarkup(p, n);
   ensurePromptList(p, n).catch(() => {});   // Prompt 段异步补数据，拿到后只重绘这一段
-  if (n.kind !== 'idea') refreshPoolCount(p, n);   // 构思卡不再有候选池按钮
+  if (n.kind === 'milestone') refreshPoolCount(p, n);   // 候选池只挂在里程碑上
   d.hidden = false;
   document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
   anchor.classList.add('is-active');
@@ -4084,8 +4079,8 @@ async function viewSession(sessionId){
 }
 
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
-    构思与执行记录没有可补的字段（方案已退役、记录只留只读信息），这里给空数组把入口关掉 */
-const GEN_FIELDS_CLIENT = { milestone: ['vision', 'blockers', 'metrics'], goal: ['scenario', 'constraints', 'acceptance'], idea: [], exec: ['verify'] };
+    执行记录没有可补的字段（记录只留只读信息），这里给空数组把入口关掉 */
+const GEN_FIELDS_CLIENT = { milestone: ['vision', 'supports', 'metrics'], support: ['metric', 'approach'], exec: ['verify'] };
 /** 缺项判据：与 generateMissing 共用同一份字段表，文案与高亮都从这一处派生 */
 function genStateOf(n){
   const rec = isRecord(n);
@@ -4095,12 +4090,12 @@ function genStateOf(n){
   return { fields, missing, hasTitle: !isBlankTitle(n && n.title) };
 }
 /**
- * 「生成 N 项」按钮：节点卡下缘（确认收敛右侧）与详情卡动作行共用同一个出口。
+ * 「生成 N 项」按钮：节点卡下缘（确认达成右侧）与详情卡动作行共用同一个出口。
  * 高亮判据：缺项 > 0 就亮——「刚生成」的节点天然字段全空，补完自动变灰「无缺项」。
  */
 function genBtnMarkup(p, n){
   const st = genStateOf(n);
-  if (!st.fields.length) return '';       // 构思 / 执行记录没有可补字段：整颗按钮不出现
+  if (!st.fields.length) return '';       // 执行记录没有可补字段：整颗按钮不出现
   const canGen = st.hasTitle && st.missing.length > 0;
   const label = canGen ? `生成 ${st.missing.length} 项` : (st.hasTitle ? '无缺项' : '生成');
   const tip = canGen
@@ -4153,7 +4148,7 @@ async function loadCandidates(p, n){
 async function generateCandidates(pid, nid, btn){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return toast('节点已不在当前卡片里');
-  if (ideaLocked(n0)) return toast(ideaLockTip(n0));
+  if (n0.kind !== 'milestone') return toast('候选池只给里程碑用');
   const oldText = btn && btn.textContent;
   if (btn){ btn.disabled = true; btn.textContent = '生成中…'; }
   try {
@@ -4190,23 +4185,13 @@ async function generateCandidates(pid, nid, btn){
 
 /** 把候选条数刷到所有装着这两个按钮的地方（详情卡 + 节点卡），不重建 DOM */
 function paintCandButtons(count, node, ...boxes){
-  // 旧节点引用可能落在采纳之后：按 id 取当前树里的节点，锁定态才不会被旧状态抹掉
-  const owner = node ? findProjectByNode(node.id) : null;
-  const fresh = owner ? (findNode(owner.root, node.id) || node) : node;
-  const locked = ideaLocked(fresh);
   for (const box of boxes){
     if (!box) continue;
     const gen = box.querySelector('[data-cand-gen]');
     const pool = box.querySelector('[data-cand-pool]');
     if (gen){
-      gen.disabled = !locked && count > 0;
-      gen.classList.toggle('is-locked', locked);
-      if (locked){
-        gen.setAttribute('aria-disabled', 'true');
-        gen.title = ideaLockTip(fresh);
-      } else {
-        gen.removeAttribute('aria-disabled');
-      }
+      gen.disabled = count > 0;   // 候选池里还有未处理的候选，先别重复生成
+      gen.removeAttribute('aria-disabled');
     }
     if (pool){
       pool.disabled = count === 0;
@@ -4225,8 +4210,8 @@ async function refreshPoolCount(p, n){
     document.querySelector(`.tnode[data-nid="${n.id}"]`));
 }
 
-/* ─────────── 构思动作：生成计划 / 执行计划（action-records/v1） ─────────── */
-const IDEA_ACTIONS = {
+/* ─────────── 支撑项动作：生成计划 / 执行计划（action-records/v1） ─────────── */
+const SUPPORT_ACTIONS = {
   plan: { path:'/action/plan', busy:'生成计划中', ok:'计划已生成', fail:'生成计划失败' },
   exec: { path:'/action/exec', busy:'执行计划中', ok:'执行完成', fail:'执行失败' },
 };
@@ -4240,17 +4225,17 @@ function stopActionPolls(){
   actionPolls.clear();
 }
 /** 发送预览确认后真正起会话：POST 建记录 + 起会话，然后轮询 /api/runs */
-async function startIdeaAction(p0, n0, action, btn, override = {}){
+async function startSupportAction(p0, n0, action, btn, override = {}){
   if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
   if (!p0.file) return toast('该项目没有可写回的卡片文件');
   if (!API_BASE) return toast('未连接服务，无法发起会话');
-  const cfg = IDEA_ACTIONS[action];
+  const cfg = SUPPORT_ACTIONS[action];
   if (!cfg) return;
   if (action === 'exec' && !(n0.raw && n0.raw.plan)) return toast('还没有计划：先「生成计划」');
   const up0 = activeAncestorOf(p0, n0);
   if (up0){ toast(`上游「${up0.title || up0.id}」正在生成，先等它结束`); return; }
   const pollKey = p0.file + '::' + n0.id;
-  if (actionPolls.has(pollKey)) return toast('这个构思已经有会话在跑，等它结束');
+  if (actionPolls.has(pollKey)) return toast('这个支撑项已经有会话在跑，等它结束');
   const oldText = btn && btn.textContent;
   if (btn){ btn.disabled = true; btn.textContent = cfg.busy + '…'; }
   try {
@@ -4263,14 +4248,14 @@ async function startIdeaAction(p0, n0, action, btn, override = {}){
     if (j.run && j.run.key) runMap.set(j.run.key, j.run);
     paintRunBadges();
     toast(`${cfg.busy}…会话跑完会自动刷新卡片`);
-    await pollIdeaAction({ pollKey, p0, n0, run: j.run, cfg });
+    await pollSupportAction({ pollKey, p0, n0, run: j.run, cfg });
   } catch (error) {
     toast(cfg.fail + '：' + error.message);
     if (btn && document.body.contains(btn)){ btn.disabled = false; btn.textContent = oldText || ''; }
   }
 }
-/** 等这个构思的 run 终止（done / failed / cancelled）再 reloadProjects 换掉卡片 */
-async function pollIdeaAction({ pollKey, p0, n0, run, cfg }){
+/** 等这个支撑项的 run 终止（done / failed / cancelled）再 reloadProjects 换掉卡片 */
+async function pollSupportAction({ pollKey, p0, n0, run, cfg }){
   const token = { cancelled: false };
   actionPolls.set(pollKey, token);
   const key = (run && run.key) || pollKey;
@@ -4282,7 +4267,7 @@ async function pollIdeaAction({ pollKey, p0, n0, run, cfg }){
       if (token.cancelled) return;
       const list = await fetchRunsSnapshot();
       if (!list) continue;
-      // run 的 nodeId 是构思 id、recordId 是记录 id：两个都认
+      // run 的 nodeId 是支撑项 id、recordId 是记录 id：两个都认
       const hit = list.find(x => x.key === key)
         || (recordId ? list.find(x => x.recordId === recordId) : null)
         || list.find(x => x.nodeId === n0.id && (x.status === 'starting' || x.status === 'running'));
@@ -4311,35 +4296,117 @@ let CAND_UID = 0;
 const candUid = (c) => c.__uid || (c.__uid = ++CAND_UID);
 const candIndexOf = (uid) => CAND_META.list.findIndex(c => String(candUid(c)) === String(uid));
 
-const candRowHtml = (c, p0, n0) => {
-  const locked = ideaLocked(n0);
+const candImpOf = (c) => {
+  const n = Number(c && c.importance);
+  return Number.isFinite(n) && n > 0 ? Math.min(5, Math.max(1, Math.round(n))) : 0;
+};
+
+/** 候选行瘦身：序号 + 重要性徽标 + 标题 + 承接支撑项一行；其余字段都在悬浮卡里 */
+const candRowHtml = (c, p0, n0, idx) => {
+  const uid = candUid(c);
+  const imp = candImpOf(c);
+  const sup = String((c && c.support) || '').trim();
   return `
-    <div class="cand-row" data-cand-row="${candUid(c)}">
+    <div class="cand-row" data-cand-row="${uid}" tabindex="0">
+      <span class="cand-idx mono">${idx + 1}</span>
+      <span class="cand-imp" data-imp="${imp}" title="${imp ? '重要性 ' + imp + ' / 5' : '重要性未生成'}"
+        aria-label="${imp ? '重要性 ' + imp + ' / 5' : '重要性未生成'}">${imp || '–'}</span>
       <div class="cand-main">
         <div class="cand-title">${esc(c.title || '（未命名）')}</div>
-        ${c.blocker ? `<div class="cand-str">阻碍：${esc(c.blocker)}</div>` : ''}
-        ${c.strength ? `<div class="cand-str">优势：${esc(c.strength)}</div>` : ''}
-        ${c.evidence ? `<div class="cand-str">证据：${esc(c.evidence)}</div>` : ''}
-        ${c.acceptance ? `<div class="cand-acc">${esc(c.acceptance)}</div>` : ''}
+        <div class="cand-sup" title="${esc(sup || '承接支撑项未生成')}">${esc(sup || '承接支撑项未生成')}</div>
       </div>
-      <button class="tbtn primary" data-cand-adopt="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}"
-        ${locked ? `disabled title="${esc(ideaLockTip(n0))}"` : ''}>添加</button>
-      <button class="tbtn" data-cand-del="${candUid(c)}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
+      <button class="tbtn primary" data-cand-adopt="${uid}" data-nid="${n0.id}" data-proj="${p0.id}">添加</button>
+      <button class="tbtn" data-cand-del="${uid}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
     </div>`;
 };
 
+/** 纯函数：候选悬浮卡内容（全部 esc；空字段给「（未生成）」降级文案） */
+function candTipHtml(c){
+  const norm = (v) => String(v == null ? '' : v).trim();
+  const row = (k, v) => `<div class="ct-row"><dt>${k}</dt><dd>${v ? esc(v) : '<span class="ct-empty">（未生成）</span>'}</dd></div>`;
+  const imp = candImpOf(c);
+  return `<div class="ct-head">
+      <span class="ct-title">${esc(norm(c && c.title) || '（未命名）')}</span>
+      <span class="ct-imp">重要性 ${imp ? esc(String(imp) + ' / 5') : '（未生成）'}</span>
+    </div>
+    <dl class="ct-list">
+      ${row('承接支撑项', norm(c && c.support))}
+      ${row('必要性', norm(c && c.necessity))}
+      ${row('因果', norm(c && c.causal))}
+      ${row('证据', norm(c && c.evidence))}
+    </dl>`;
+}
+
+/** 悬浮卡是 body 级单例：.cand-row 的 overflow:hidden 与 .modal 的 backdrop-filter 都会裁掉它 */
+let candTipUid = null;
+function hideCandTip(){
+  const tip = $('#cand-tip');
+  candTipUid = null;
+  if (!tip || tip.hidden) return;
+  tip.dataset.show = 'false';
+  tip.hidden = true;
+  tip.setAttribute('aria-hidden', 'true');
+  tip.innerHTML = '';
+}
+function showCandTip(row, uid){
+  if (!row) return;
+  const tip = $('#cand-tip');
+  if (!tip) return;
+  const idx = candIndexOf(uid);
+  if (idx < 0) return;
+  const r = row.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const key = String(uid);
+  candTipUid = key;
+  tip.innerHTML = candTipHtml(CAND_META.list[idx]);
+  tip.hidden = false;
+  tip.setAttribute('aria-hidden', 'false');
+  tip.dataset.show = 'false';
+  // 贴行定位：默认放右侧，放不下翻到左侧；下方放不下翻到上方（与「+ 目标」菜单同一套夹取逻辑）
+  const tw = tip.offsetWidth || 280, th = tip.offsetHeight || 180;
+  let left = r.right + 10;
+  if (left + tw > window.innerWidth - 8) left = r.left - tw - 10;
+  if (left < 8) left = Math.max(8, Math.min(window.innerWidth - tw - 8, r.left));
+  let top = r.top;
+  if (top + th > window.innerHeight - 8) top = Math.max(8, r.bottom - th);
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+  tip.dataset.flip = top < r.top ? '1' : '0';
+  requestAnimationFrame(() => { if (candTipUid === key) tip.dataset.show = 'true'; });
+}
+
+/** #ask-body 是一次性元素：委托只绑一次（候选行只在候选池弹窗里出现） */
+let candTipBound = false;
+function bindCandTip(){
+  if (candTipBound) return;
+  const body = $('#ask-body');
+  if (!body) return;
+  candTipBound = true;
+  const rowOf = (e) => (e.target && e.target.closest ? e.target.closest('.cand-row') : null);
+  const leave = (e, row) => {
+    const tip = $('#cand-tip');
+    if (e.relatedTarget && tip && tip.contains(e.relatedTarget)) return;
+    if (candTipUid === String(row.dataset.candRow)) hideCandTip();
+  };
+  body.addEventListener('mouseover', (e) => { const row = rowOf(e); if (row) showCandTip(row, row.dataset.candRow); });
+  body.addEventListener('mouseout', (e) => { const row = rowOf(e); if (row) leave(e, row); });
+  body.addEventListener('focusin', (e) => { const row = rowOf(e); if (row) showCandTip(row, row.dataset.candRow); });
+  body.addEventListener('focusout', (e) => { const row = rowOf(e); if (row) leave(e, row); });
+  const tip = $('#cand-tip');
+  if (tip) tip.addEventListener('mouseleave', hideCandTip);
+}
+
 const candEmptyHtml = (added) => `<div class="cand-empty">${added
-  ? `本次已加入 ${added} 条子节点`
+  ? `本次已加入 ${added} 条支撑项`
   : '候选池是空的：先点「生成候选」'}</div>`;
 
 const candNoteText = () => {
   if (!CAND_META.list.length) return '';
-  if (ideaLocked(CAND_META.n0)) return ideaLockTip(CAND_META.n0);
-  return '点「添加」写入为真实子节点（一个目标只采纳 1 条构思，其余会自动清空）；确认后会自己退场。';
+  return '点「添加」写入为支撑项子节点；悬停候选行或 Tab 聚焦可看必要性 / 因果 / 证据。';
 };
 
 const candPoolBody = () => CAND_META.list.length
-  ? `<div class="cand-list">${CAND_META.list.map(c => candRowHtml(c, CAND_META.p0, CAND_META.n0)).join('')}</div>
+  ? `<div class="cand-list">${CAND_META.list.map((c, i) => candRowHtml(c, CAND_META.p0, CAND_META.n0, i)).join('')}</div>
     <div class="mnote">${candNoteText()}</div>`
   : `<div class="cand-list">${candEmptyHtml(CAND_META.added)}</div>`;
 
@@ -4350,6 +4417,7 @@ function paintCandChrome(){
   $('#ask-ok').textContent = n ? '清空候选池' : '关闭';
   if (!n){
     askCb = null;
+    hideCandTip();                                 // 清空后悬浮卡不能留在屏幕上
     $('#ask-cancel').style.display = 'none';      // 空池只剩「关闭」，不留一个无意义的取消
     $('#ask-body .mnote')?.remove();              // 「会自己退场」的说明此刻已失效
     return;
@@ -4380,12 +4448,14 @@ async function openCandidatePool(pid, nid){
   CAND_META.p0 = p0; CAND_META.n0 = n0;
   CAND_META.list = list.slice();
   CAND_META.added = 0;
+  hideCandTip();
   paintPoolButtons();
   askConfirm(
     CAND_META.list.length ? `候选池 · ${CAND_META.list.length} 条` : '候选池 · 已清空',
     candPoolBody(),
     CAND_META.list.length ? '清空候选池' : '关闭',
     CAND_META.list.length ? async () => {
+      hideCandTip();
       await fetch(api('/candidates/delete'), {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ file: CAND_META.p0.file, nodeId: CAND_META.n0.id, all: true }),
@@ -4396,6 +4466,7 @@ async function openCandidatePool(pid, nid){
       toast('候选池已清空');
     } : null,
   );
+  bindCandTip();   // 悬停 / Tab 聚焦出悬浮卡；scroll / resize / 关窗时收起
 }
 
 /** 添加：行内立刻切成「✓ 已添加」，0.5s 后收缩退场；期间不整窗重建，也不打断下一个点击 */
@@ -4403,6 +4474,7 @@ async function adoptCandidate(uid, btn){
   const idx = candIndexOf(uid);
   const row = btn && btn.closest('.cand-row');
   if (idx < 0 || !row || row.dataset.busy === '1') return;
+  hideCandTip();
   row.dataset.busy = '1';
   row.dataset.added = '1';
   btn.classList.remove('primary');
@@ -4420,17 +4492,13 @@ async function adoptCandidate(uid, btn){
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     CAND_META.list.splice(idx, 1);
     CAND_META.added += 1;
-    if (j.locked) CAND_META.list = [];   // 目标锁定：其余备选由服务端一并清掉
     paintCandChrome();
-    toast(j.locked
-      ? `已采纳构思：${(j.child && j.child.title) || ''}（其余候选已清空，一个目标只保留一个构思）`
-      : `已加入子节点：${(j.child && j.child.title) || ''}`);
+    toast(`已加入支撑项：${(j.child && j.child.title) || ''}`);
     reloadProjects();   // 卡片上的「候选池 n」与新子节点一起刷新，不挡退场动画
     setTimeout(() => {
       row.dataset.leaving = '1';
       setTimeout(() => {
         row.remove();
-        if (j.locked) document.querySelectorAll('#ask-body .cand-row').forEach(r => r.remove());
         syncCandEmpty();
         paintPoolButtons();
       }, 200);
@@ -4452,6 +4520,7 @@ async function deleteCandidate(uid, btn){
   const idx = candIndexOf(uid);
   const row = btn && btn.closest('.cand-row');
   if (idx < 0 || !row || row.dataset.busy === '1') return;
+  hideCandTip();
   row.dataset.busy = '1';
   row.dataset.leaving = '1';
   try {
@@ -4474,11 +4543,11 @@ async function deleteCandidate(uid, btn){
 async function manualAddChild(pid, nid){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
-  const childKind = { milestone: 'goal', goal: 'idea', idea: 'exec' }[n0.kind];
-  if (!childKind) return toast('执行项不能再往下加');
+  const childKind = { milestone: 'support', support: 'exec' }[n0.kind] || null;
+  if (!childKind) return toast('执行记录不能再往下加');
   askConfirm(`手动添加${KIND[childKind]}`,
     `<div class="detail-row"><dt>标题</dt><dd><input class="dfield" id="mc-title" style="width:100%" placeholder="8–16 字，说清做到什么"></dd></div>
-     <div class="mnote">加完会在详情卡里继续填约束 / 验收。</div>`,
+     <div class="mnote">加完会在详情卡里继续填字段；支撑项的承接支撑项 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
     '添加', async () => {
       const title = ($('#mc-title') || {}).value || '';
       if (!title.trim()) return toast('标题不能为空');
@@ -4989,11 +5058,11 @@ async function openActionPreview(projId, nid, action){
   const item = (data.list || [])[0] || {};
   if (action === 'exec'){
     launchCtx = { mode: 'exec', p, n, action, objective: data.objective || '', fallback: data.fallback || item.prompt || '' };
-    $('#launch-title').textContent = `发送预览 · 执行计划 · 构思「${n.title}」`;
+    $('#launch-title').textContent = `发送预览 · 执行计划 · 支撑项「${n.title}」`;
     paintExecLaunch({ objective: data.objective || '', fallback: data.fallback || item.prompt || '', workdir: launchWorkdir(p) });
   } else {
     launchCtx = { mode: 'plan', p, n, action, text: item.prompt || '' };
-    $('#launch-title').textContent = `发送预览 · 生成计划 · 构思「${n.title}」`;
+    $('#launch-title').textContent = `发送预览 · 生成计划 · 支撑项「${n.title}」`;
     paintTextLaunch({
       text: item.prompt || '',
       commandLines: data.command && data.command.length ? [data.command[0].split('\n')[0] + ' …（整段作为正文）'] : [],
@@ -5025,12 +5094,12 @@ async function doLaunch(){
     const objective = String(($('#launch-objective') || {}).value || ctx.objective || '').trim();
     if (!objective) return toast('目标不能为空');
     closeLaunch();
-    return startIdeaAction(p, n, 'exec', null, { objective });
+    return startSupportAction(p, n, 'exec', null, { objective });
   }
   const text = String(($('#launch-prompt') || {}).value || ctx.text || '').trim();
   if (!text) return toast('prompt 是空的');
   closeLaunch();
-  if (mode === 'plan') return startIdeaAction(p, n, 'plan', null, { prompt: text });
+  if (mode === 'plan') return startSupportAction(p, n, 'plan', null, { prompt: text });
   toast('会话启动中…');
   try {
     const res = await fetch(api('/run'), {
@@ -5070,6 +5139,7 @@ function showModal(m){
 }
 function hideModal(m){
   if (!m || m.hidden) return;
+  if (m.id === 'ask') hideCandTip();
   m.dataset.show = 'false';
   m.style.opacity = '';
   const card = m.querySelector('.modal-card');
@@ -5080,30 +5150,27 @@ function hideModal(m){
 function openConfirm(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id); if (!n) return;
-  if (blockerGate(n)) return toast(blockerGateTip(n));
   const pr = progressOf(n), parent = findParent(p.root, id);
   pendingClose = id;
   const isMilestone = n.kind === 'milestone';
-  const isGoal = n.kind === 'goal';
-  $('#modal-title').textContent = `${(isMilestone || isGoal) ? closeLabelOf(n) : '确认关闭'}「${n.title}」？`;
-  const rows = [`<div class="mrow"><span>类型</span><b>${KIND[n.kind]} · ${n.id}</b></div>`];
+  const isSupport = n.kind === 'support';
+  // 里程碑「确认达成」、支撑项「完成」是正式动作；执行记录仍叫「确认关闭」
+  $('#modal-title').textContent = `${(isMilestone || isSupport) ? closeLabelOf(n) : '确认关闭'}「${n.title}」？`;
+  const rows = [`<div class="mrow"><span>类型</span><b>${KIND[n.kind] || n.kind} · ${n.id}</b></div>`];
   if ((n.children||[]).length) rows.push(`<div class="mrow"><span>子项</span><b>${pr.closed}/${pr.kids} 已关闭</b></div>`);
-  if (parent) rows.push(`<div class="mrow"><span>上级</span><b>${KIND[parent.kind]} · ${parent.title}</b></div>`);
+  if (parent) rows.push(`<div class="mrow"><span>上级</span><b>${KIND[parent.kind] || parent.kind} · ${parent.title}</b></div>`);
   if (n.kind === 'exec' && n.meta) {
     const label = n.meta.startsWith('验证') ? '验证' : '证据';
     rows.push(`<div class="mrow warn"><span>${label}</span><b>${n.meta.replace(/^验证：/, '')}</b></div>`);
   }
   if ((n.issues||[]).length) rows.push(`<div class="mrow warn"><span>未处置</span><b>${n.issues.length} 条问题反馈</b></div>`);
-  if (isMilestone && blockerGate(n)) {
-    rows.push(`<div class="mrow warn"><span>阻碍项</span><b>${blockerCountOf(n)} 条未清，不能确认达成</b></div>`);
-  }
   rows.push(`<div class="mnote">${isMilestone
     ? '确认后里程碑进入「已达成」，项目仍留在主泳道；可从项目菜单查看「里程碑历史」、开新里程碑或重开。'
-    : isGoal
-      ? '子项全部关闭后才能收敛。确认后目标折叠进里程碑卡片的「已闭环 N」里，不会消失；可随时展开或去里程碑历史回看。'
-      : '构思记录全闭环会自动闭环；目标 / 里程碑要人确认，不会自动关。关错了可点「重开」恢复。'}</div>`);
+    : isSupport
+      ? '支撑项有执行记录时，记录全闭环会自动完成；没有记录时可在这里手动完成。确认后折叠进里程碑卡片的「已闭环 N」，不会消失；关错了可点「重开」恢复。'
+      : '执行记录随会话结束自动闭环；支撑项 / 里程碑要人确认，不会自动关。关错了可点「重开」恢复。'}</div>`);
   $('#modal-body').innerHTML = rows.join('');
-  $('#modal-ok').textContent = (isMilestone || isGoal) ? closeLabelOf(n) : '确认关闭';
+  $('#modal-ok').textContent = (isMilestone || isSupport) ? closeLabelOf(n) : '确认关闭';
   const m = $('#modal');
   showModal(m);
   $('#modal-ok').focus();
@@ -5631,7 +5698,7 @@ $('#file-input').addEventListener('change', (e) => {
       if (i >= 0) PROJECTS[i] = proj; else PROJECTS.push(proj);
       state.focusId = proj.id;
       render();
-      toast(`已载入 ${proj.name}（${proj.root.children.length} 个目标）`);
+      toast(`已载入 ${proj.name}（${proj.root.children.length} 个支撑项）`);
     } catch (err) { toast(`载入失败：${err.message}`); }
   };
   rd.readAsText(f);
@@ -5644,7 +5711,7 @@ $('#density').addEventListener('click', (e)=>{
   savePrefs({ density: on ? 'compact' : 'comfort' });   // 显示风格跨刷新保留
   render();
 });
-// 「隐藏已闭环」：画布上不留已闭环的目标 / 构思；已达成里程碑仍留主管，数量上提到卡片 chips
+// 「隐藏已闭环」：画布上不留已闭环的支撑项 / 执行记录；已达成里程碑仍留主管，数量上提到卡片 chips
 $('#hide-closed').addEventListener('click', (e)=>{
   state.hideClosed = !state.hideClosed;
   e.currentTarget.setAttribute('aria-pressed', state.hideClosed ? 'true' : 'false');
@@ -5765,9 +5832,9 @@ document.addEventListener('click', (e)=>{
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const candGen = e.target.closest('[data-cand-gen]');
   if (candGen){ generateCandidates(candGen.dataset.proj, candGen.dataset.nid, candGen); return; }
-  const ideaAct = e.target.closest('[data-idea-act]');
-  if (ideaAct){
-    if (!ideaAct.disabled) openActionPreview(ideaAct.dataset.proj, ideaAct.dataset.nid, ideaAct.dataset.ideaAct);
+  const supportAct = e.target.closest('[data-support-act]');
+  if (supportAct){
+    if (!supportAct.disabled) openActionPreview(supportAct.dataset.proj, supportAct.dataset.nid, supportAct.dataset.supportAct);
     return;
   }
   const planDoc = e.target.closest('[data-plan-doc]');
@@ -6081,8 +6148,8 @@ document.addEventListener('click', (e)=>{
     else toast(`已请求打开 ${p.name} 的最近会话 ${p.session}（原型未接宿主）`);
   }
 });
-window.addEventListener('resize', ()=>render());
-window.addEventListener('scroll', ()=>closeAddMenu(), true);
+window.addEventListener('resize', ()=>{ hideCandTip(); render(); });
+window.addEventListener('scroll', ()=>{ closeAddMenu(); hideCandTip(); }, true);
 
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
