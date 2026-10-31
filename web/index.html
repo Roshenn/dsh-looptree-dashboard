@@ -205,6 +205,24 @@
   .tnode[data-idle="modest"]::before{width:2px;background:var(--ready);opacity:.55}
   .tnode[data-idle="strong"]:hover,.tnode[data-idle="modest"]:hover{border-color:color-mix(in srgb,var(--ready) 62%,var(--b3))}
   /* 刚变空闲时闪一次（只在状态翻转那一下，不做常驻呼吸动画） */
+  /* 会话完成后「有新内容」：暖色描边 + 右上角「新」；保留到点开该节点 */
+  .tnode[data-updated="ok"]{border-color:color-mix(in srgb,var(--amber) 60%,var(--b1));
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--amber) 32%,transparent),0 10px 24px -18px color-mix(in srgb,var(--amber) 55%,transparent)}
+  .tnode[data-updated="ok"]::after{content:'新';position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;
+    display:inline-grid;place-items:center;padding:0 4px;border-radius:6px;font-size:10px;line-height:1;
+    color:#241a05;background:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 70%,#000);
+    animation:freshPulse 1.2s var(--ease-out) 2}
+  .tnode[data-updated="fail"]{border-color:color-mix(in srgb,var(--red) 62%,var(--b1));
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--red) 30%,transparent),0 10px 24px -18px color-mix(in srgb,var(--red) 55%,transparent)}
+  .tnode[data-updated="fail"]::after{content:'!';position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;
+    display:inline-grid;place-items:center;padding:0 4px;border-radius:6px;font-size:11px;font-weight:600;line-height:1;
+    color:#fff;background:var(--red);border:1px solid color-mix(in srgb,var(--red) 70%,#000);
+    animation:freshPulse 1.2s var(--ease-out) 2}
+  @keyframes freshPulse{0%,100%{transform:scale(1)}45%{transform:scale(1.18)}}
+  @media (prefers-reduced-motion:reduce){
+    .tnode[data-updated]::after{animation:none}
+    .tnode[data-idle-pulse="1"]{animation:none}
+  }
   .tnode[data-idle-pulse="1"]{animation:idleFlash 700ms var(--ease-out)}
   @keyframes idleFlash{
     0%{background:color-mix(in srgb,var(--ready) 26%,var(--l2))}
@@ -815,6 +833,10 @@
   </main>
 
   <footer class="footer">
+    <button class="next fresh" id="fresh-jump" type="button" hidden aria-label="跳到已更新的节点">
+      <span class="pill"><span class="dot"></span><span id="fresh-count">已更新 0</span></span>
+      <span class="next-arrow" aria-hidden="true">→</span>
+    </button>
     <button class="next" id="next-jump" type="button" data-kind="none" aria-label="跳到空闲分支">
       <span class="pill"><span class="dot"></span><span id="next-pill-text">建议下一个轮转</span></span>
       <b id="next-project">–</b>
@@ -2584,6 +2606,7 @@ function render(){
   if (state.view==='matrix') renderMatrix(); else renderFocus();
   updateKpis();
   paintIdle();                     // 刷新 data-idle + 泳道头 + 页脚（run 轮询也走同一处）
+  paintUpdatedMarkers();           // 会话完成后打的「新」角标，重绘后要贴回去
   if (keepDetail && findProjectByNode(keepDetail)){
     requestAnimationFrame(() => openDetail(keepDetail));
     setTimeout(() => { if (!detailNode) openDetail(keepDetail); }, 60);
@@ -4195,22 +4218,18 @@ async function generateCandidates(pid, nid, btn){
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     toast('已发起候选生成，完成后候选池会出现待选节点');
-    const key = (j.run && j.run.key) || `${p0.file}::${n0.id}`;
-    const deadline = Date.now() + 180000;
-    while (Date.now() < deadline){
-      await new Promise(r => setTimeout(r, 1500));
-      const runs = await fetch(api('/runs')).then(r => r.json()).catch(() => ({}));
-      const run = (runs.runs || []).find(x => x.key === key);
-      if (!run) continue;
-      if (['failed','cancelled'].includes(run.status)){ toast('候选生成失败：' + (run.error || run.status)); break; }
-      if (run.status === 'done' && run.candidatesError){ toast('候选生成失败：' + run.candidatesError); break; }
-      if (run.status === 'done' && run.candidatesAdded){
-        await loadCandidates(p0, n0);
-        await loadCandidateCounts(p0);
-        render();   // 节点卡与详情卡的「生成候选 / 候选池 n」一起换挡
-        toast(`候选池已就绪：${run.candidatesAdded} 条，点「候选池」挑一个`);
-        break;
-      }
+    const settledRun = await waitRunSettled(j.run || `${p0.file}::${n0.id}`, 180000);
+    if (!settledRun) toast('等得太久了：会话可能仍在跑，稍后点刷新看看');
+    else if (settledRun.status === 'failed' || settledRun.status === 'cancelled') {
+      toast('候选生成失败：' + (settledRun.error || settledRun.status));
+    } else if (settledRun.candidatesError) {
+      toast('候选生成失败：' + settledRun.candidatesError);
+    } else if (settledRun.candidatesAdded) {
+      await loadCandidates(p0, n0);
+      await loadCandidateCounts(p0);
+      toast(`候选池已就绪：${settledRun.candidatesAdded} 条，点「候选池」挑一个`);
+    } else {
+      toast('会话结束，但这次没有写出候选');
     }
   } catch (error) {
     toast('生成候选失败：' + error.message);
@@ -4251,10 +4270,8 @@ const SUPPORT_ACTIONS = {
   plan: { path:'/action/plan', busy:'生成计划中', ok:'计划已生成', fail:'生成计划失败' },
   exec: { path:'/action/exec', busy:'执行计划中', ok:'执行完成', fail:'执行失败' },
 };
-const ACTION_POLL_MS = 1500;
 const ACTION_POLL_MAX_MS = 15 * 60 * 1000;   // 轮询上限 15 分钟，超时交给用户手动刷新
 const actionPolls = new Map();               // `${file}::${nodeId}` → { cancelled }
-const actionSleep = (ms) => new Promise(r => setTimeout(r, ms));
 /** 切视图 / 离开页面时停掉所有动作轮询：回来点刷新就能看到结果 */
 function stopActionPolls(){
   for (const t of actionPolls.values()) t.cancelled = true;
@@ -4294,32 +4311,15 @@ async function startCapabilityAction(p0, n0, action, btn, override = {}){
 async function pollCapabilityAction({ pollKey, p0, n0, run, cfg }){
   const token = { cancelled: false };
   actionPolls.set(pollKey, token);
-  const key = (run && run.key) || pollKey;
-  const recordId = run && run.recordId;
-  const deadline = Date.now() + ACTION_POLL_MAX_MS;
   try {
-    while (!token.cancelled && Date.now() < deadline){
-      await actionSleep(ACTION_POLL_MS);
-      if (token.cancelled) return;
-      const list = await fetchRunsSnapshot();
-      if (!list) continue;
-      // run 的 nodeId 是能力闭环 id、recordId 是记录 id：两个都认
-      const hit = list.find(x => x.key === key)
-        || (recordId ? list.find(x => x.recordId === recordId) : null)
-        || list.find(x => x.nodeId === n0.id && (x.status === 'starting' || x.status === 'running'));
-      if (!hit) continue;
-      if (hit.status === 'done'){
-        await reloadProjects();
-        toast(cfg.ok);
-        return;
-      }
-      if (hit.status === 'failed' || hit.status === 'cancelled'){
-        await reloadProjects();   // 失败的记录卡也要显示状态与错误摘要
-        toast(cfg.fail + '：' + (hit.error || RUN_LABEL[hit.status] || hit.status));
-        return;
-      }
+    // 卡片刷新交给全局终态监听（含「新」角标），这里只等结果并给提示
+    const hit = await waitRunSettled(run || pollKey, ACTION_POLL_MAX_MS);
+    if (token.cancelled) return;
+    if (!hit){ toast('等得太久了：会话可能仍在跑，稍后点刷新看看'); return; }
+    if (hit.status === 'done'){ toast(cfg.ok); return; }
+    if (hit.status === 'failed' || hit.status === 'cancelled'){
+      toast(cfg.fail + '：' + (hit.error || RUN_LABEL[hit.status] || hit.status));
     }
-    if (!token.cancelled) toast('等得太久了：会话可能仍在跑，稍后点刷新看看');
   } finally {
     if (actionPolls.get(pollKey) === token) actionPolls.delete(pollKey);
   }
@@ -4631,30 +4631,19 @@ async function generateMissing(pid, nid, btn){
       }
       throw new Error(j.error || ('HTTP ' + res.status));
     }
-    const key = (j.run && j.run.key) || (p0.file + '::' + n0.id);
     toast(`已发起生成（${(j.fields || need).map(f => FIELD_LABEL[f] || f).join('、')}），完成后自动写入`);
-    const deadline = Date.now() + 180000;
-    let settled = false;
-    while (Date.now() < deadline){
-      await new Promise(r => setTimeout(r, 1500));
-      const runs = await fetch(api('/runs')).then(r => r.json()).catch(() => ({}));
-      const run = (runs.runs || []).find(x => x.key === key);
-      if (!run) continue;
-      if (['failed', 'cancelled'].includes(run.status)){
-        toast('生成失败：' + (run.error || run.status));
-        settled = true; break;
-      }
-      // 会话 done 之后 host 还要把 JSON 写进卡片：等到 fillApplied/fillError 才算真的完成
-      if (run.status === 'done'){
-        if (run.fillError){ toast('生成结果没写进卡片：' + run.fillError); settled = true; break; }
-        if (run.fillApplied && run.fillApplied.length){
-          await reloadProjects();
-          toast('已生成并写入：' + run.fillApplied.map(f => FIELD_LABEL[f] || f).join('、'));
-          settled = true; break;
-        }
-      }
+    // 卡片刷新由全局终态监听统一做（含「新」角标），这里只负责结果提示
+    const settledRun = await waitRunSettled(j.run || (p0.file + '::' + n0.id), 180000);
+    if (!settledRun) toast('等得太久了：会话可能仍在跑，稍后点刷新看看');
+    else if (settledRun.status === 'failed' || settledRun.status === 'cancelled') {
+      toast('生成失败：' + (settledRun.error || settledRun.status));
+    } else if (settledRun.fillError) {
+      toast('生成结果没写进卡片：' + settledRun.fillError);
+    } else if (settledRun.fillApplied && settledRun.fillApplied.length) {
+      toast('已生成并写入：' + settledRun.fillApplied.map(f => FIELD_LABEL[f] || f).join('、'));
+    } else {
+      toast('会话结束，但这次没有可写入的字段');
     }
-    if (!settled) toast('等得太久了：会话可能仍在跑，稍后点刷新看看');
   } catch (error) {
     toast('生成失败：' + error.message);
   } finally {
@@ -4664,6 +4653,8 @@ async function generateMissing(pid, nid, btn){
 
 /** 重新拉一次卡片并按当前详情节点重绘（不整页刷新） */
 async function reloadProjects(){
+  const scroller = document.querySelector('.scroll');
+  const keepScroll = scroller ? { top: scroller.scrollTop, left: scroller.scrollLeft } : null;
   try {
     const r = await fetch(api('/cards'));
     const j = await r.json();
@@ -4673,8 +4664,13 @@ async function reloadProjects(){
     await loadAllCandidateCounts();   // 节点卡上的「候选池 n」要跟着卡片一起刷新
     render();
     if (detailNode && findProjectByNode(detailNode)) openDetail(detailNode);
+    if (keepScroll && scroller){ scroller.scrollTop = keepScroll.top; scroller.scrollLeft = keepScroll.left; }
+    syncStampBaseline();              // 刚写/刚拉过：基线对齐，避免自己触发外部刷新
     return true;
-  } catch { return false; }
+  } catch {
+    if (keepScroll && scroller){ scroller.scrollTop = keepScroll.top; scroller.scrollLeft = keepScroll.left; }
+    return false;
+  }
 }
 
 /** 标题很短，直接在原地改：点击变输入框，Enter/失焦保存，Esc 取消 */
@@ -5527,16 +5523,223 @@ function applyFrozenStates(){
   });
 }
 
+/* ─────────── 会话完成 → 自动刷新 / 「新」标记 ───────────
+ * 之前只有发起会话的那个点击回调自己轮询，切走再回来靠 iframe 重挂载兜底；
+ * 现在改成全局监听：每 2s 的 /api/runs 快照里一旦有 run 首次进入终态（且已落盘），
+ * 就重拉卡片，并给受影响的节点打「新」角标，保留到点开为止。
+ */
+const TERMINAL_RUN = new Set(['done', 'failed', 'cancelled']);
+const PREV_RUN_STATUS = new Map();   // run 实例身份 → 上一次快照的状态
+const SETTLED_SEEN = new Set();      // 已经处理过的终态 run 实例
+const RUN_WAITERS = new Map();       // run 实例身份 → [resolve]（发起方等这一个会话收尾）
+
+/** run 身份：同一个节点/同一条 key 会连续起多次会话，必须带上实例标记才不串 */
+function runIdOf(run){
+  if (!run) return '';
+  if (typeof run === 'string') return run;
+  return `${run.key || ''}|${run.startedAt || ''}|${run.sessionId || ''}`;
+}
+const UPDATED_NODES = new Map();     // nodeId → 'ok' | 'fail'（保留到点开）
+let runBaselineReady = false;
+let refreshDebounce = null;
+const PENDING_FLASH = new Map();     // nodeId → tone，去抖期间累积
+
+/** 比较两次 /api/runs 快照：只报「首次进入终态且宿主已落盘」的 run */
+function diffRuns(prev, next){
+  const before = prev instanceof Map ? prev : new Map(Object.entries(prev || {}));
+  const out = [];
+  (next || []).forEach((r) => {
+    if (!r || !r.key) return;
+    if (!TERMINAL_RUN.has(r.status)) return;
+    if (r.settling) return;                          // 还在回写卡片，等下一轮
+    if (before.get(runIdOf(r)) === r.status) return; // 同一个 run 的同一个终态不重复报
+    out.push(r);
+  });
+  return out;
+}
+
+/** 比较两次卡片 mtime 戳：返回变了的 file 列表（外部改动检测） */
+function diffStamps(base, next){
+  const before = base instanceof Map ? base : new Map(Object.entries(base || {}));
+  return Object.keys(next || {}).filter((file) => {
+    const prev = before.get(file);
+    return prev === undefined || Number(prev) !== Number(next[file]);
+  });
+}
+
+function settleWaiters(key, run){
+  const id = runIdOf(run);
+  const list = RUN_WAITERS.get(id) || [];
+  RUN_WAITERS.delete(id);
+  list.forEach((fn) => { try { fn(run); } catch { /* noop */ } });
+}
+
+/** 等某个 run 首次进入终态；超时返回 null（发起方据此提示「还在跑」） */
+function waitRunSettled(runOrKey, timeoutMs = 180000){
+  const id = runIdOf(runOrKey);
+  if (!id) return Promise.resolve(null);
+  if (SETTLED_SEEN.has(id)) return Promise.resolve(runMap.get(runOrKey && runOrKey.key) || { status: 'done' });
+  return new Promise((resolve) => {
+    const list = RUN_WAITERS.get(id) || [];
+    let timer = null;
+    const done = (run) => { if (timer) clearTimeout(timer); resolve(run); };
+    timer = setTimeout(() => {
+      const rest = (RUN_WAITERS.get(id) || []).filter((fn) => fn !== done);
+      if (rest.length) RUN_WAITERS.set(id, rest); else RUN_WAITERS.delete(id);
+      resolve(null);
+    }, timeoutMs);
+    list.push(done);
+    RUN_WAITERS.set(id, list);
+  });
+}
+
+function nodeTitleOf(nid){
+  for (const p of PROJECTS) { const n = findNode(p.root, nid); if (n) return n.title || n.id; }
+  return '';
+}
+
+/** 把一次终态涉及的节点排进刷新队列（150ms 去抖，多个 run 合并成一次重拉） */
+function scheduleCardRefresh(nodeIds, tone = 'ok'){
+  (nodeIds || []).filter(Boolean).forEach((nid) => { if (!PENDING_FLASH.has(nid)) PENDING_FLASH.set(nid, tone); });
+  if (refreshDebounce) clearTimeout(refreshDebounce);
+  refreshDebounce = setTimeout(flushCardRefresh, 160);
+}
+
+async function flushCardRefresh(){
+  refreshDebounce = null;
+  if (!PENDING_FLASH.size) return;
+  if (document.hidden) return;                        // 后台不重绘，回前台统一刷
+  if ($('#field-pop') && !$('#field-pop').hidden){    // 正在编辑字段：别吞掉输入
+    refreshDebounce = setTimeout(flushCardRefresh, 1200);
+    return;
+  }
+  const entries = [...PENDING_FLASH.entries()].map(([nid, tone]) => ({ nid, tone }));
+  PENDING_FLASH.clear();
+  const ok = await reloadProjects();
+  if (!ok){ entries.forEach((e) => PENDING_FLASH.set(e.nid, e.tone)); return; }
+  entries.forEach((e) => markNodeUpdated(e.nid, e.tone));
+  const titles = entries.map((e) => nodeTitleOf(e.nid)).filter(Boolean);
+  if (titles.length === 1) toast('已更新：' + titles[0]);
+  else if (titles.length > 1) toast(`已更新 ${titles.length} 个节点`);
+}
+
+function markNodeUpdated(nid, tone = 'ok'){
+  if (!nid) return;
+  UPDATED_NODES.set(nid, tone);
+  const el = document.querySelector(`.tnode[data-nid="${nid}"]`);
+  if (el) el.dataset.updated = tone;
+  refreshFooterFresh();
+}
+
+/** 渲染后把已更新标记贴回卡片（重绘不会丢） */
+function paintUpdatedMarkers(){
+  document.querySelectorAll('.tnode[data-nid]').forEach((el) => {
+    const tone = UPDATED_NODES.get(el.dataset.nid);
+    if (tone) el.dataset.updated = tone; else el.removeAttribute('data-updated');
+  });
+  refreshFooterFresh();
+}
+
+function markNodeRead(nid){
+  if (!nid || !UPDATED_NODES.has(nid)) return;
+  UPDATED_NODES.delete(nid);
+  document.querySelectorAll(`.tnode[data-nid="${nid}"]`).forEach((el) => el.removeAttribute('data-updated'));
+  refreshFooterFresh();
+}
+
+function refreshFooterFresh(){
+  const btn = $('#fresh-jump'), count = $('#fresh-count');
+  if (!btn || !count) return;
+  const n = UPDATED_NODES.size;
+  btn.hidden = n === 0;
+  count.textContent = `已更新 ${n}`;
+  btn.title = n ? `${n} 个节点有新内容：点一下跳到下一个` : '';
+}
+
+function jumpToNextUpdated(){
+  const ids = [...UPDATED_NODES.keys()];
+  if (!ids.length) return;
+  const nid = ids[0];
+  ensureVisible(nid);
+  const el = document.querySelector(`.tnode[data-nid="${nid}"]`);
+  if (el) flashNode(el);
+  openDetail(nid);
+  markNodeRead(nid);
+}
+
+/** 卡片 mtime 基线：外部改动（另一个窗口 / 另一台机器 / 手改文件）靠它发现 */
+const STAMP_BASELINE = new Map();
+let stampTimer = null;
+
+function setStampBaseline(stamps){
+  STAMP_BASELINE.clear();
+  Object.entries(stamps || {}).forEach(([file, mtime]) => STAMP_BASELINE.set(file, Number(mtime) || 0));
+}
+
+/** 自己写盘成功后静默对齐基线，避免 10s 后被当成外部改动 */
+async function syncStampBaseline(){
+  if (!API_BASE) return;
+  try {
+    const r = await fetch(api('/cards/stamp'));
+    if (!r.ok) return;
+    const j = await r.json();
+    setStampBaseline(j && j.stamps);
+  } catch { /* noop */ }
+}
+
+async function pollStamps(){
+  if (!API_BASE || document.hidden) return;
+  try {
+    const r = await fetch(api('/cards/stamp'));
+    if (!r.ok) return;
+    const j = await r.json();
+    const stamps = (j && j.stamps) || {};
+    if (!STAMP_BASELINE.size){ setStampBaseline(stamps); return; }
+    const changed = diffStamps(STAMP_BASELINE, stamps);
+    setStampBaseline(stamps);
+    if (!changed.length) return;
+    if (PENDING_FLASH.size || refreshDebounce) return;   // 正在刷会话结果，别抢
+    await reloadProjects();
+  } catch { /* noop */ }
+}
+
 /** 拉一次 run 列表并重画徽标；返回 run 数组（失败返回 null，供动作轮询判断） */
 async function fetchRunsSnapshot(){
   try {
     const res = await fetch(api('/runs'));
     if (!res.ok) return null;
     const j = await res.json();
+    const list = (j.runs || []);
     runMap.clear();
-    (j.runs || []).forEach(r => runMap.set(r.key, r));
+    list.forEach(r => runMap.set(r.key, r));
     paintRunBadges();
     applyFrozenStates();
+    // 首帧只建基线：host 的 runs 不清空，历史终态不能被当成「刚更新」
+    if (!runBaselineReady){
+      runBaselineReady = true;
+      list.forEach((r) => {
+        PREV_RUN_STATUS.set(runIdOf(r), r.status);
+        if (TERMINAL_RUN.has(r.status) && !r.settling) SETTLED_SEEN.add(runIdOf(r));
+      });
+      return [...runMap.values()];
+    }
+    const settled = diffRuns(PREV_RUN_STATUS, list);
+    list.forEach((r) => PREV_RUN_STATUS.set(runIdOf(r), r.status));
+    if (settled.length){
+      const ids = [];
+      settled.forEach((r) => {
+        const id = runIdOf(r);
+        if (SETTLED_SEEN.has(id)) return;
+        SETTLED_SEEN.add(id);
+        settleWaiters(id, r);
+        if (r.nodeId) ids.push(r.nodeId);
+        if (r.recordId) ids.push(r.recordId);
+      });
+      if (ids.length){
+        const tone = settled.some((r) => r.status !== 'done') ? 'fail' : 'ok';
+        scheduleCardRefresh(ids, tone);
+      }
+    }
     return [...runMap.values()];
   } catch { return null; }
 }
@@ -5568,6 +5771,7 @@ async function persist(p){
     }
     markSave(`已写入 ${p.file} · ${new Date().toLocaleTimeString('sv-SE')}`, 'ok');
     promptCache.clear();   // 卡片字段变了，prompt 上下文要重新合成
+    syncStampBaseline();   // 自己写的：基线对齐，10s 后别把它当外部改动
     return { ok:true, warnings: j.warnings || [] };
   } catch (e) {
     markSave('写入失败：' + e.message, 'err');
@@ -5627,6 +5831,8 @@ function toast(msg){
 $('#tab-matrix').addEventListener('click', ()=>{ stopActionPolls(); state.view='matrix'; render(); });
 $('#tab-focus').addEventListener('click', ()=>{ stopActionPolls(); state.view='focus'; render(); });
 $('#next-jump').addEventListener('click', jumpToNextTarget);   // 页脚「空闲分支 →」：滚到那条分支
+const freshJump = $('#fresh-jump');
+if (freshJump) freshJump.addEventListener('click', jumpToNextUpdated);   // 页脚「已更新 N →」：跳到下一个有新内容的节点
 window.addEventListener('pagehide', stopActionPolls);
 $('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
 // 刷新：真实重新拉一次 /api/cards + 服务/会话状态，再报数量（旧版只重绘内存，提示还写着 mock）
@@ -6174,6 +6380,7 @@ document.addEventListener('click', (e)=>{
   }
   const nodeEl = e.target.closest('.tnode');
   if (nodeEl && !e.target.closest('button')){
+    markNodeRead(nodeEl.dataset.nid);   // 已经看到了：角标即已读
     openDetail(nodeEl.dataset.nid, undefined, { x: e.clientX, y: e.clientY });
     return;
   }
@@ -6276,11 +6483,18 @@ if (qs.get('filter')) state.filter = qs.get('filter');
         const busy = [...runMap.values()].some(x => x.status === 'running' || x.status === 'starting');
         if (busy || Math.random() < 0.2) refreshRuns();
       }, 2000);
+      // 外部改动（另一个窗口 / 另一台机器 / 手改 rotation.json）：空闲每 10s 比一次 mtime
+      syncStampBaseline();
+      if (!stampTimer) stampTimer = setInterval(pollStamps, 10000);
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         refreshRuns();
         refreshServices();
+        if (PENDING_FLASH.size || UPDATED_NODES.size || refreshDebounce) flushCardRefresh();
+        else reloadProjects();   // 切走期间别处可能改了卡片：回来直接对齐
       });
+      // 有些宿主用 CSS 隐藏 iframe，visibilitychange 不一定发：窗口拿到焦点也补一次
+      window.addEventListener('focus', () => { if (PENDING_FLASH.size) flushCardRefresh(); });
     }
   }
   // 便于分享/截图：?open=<nodeId> 载入后直接展开该节点详情
