@@ -962,7 +962,6 @@ const MOCK_PROJECTS = [
     root: N('sw-loop','milestone','3 情节层渲染可视化', {
       vision:'打开项目就能看到三层情节图，不用读代码；作者改一段情节，视觉与结构同时更新，评审不用再截图对稿。',
       supports:'章节 → 情节两层索引\n三层叠渲染管线\n地图图层复用',
-      metrics:'三层图首屏 < 800ms\n章节切换无残影\n索引构建 4 个测试用例通过',
       lessons:[
         {text:'先做索引再画图，返工少一半',at:'2026-10-25T10:00:00.000Z'},
         {text:'渲染性能先量再优化，别猜',at:'2026-10-26T09:12:00.000Z'},
@@ -1022,7 +1021,6 @@ const MOCK_PROJECTS = [
     root: N('ck-loop','milestone','双轨学习里程碑', {
       vision:'教与学两条路径都能用同一套词块数据跑通，换教材不用重排词表。',
       supports:'教学轨可用\n学习轨可用',
-      metrics:'COCA 前 6000 命中 ≥ 90%\n采样 1.2 万句完成',
       children:[
         N('ck-s1','support','教学轨可用', {
           support:'教学轨能用词频驱动词块顺序',
@@ -1063,7 +1061,6 @@ const MOCK_PROJECTS = [
     root: N('nf-loop','milestone','需求发现里程碑', {
       vision:'每天自动从小红书捞出真实需求，按痛点排序，选题不再靠猜。',
       supports:'小红书链路跑通\n端到端产出 10 条需求',
-      metrics:'登录态保活 ≥ 6h\n去重后需求 ≥ 10 条',
       children:[
         N('nf-s1','support','小红书链路跑通', {
           support:'抓取 → 聚类 → 打分整条链路可跑',
@@ -1103,7 +1100,6 @@ const MOCK_PROJECTS = [
     root: N('sh-loop','milestone','youtube 跟读里程碑', {
       vision:'任意 YouTube 视频粘链接就能逐句跟读，练完进度可恢复。',
       supports:'素材入库\n字幕加载与时间轴对齐',
-      metrics:'入库 40 条视频\n对齐误差 < 120ms',
       children:[
         N('sh-s1','support','素材入库', {
           closed:true,
@@ -1144,7 +1140,6 @@ const MOCK_PROJECTS = [
       closed:true, convergedAt:'2026-10-18 16:40',
       vision:'四款竞品的知识图谱可查可看，选型对比一屏完成。',
       supports:'四款竞品数据入库\n图谱交互可用',
-      metrics:'入库 4 款竞品\n切换 4 款不卡顿',
       lessons:[{text:'数据先结构化成节点，图谱交互就是纯前端活',at:'2026-10-18T16:40:00.000Z'}],
       children:[
         N('kg-s1','support','四款竞品数据入库', {
@@ -1273,9 +1268,7 @@ function cardToProject(card, file){
       if (isRec) return [];
       const out = [];
       if (n.kind === 'milestone') {
-        // 核心指标 / 重要支撑都按行数算：一行一条，不要求带编号标记
-        const metricItems = lineCount(n.metrics);
-        if (metricItems) out.push(`核心指标 ${metricItems} 项`);
+        // 重要支撑按行数算：一行一条，不要求带编号标记（核心指标只挂在支撑项上）
         const supItems = lineCount(n.supports);
         if (supItems) out.push(`重要支撑 ${supItems} 条`);
       } else if (n.kind === 'support') {
@@ -1631,8 +1624,8 @@ function hasIssues(n){ return nodeIssues(n).length > 0; }
 function anyBlocked(n){ let h=false; walk(n, x=>{ if(hasIssues(x) && !x.closed) h=true; }); return h; }
 function blockCount(n){ let c=0; walk(n, x=>{ if(hasIssues(x) && !x.closed) c++; }); return c; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
-// 三列口径：里程碑看愿景 / 重要支撑 / 核心指标；支撑项看承接支撑项 / 核心指标 / 实现思路 / 必要性 / 因果；记录看验证与证据
-const INFO_FIELDS = ['vision','metrics','supports','support','metric','approach','necessity','causal','verify','proof'];
+// 三列口径：里程碑看愿景 / 重要支撑；支撑项看承接支撑项 / 核心指标 / 实现思路 / 必要性 / 因果；记录看验证与证据
+const INFO_FIELDS = ['vision','supports','support','metric','approach','necessity','causal','verify','proof'];
 // 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
 const PLACEHOLDER_RE = /^[（(]待补[）)]/;
 function isFilled(v){
@@ -3115,7 +3108,6 @@ function newLoopConfirm(p){
         title: '新里程碑（待命名）',
         vision: '',
         blockers: '',
-        metrics: '（待补）核心指标',
         status: 'plan',
         closed_at: null,
         children: [],
@@ -3476,7 +3468,7 @@ const isBlankTitle = (t) => {
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
 /* 可点开直接改的字段：支撑项的承接支撑项 / 必要性 / 因果只读，核心指标与实现思路可写 */
-const EDIT_FIELDS = { milestone:['vision','supports','metrics'], support:['metric','approach'], exec:['verify','proof'] };
+const EDIT_FIELDS = { milestone:['vision','supports'], support:['metric','approach'], exec:['verify','proof'] };
 const FIELD_LABEL = {
   'title':'标题', vision:'里程碑愿景', supports:'重要支撑', metrics:'核心指标', metric:'核心指标',
   support:'承接支撑项', necessity:'必要性', causal:'因果', approach:'实现思路',
@@ -4087,7 +4079,7 @@ async function viewSession(sessionId){
 
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
     执行记录没有可补的字段（记录只留只读信息），这里给空数组把入口关掉 */
-const GEN_FIELDS_CLIENT = { milestone: ['vision', 'supports', 'metrics'], support: ['metric', 'approach'], exec: ['verify'] };
+const GEN_FIELDS_CLIENT = { milestone: ['vision', 'supports'], support: ['metric', 'approach'], exec: ['verify'] };
 /** 缺项判据：与 generateMissing 共用同一份字段表，文案与高亮都从这一处派生 */
 function genStateOf(n){
   const rec = isRecord(n);
