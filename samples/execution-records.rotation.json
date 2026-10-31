@@ -5,7 +5,7 @@
   "workspace": "/Users/julian/agentic/projects/english-shadow-loop",
   "vision": "任何一条英文视频链接，都能变成可跟读、可计数的练习卡，学员不用自己剪音频、不必装本地工具。"
  },
- "updated": "2026-10-30T00:42:55.982Z",
+ "updated": "2026-10-31T00:00:00+08:00",
  "milestone": {
   "id": "xr-loop",
   "kind": "milestone",
@@ -27,163 +27,161 @@
   ],
   "children": [
    {
-    "id": "xr-g1",
-    "kind": "goal",
-    "title": "链接到练习卡可一键生成",
-    "acceptance": "粘贴链接后 60 秒内出现练习卡",
+    "id": "xr-i1",
+    "kind": "support",
+    "title": "外部链接自动补全卡片元信息",
+    "support": "外部链接元信息自动补全",
+    "necessity": "没有自动补全，用户粘链接后要自己填标题、时长、字幕可用性， 90 秒出练习卡不成立。",
+    "causal": "链接页只有 videoId → 练习卡首屏缺标题/时长/字幕 → 用户手工补 → 出卡时间超过 90 秒。",
+    "metric": "粘贴链接后 60 秒内出现练习卡，字幕缺失时走降级入口",
+    "approach": "先解析视频标题与时长，缺什么补什么，再写进练习卡；字幕探测失败降级为手动上传。",
     "status": "doing",
     "closed_at": null,
-    "started_at": "2026-10-29T12:05:00+08:00",
+    "started_at": "2026-10-29T12:10:00+08:00",
+    "plan": {
+     "goal": "粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡",
+     "verify": [
+      "npm run preflight",
+      "npx playwright test tests/e2e/journey.spec.ts"
+     ],
+     "steps": [
+      "解析链接拿到 videoId，用 oEmbed 取标题与作者",
+      "字幕可用性探测失败时降级为手动上传字幕",
+      "把元信息写进练习卡首屏，并加「重新解析」入口"
+     ],
+     "doc": "# 外部链接自动补全卡片元信息\n\n## 目标\n粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡。\n\n## 验证命令\n```bash\nnpm run preflight\nnpx playwright test tests/e2e/journey.spec.ts\n```\n\n## 步骤\n1. 解析链接拿到 videoId，用 oEmbed 取标题与作者\n2. 字幕可用性探测失败时降级为手动上传字幕\n3. 把元信息写进练习卡首屏，并加「重新解析」入口\n",
+     "at": "2026-10-29T12:20:00+08:00",
+     "session": "session-aaaa1111-2222-3333-4444-555566667777"
+    },
     "children": [
      {
-      "id": "xr-i1",
-      "kind": "idea",
-      "title": "外部链接自动补全卡片元信息",
-      "approach": "先解析视频标题与时长，缺什么补什么，再写进练习卡",
-      "status": "doing",
-      "closed_at": null,
-      "plan": {
-       "goal": "粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡",
-       "verify": [
-        "npm run preflight",
-        "npx playwright test tests/e2e/journey.spec.ts"
-       ],
-       "steps": [
-        "解析链接拿到 videoId，用 oEmbed 取标题与作者",
-        "字幕可用性探测失败时降级为手动上传字幕",
-        "把元信息写进练习卡首屏，并加「重新解析」入口"
-       ],
-       "doc": "# 外部链接自动补全卡片元信息\n\n## 目标\n粘贴链接后自动补全标题、时长、字幕可用性，并写入练习卡。\n\n## 验证命令\n```bash\nnpm run preflight\nnpx playwright test tests/e2e/journey.spec.ts\n```\n\n## 步骤\n1. 解析链接拿到 videoId，用 oEmbed 取标题与作者\n2. 字幕可用性探测失败时降级为手动上传字幕\n3. 把元信息写进练习卡首屏，并加「重新解析」入口\n",
-       "at": "2026-10-29T12:20:00+08:00",
-       "session": "session-aaaa1111-2222-3333-4444-555566667777"
-      },
-      "started_at": "2026-10-29T12:10:00+08:00",
-      "children": [
-       {
-        "id": "xr-i1-p1",
-        "kind": "exec",
-        "action": "plan",
-        "title": "计划 · 外部链接自动补全卡片元信息",
-        "status": "done",
-        "started_at": "2026-10-29T12:18:30+08:00",
-        "closed_at": "2026-10-29T12:20:00+08:00",
-        "proof": "计划已提交：3 个步骤、2 条验证命令",
-        "session": {
-         "id": "session-aaaa1111-2222-3333-4444-555566667777",
-         "status": "done",
-         "started_at": "2026-10-29T12:18:30+08:00",
-         "ended_at": "2026-10-29T12:20:00+08:00",
-         "result": "计划已提交，等待确认。"
-        }
-       },
-       {
-        "id": "xr-i1-e1",
-        "kind": "exec",
-        "action": "exec",
-        "title": "执行 · 外部链接自动补全卡片元信息",
-        "verify": "npm run preflight",
-        "status": "done",
-        "started_at": "2026-10-29T12:21:00+08:00",
-        "closed_at": "2026-10-29T12:29:00+08:00",
-        "proof": "preflight 绿；e2e 8 条通过；字幕缺失走降级分支",
-        "session": {
-         "id": "session-aaaa1111-2222-3333-4444-555566667777",
-         "status": "done",
-         "started_at": "2026-10-29T12:21:00+08:00",
-         "ended_at": "2026-10-29T12:29:00+08:00",
-         "result": "改完 3 处，验证命令全绿；oEmbed 429 时缓存 10 分钟。"
-        }
-       },
-       {
-        "id": "xr-i1-r1",
-        "kind": "exec",
-        "action": "reflect",
-        "title": "反馈 · 外部链接自动补全卡片元信息",
-        "status": "done",
-        "started_at": "2026-10-29T12:29:05+08:00",
-        "closed_at": "2026-10-29T12:30:00+08:00",
-        "proof": "提炼 2 条经验，写入闭环经验积累",
-        "session": {
-         "id": "session-aaaa1111-2222-3333-4444-555566667777",
-         "status": "done",
-         "started_at": "2026-10-29T12:29:05+08:00",
-         "ended_at": "2026-10-29T12:30:00+08:00",
-         "result": "{\"lessons\":[\"面板与 host 先定记录 JSON 形状再写两侧\"]}"
-        }
-       },
-       {
-        "id": "xr-i1-e2",
-        "kind": "exec",
-        "action": "exec",
-        "title": "执行 · 字幕缺失时的降级分支",
-        "verify": "npm run preflight",
-        "status": "blocked",
-        "started_at": "2026-10-29T12:31:00+08:00",
-        "closed_at": null,
-        "issues": [
-         {
-          "text": "e2e 断言失败：字幕缺失时应显示手动上传入口，实际空白",
-          "at": "2026-10-29T12:36:00+08:00"
-         }
-        ],
-        "session": {
-         "id": "session-bbbb1111-2222-3333-4444-555566667777",
-         "status": "failed",
-         "started_at": "2026-10-29T12:31:00+08:00",
-         "ended_at": "2026-10-29T12:36:00+08:00",
-         "result": "已改 UI，但 e2e 仍红。",
-         "error": "turn 结束原因：error"
-        }
-       }
-      ]
+      "id": "xr-i1-p1",
+      "kind": "exec",
+      "action": "plan",
+      "title": "计划 · 外部链接自动补全卡片元信息",
+      "status": "done",
+      "started_at": "2026-10-29T12:18:30+08:00",
+      "closed_at": "2026-10-29T12:20:00+08:00",
+      "proof": "计划已提交：3 个步骤、2 条验证命令",
+      "session": {
+       "id": "session-aaaa1111-2222-3333-4444-555566667777",
+       "status": "done",
+       "started_at": "2026-10-29T12:18:30+08:00",
+       "ended_at": "2026-10-29T12:20:00+08:00",
+       "result": "计划已提交，等待确认。"
+      }
      },
      {
-      "id": "xr-i2",
-      "kind": "idea",
-      "title": "单句循环跟读与计数",
-      "approach": "一句一卡，Enter 记一次，localStorage 持久化",
-      "status": "plan",
+      "id": "xr-i1-e1",
+      "kind": "exec",
+      "action": "exec",
+      "title": "执行 · 外部链接自动补全卡片元信息",
+      "verify": "npm run preflight",
+      "status": "done",
+      "started_at": "2026-10-29T12:21:00+08:00",
+      "closed_at": "2026-10-29T12:29:00+08:00",
+      "proof": "preflight 绿；e2e 8 条通过；字幕缺失走降级分支",
+      "session": {
+       "id": "session-aaaa1111-2222-3333-4444-555566667777",
+       "status": "done",
+       "started_at": "2026-10-29T12:21:00+08:00",
+       "ended_at": "2026-10-29T12:29:00+08:00",
+       "result": "改完 3 处，验证命令全绿；oEmbed 429 时缓存 10 分钟。"
+      }
+     },
+     {
+      "id": "xr-i1-r1",
+      "kind": "exec",
+      "action": "reflect",
+      "title": "反馈 · 外部链接自动补全卡片元信息",
+      "status": "done",
+      "started_at": "2026-10-29T12:29:05+08:00",
+      "closed_at": "2026-10-29T12:30:00+08:00",
+      "proof": "提炼 2 条经验，写入闭环经验积累",
+      "session": {
+       "id": "session-aaaa1111-2222-3333-4444-555566667777",
+       "status": "done",
+       "started_at": "2026-10-29T12:29:05+08:00",
+       "ended_at": "2026-10-29T12:30:00+08:00",
+       "result": "{\"lessons\":[\"面板与 host 先定记录 JSON 形状再写两侧\"]}"
+      }
+     },
+     {
+      "id": "xr-i1-e2",
+      "kind": "exec",
+      "action": "exec",
+      "title": "执行 · 字幕缺失时的降级分支",
+      "verify": "npm run preflight",
+      "status": "blocked",
+      "started_at": "2026-10-29T12:31:00+08:00",
       "closed_at": null,
-      "plan": {
-       "goal": "同一句可反复跟读，次数可靠累计并能清零",
-       "verify": [
-        "npm run preflight",
-        "npx playwright test tests/e2e/count.spec.ts"
-       ],
-       "steps": [
-        "抽出计数模块，读写 localStorage 带版本号",
-        "Enter / 点击「本句已练」都记一次，避免重复绑定",
-        "刷新后按版本号迁移旧数据"
-       ],
-       "doc": "# 单句循环跟读与计数\n\n## 目标\n同一句可反复跟读，次数可靠累计并能清零。\n\n## 验证命令\n```bash\nnpm run preflight\nnpx playwright test tests/e2e/count.spec.ts\n```\n\n## 步骤\n1. 抽出计数模块，读写 localStorage 带版本号\n2. Enter / 点击「本句已练」都记一次，避免重复绑定\n3. 刷新后按版本号迁移旧数据\n",
-       "at": "2026-10-29T12:40:00+08:00",
-       "session": "session-cccc1111-2222-3333-4444-555566667777"
-      },
-      "started_at": "2026-10-29T12:38:00+08:00",
-      "children": [
+      "issues": [
        {
-        "id": "xr-i2-p1",
-        "kind": "exec",
-        "action": "plan",
-        "title": "计划 · 单句循环跟读与计数",
-        "status": "done",
-        "started_at": "2026-10-29T12:38:30+08:00",
-        "closed_at": "2026-10-29T12:40:00+08:00",
-        "proof": "计划已提交：3 个步骤、2 条验证命令",
-        "session": {
-         "id": "session-cccc1111-2222-3333-4444-555566667777",
-         "status": "done",
-         "started_at": "2026-10-29T12:38:30+08:00",
-         "ended_at": "2026-10-29T12:40:00+08:00",
-         "result": "计划已提交，等待确认。"
-        }
+        "text": "e2e 断言失败：字幕缺失时应显示手动上传入口，实际空白",
+        "at": "2026-10-29T12:36:00+08:00"
        }
-      ]
+      ],
+      "session": {
+       "id": "session-bbbb1111-2222-3333-4444-555566667777",
+       "status": "failed",
+       "started_at": "2026-10-29T12:31:00+08:00",
+       "ended_at": "2026-10-29T12:36:00+08:00",
+       "result": "已改 UI，但 e2e 仍红。",
+       "error": "turn 结束原因：error"
+      }
+     }
+    ]
+   },
+   {
+    "id": "xr-i2",
+    "kind": "support",
+    "title": "单句循环跟读与计数",
+    "support": "逐句跟读与计数",
+    "necessity": "跟读次数是学习闭环的度量；不计数的话，练习有没有发生、发生了多少都无法验证。",
+    "causal": "计数只存在内存 → 刷新即丢 → 学习进度无法验证 → 跟读闭环缺证据。",
+    "metric": "同一句反复跟读，次数可靠累计，刷新后不丢",
+    "approach": "一句一卡，Enter 记一次，localStorage 持久化；迁移旧数据带版本号。",
+    "status": "plan",
+    "closed_at": null,
+    "started_at": "2026-10-29T12:38:00+08:00",
+    "plan": {
+     "goal": "同一句可反复跟读，次数可靠累计并能清零",
+     "verify": [
+      "npm run preflight",
+      "npx playwright test tests/e2e/count.spec.ts"
+     ],
+     "steps": [
+      "抽出计数模块，读写 localStorage 带版本号",
+      "Enter / 点击「本句已练」都记一次，避免重复绑定",
+      "刷新后按版本号迁移旧数据"
+     ],
+     "doc": "# 单句循环跟读与计数\n\n## 目标\n同一句可反复跟读，次数可靠累计并能清零。\n\n## 验证命令\n```bash\nnpm run preflight\nnpx playwright test tests/e2e/count.spec.ts\n```\n\n## 步骤\n1. 抽出计数模块，读写 localStorage 带版本号\n2. Enter / 点击「本句已练」都记一次，避免重复绑定\n3. 刷新后按版本号迁移旧数据\n",
+     "at": "2026-10-29T12:40:00+08:00",
+     "session": "session-cccc1111-2222-3333-4444-555566667777"
+    },
+    "children": [
+     {
+      "id": "xr-i2-p1",
+      "kind": "exec",
+      "action": "plan",
+      "title": "计划 · 单句循环跟读与计数",
+      "status": "done",
+      "started_at": "2026-10-29T12:38:30+08:00",
+      "closed_at": "2026-10-29T12:40:00+08:00",
+      "proof": "计划已提交：3 个步骤、2 条验证命令",
+      "session": {
+       "id": "session-cccc1111-2222-3333-4444-555566667777",
+       "status": "done",
+       "started_at": "2026-10-29T12:38:30+08:00",
+       "ended_at": "2026-10-29T12:40:00+08:00",
+       "result": "计划已提交，等待确认。"
+      }
      }
     ]
    }
   ],
   "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
+  "supports": "1)外部链接元信息自动补全（标题/时长/字幕，90 秒内出卡）\n2)逐句跟读与计数（localStorage 持久化，刷新不丢）",
   "metrics": "1)粘贴任意 YouTube 链接，90 秒内出练习卡\n2)刷新页面后跟读计数与练习进度不丢\n3)抽 10 条链接，≥9 条能直接出卡且不用手工修字幕"
  }
 }

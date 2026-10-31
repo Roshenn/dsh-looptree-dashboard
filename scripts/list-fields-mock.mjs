@@ -4,10 +4,11 @@
  *
  *   node scripts/list-fields-mock.mjs
  *
- * 背景（2026-10-30 用户反馈）：补全阻碍项时，模型用 `○` 前缀 + 单换行写了 5 条，
+ * 背景（2026-10-30 用户反馈）：补全列表字段时，模型用 `○` 前缀 + 单换行写了 5 条，
  * 而条目编辑器只认「1) / A. / -」这类标记，认不出 `○` 就退回 plain 模式（只按空行切），
  * 整段被当成一条融合块。两处一起修：
- *   生成端：列表字段改 JSON 数组契约，host 侧 normalizeListValue() 拼成「一条一行、每行带序号」
+ *   生成端：列表字段（重要支撑 supports / 核心指标 metrics 等）改 JSON 数组契约，
+ *           host 侧 normalizeListValue() 拼成「一条一行、每行带序号」
  *   编辑端：ITEM_RE 扩到 ○ ◯ · • ▪ ◦ ①②③，打开编辑器就能把旧融合块拆开（不改存量数据）
  */
 import { readFileSync } from 'node:fs';
@@ -60,10 +61,14 @@ const { parseItems, serializeItems } = new Function(`${src}
 return { parseItems, serializeItems };`)();
 
 /* ── 1. 生成端：列表字段 → 一条一行、每行带序号 ── */
-check('列表字段清单覆盖 阻碍项/核心指标/验收/约束/场景', ['blockers', 'metrics', 'acceptance', 'constraints', 'scenario'].every((f) => LIST_FIELDS.has(f)));
+check('列表字段清单含重要支撑 supports 与核心指标 metrics', LIST_FIELDS.has('supports') && LIST_FIELDS.has('metrics'), JSON.stringify([...LIST_FIELDS]));
 
 const arr = ['缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」', '缺章节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」'];
 check('数组 → 一条一行且补序号', normalizeListValue(arr) === '1)缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」\n2)缺章节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」', normalizeListValue(arr));
+check('supports（重要支撑）走同一条一条一行口径',
+  normalizeListValue(['章节→情节两层索引（src/plot/index.ts）→ 挡住「打开即见三层图」', '分层 SVG 绘制（每层一个 <g>）→ 挡住「首屏 < 800ms」'])
+  === '1)章节→情节两层索引（src/plot/index.ts）→ 挡住「打开即见三层图」\n2)分层 SVG 绘制（每层一个 <g>）→ 挡住「首屏 < 800ms」',
+  JSON.stringify(normalizeListValue(['章节→情节两层索引（src/plot/index.ts）→ 挡住「打开即见三层图」', '分层 SVG 绘制（每层一个 <g>）→ 挡住「首屏 < 800ms」'])));
 check('元素内换行被压平（一条一行）', !normalizeListValue(['缺 A，\n确实没有', '缺 B']).includes('\n\n') && normalizeListValue(['缺 A，\n确实没有', '缺 B']).split('\n').length === 2, JSON.stringify(normalizeListValue(['缺 A，\n确实没有', '缺 B'])));
 check('已带序号/符号的元素统一重编号', normalizeListValue(['1) 缺 A', '○缺 B']) === '1)缺 A\n2)缺 B', JSON.stringify(normalizeListValue(['1) 缺 A', '○缺 B'])));
 check('混用 ○ 与 1) 不会漏成「○缺…\\n2)…」', !/○/.test(normalizeListValue(['○缺 A', '2)缺 B'])), JSON.stringify(normalizeListValue(['○缺 A', '2)缺 B'])));
@@ -90,8 +95,9 @@ check('round-trip 条数不变', round.items.length === 5, String(round.items.le
 /* ── 3. 接线：host 回填走 normalizeListValue，prompt 契约是数组 ── */
 const index = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8');
 const prompt = readFileSync(join(ROOT, 'lib', 'prompt.mjs'), 'utf8');
-check('host 回填对列表字段做归一', /LIST_FIELDS\.has\(field\)\s*\n?\s*\? normalizeListValue\(patch\[field\]\)/.test(index), '');
-check('fill prompt 用数组契约（列表字段）', prompt.includes('LIST_FIELDS.has(f) ? `"${f}": ["…", "…"]`'), '');
+check('host 回填对列表字段（含 supports）做归一', /LIST_FIELDS\.has\(field\)[\s\S]{0,40}?normalizeListValue\(patch\[field\]\)/.test(index), '');
+check('fill prompt 用数组契约（列表字段）', prompt.includes('["…", "…"]') && prompt.includes('LIST_FIELDS_ALL.has(f)'), '');
+check('fill prompt 的列表字段集合包含 supports', prompt.includes('LIST_FIELDS_ALL') && /supports/.test(prompt), '');
 check('fill prompt 写明一条一个元素', prompt.includes('一条一个元素'), '');
 check('fill prompt 禁止符号前缀', prompt.includes('行首不要加 ○ · • 这类符号'), '');
 

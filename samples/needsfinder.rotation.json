@@ -5,7 +5,7 @@
   "workspace": "/Users/julian/agentic/projects/needsfinder",
   "vision": "选题不再靠猜：每天从小红书真实讨论里捞出需求，按痛点强度排好，直接能开工。"
  },
- "updated": "2026-10-30T00:42:55.983Z",
+ "updated": "2026-10-31T00:00:00+08:00",
  "milestone": {
   "id": "nf-loop",
   "kind": "milestone",
@@ -14,74 +14,63 @@
   "closed_at": null,
   "children": [
    {
-    "id": "nf-g1",
-    "kind": "goal",
-    "title": "小红书链路跑通",
-    "acceptance": "抓取→聚类→打分三段能跑完整条链路",
-    "status": "blocked",
+    "id": "nf-i1",
+    "kind": "support",
+    "title": "抓取 → 聚类 → 打分",
+    "support": "小红书抓取链路的稳定性",
+    "necessity": "整条需求发现链路都挂在小红书数据上；抓取段不稳定，后面的聚类和打分再准也没有原料。",
+    "causal": "扫码登录 6 小时失效 → 抓取中断 → 当天需求池为空 → 选题链路停摆。",
+    "metric": "抓取段单次运行完整跑完，登录态保活 ≥ 6h",
+    "approach": "三段各自可单独重跑；抓取段先修登录态保活，再谈聚类与打分。",
+    "status": "doing",
     "closed_at": null,
+    "started_at": "2026-10-21T21:00:00+08:00",
     "children": [
      {
-      "id": "nf-i1",
-      "kind": "idea",
-      "title": "抓取 → 聚类 → 打分",
-      "approach": "三段各自可单独重跑",
-      "status": "doing",
+      "id": "nf-e1",
+      "kind": "exec",
+      "title": "登录态保活 6h",
+      "verify": "node scripts/crawl.mjs --smoke",
+      "status": "blocked",
       "closed_at": null,
-      "children": [
+      "issues": [
        {
-        "id": "nf-e1",
-        "kind": "exec",
-        "title": "登录态保活 6h",
-        "verify": "node scripts/crawl.mjs --smoke",
-        "status": "blocked",
-        "closed_at": null,
-        "issues": [
-         {
-          "text": "扫码登录 6 小时后失效，抓取链路中断",
-          "at": "2026-10-26T21:35:00+08:00"
-         }
-        ],
-        "started_at": "2026-10-16T00:30:00+08:00"
+        "text": "扫码登录 6 小时后失效，抓取链路中断",
+        "at": "2026-10-26T21:35:00+08:00"
        }
       ],
-      "started_at": "2026-10-21T21:00:00+08:00"
+      "started_at": "2026-10-16T00:30:00+08:00"
      }
-    ],
-    "started_at": "2026-10-23T09:00:00+08:00"
+    ]
    },
    {
-    "id": "nf-g2",
-    "kind": "goal",
-    "title": "端到端产出 10 条需求",
-    "acceptance": "去重后 ≥10 条且带出处链接",
+    "id": "nf-i2",
+    "kind": "support",
+    "title": "需求去重",
+    "support": "端到端产出可验证的需求列表",
+    "necessity": "同一痛点会被多人重复发帖，不去重就凑不够 10 条真正不同的需求，产出不可用。",
+    "causal": "原帖重复度高 → 直接排序会得到一堆同义条目 → 需要按语义相似度去重再排序。",
+    "metric": "去重后 ≥10 条需求，每条带原帖出处链接",
+    "approach": "按语义相似度去重，阈值 0.82；去重后再按痛点强度排序。",
     "status": "plan",
     "closed_at": null,
+    "started_at": "2026-10-21T21:00:00+08:00",
     "children": [
      {
-      "id": "nf-i2",
-      "kind": "idea",
-      "title": "需求去重",
-      "approach": "按语义相似度去重，阈值 0.82",
+      "id": "nf-e2",
+      "kind": "exec",
+      "title": "需求去重率 < 20%",
+      "verify": "node scripts/dedupe-stats.mjs",
       "status": "plan",
       "closed_at": null,
-      "children": [
-       {
-        "id": "nf-e2",
-        "kind": "exec",
-        "title": "需求去重率 < 20%",
-        "verify": "node scripts/dedupe-stats.mjs",
-        "status": "plan",
-        "closed_at": null,
-        "issues": []
-       }
-      ]
+      "issues": []
      }
     ]
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
   "vision": "从小红书真实讨论里端到端产出可验证的需求列表",
+  "supports": "1)小红书抓取链路的登录态与稳定性（决定当天有没有原料）\n2)需求去重与排序（决定产出是不是 10 条真正不同的需求）",
   "metrics": "1)单次运行产出 ≥10 条去重需求，每条带原帖出处\n2)其中 ≥6 条能被第三方按原帖复现\n3)从抓取到排序一次跑完，不需要人工补数据"
  }
 }

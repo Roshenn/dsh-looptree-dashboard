@@ -5,7 +5,7 @@
   "workspace": "/Users/julian/agentic/projects/kg",
   "vision": "选型对比不再翻十几个标签页：四款竞品的功能、交互、定价在一张图里横向看完。"
  },
- "updated": "2026-10-30T00:42:55.982Z",
+ "updated": "2026-10-31T00:00:00+08:00",
  "milestone": {
   "id": "kg-loop",
   "kind": "milestone",
@@ -14,67 +14,56 @@
   "closed_at": "2026-10-18T16:40:00+08:00",
   "children": [
    {
-    "id": "kg-g1",
-    "kind": "goal",
-    "title": "四款竞品数据入库",
-    "acceptance": "4 款竞品官网+文档抓取完成",
+    "id": "kg-i1",
+    "kind": "support",
+    "title": "官网 + 文档抓取",
+    "support": "竞品数据的统一入库",
+    "necessity": "四款竞品的功能与定价散在各自官网和文档里，不先统一入库，图谱就没有可对比的同一套字段。",
+    "causal": "各站点字段名与结构不同 → 直接对比会错位 → 需要适配器把四款数据抓成同一张表。",
+    "metric": "4 款竞品全量入图，功能点可追到出处，0 手工补录",
+    "approach": "按站点适配抓取器，输出统一的功能/交互/定价字段。",
     "status": "done",
-    "closed_at": "2026-10-18T14:20:00+08:00",
+    "closed_at": "2026-10-18T14:10:00+08:00",
     "children": [
      {
-      "id": "kg-i1",
-      "kind": "idea",
-      "title": "官网 + 文档抓取",
-      "approach": "按站点适配抓取器",
+      "id": "kg-e1",
+      "kind": "exec",
+      "title": "入库 4 款竞品",
+      "verify": "node scripts/kg-ingest.mjs",
       "status": "done",
-      "closed_at": "2026-10-18T14:10:00+08:00",
-      "children": [
-       {
-        "id": "kg-e1",
-        "kind": "exec",
-        "title": "入库 4 款竞品",
-        "verify": "node scripts/kg-ingest.mjs",
-        "status": "done",
-        "closed_at": "2026-10-18T14:00:00+08:00",
-        "issues": [],
-        "proof": "4 款入库"
-       }
-      ]
+      "closed_at": "2026-10-18T14:00:00+08:00",
+      "issues": [],
+      "proof": "4 款入库"
      }
     ]
    },
    {
-    "id": "kg-g2",
-    "kind": "goal",
-    "title": "图谱交互可用",
-    "acceptance": "节点连线 + 过滤，切换不卡顿",
+    "id": "kg-i2",
+    "kind": "support",
+    "title": "节点连线 + 过滤",
+    "support": "图谱交互可用",
+    "necessity": "数据入图只是原料，能按类别过滤并看清连线，才让「单屏对比」这件事成立。",
+    "causal": "只有散点没有连线与过滤 → 用户仍要自己脑补竞品关系 → 对比退化成翻页。",
+    "metric": "单屏看完 4 款核心差异，任一功能点能追到出处",
+    "approach": "力导向布局，按类别过滤；切换竞品不重新布局。",
     "status": "done",
-    "closed_at": "2026-10-18T16:40:00+08:00",
+    "closed_at": "2026-10-18T16:30:00+08:00",
     "children": [
      {
-      "id": "kg-i2",
-      "kind": "idea",
-      "title": "节点连线 + 过滤",
-      "approach": "力导向布局，按类别过滤",
+      "id": "kg-e2",
+      "kind": "exec",
+      "title": "切换 4 款不卡顿",
+      "verify": "webapp-testing 录屏",
       "status": "done",
-      "closed_at": "2026-10-18T16:30:00+08:00",
-      "children": [
-       {
-        "id": "kg-e2",
-        "kind": "exec",
-        "title": "切换 4 款不卡顿",
-        "verify": "webapp-testing 录屏",
-        "status": "done",
-        "closed_at": "2026-10-18T16:20:00+08:00",
-        "issues": [],
-        "proof": "切换 < 200ms"
-       }
-      ]
+      "closed_at": "2026-10-18T16:20:00+08:00",
+      "issues": [],
+      "proof": "切换 < 200ms"
      }
     ]
    }
   ],
   "vision": "竞品功能和交互能在一个图谱里横向对比",
+  "supports": "1)竞品数据的统一入库（4 款官网 + 文档抓成同一套字段）\n2)图谱交互（节点连线 + 过滤，切换不重新布局）",
   "metrics": "1)4 款竞品全部入图，可一键切换\n2)任一功能点都能追到出处（官网 / 文档链接）\n3)单屏看完 4 款核心差异，不用滚第二屏"
  }
 }

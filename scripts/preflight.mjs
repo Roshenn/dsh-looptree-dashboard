@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * 提交前的完整自检（跨平台）：
- * lint → client 契约 → 会话 mock → 动作链路 mock（/plan → /goal → 提炼）→ 面板 stale 会话 → 面板空闲分支判定 → 样例校验 → 安装文件集
+ * lint → client 契约 → 会话 mock → 动作链路 mock（/plan → /exec → 提炼）→ 候选池 mock
+ * → 面板 stale 会话 / 空闲分支 / 生成按钮 / 候选详情卡 → 样例校验 → 安装文件集
  * 用临时 ROTATION_HOME / MOCK_WS 与随机端口，避免污染真实注册表。
  */
 import { spawn } from 'node:child_process';
@@ -31,10 +32,10 @@ try {
   await run(npm, ['run', 'mock:client']);
   console.log('── mock:session ──');
   await run('node', ['scripts/dev-session-mock.mjs'], { ROTATION_HOME: home, MOCK_WS: ws, PORT: port });
-  console.log('── mock:idea-lock ──');
-  await run('node', ['scripts/idea-lock-mock.mjs'], { PORT: String(Number(port) + 2) });
   console.log('── mock:action ──');
   await run(npm, ['run', 'mock:action'], { PORT: String(Number(port) + 1) });
+  console.log('── mock:candidates ──');
+  await run('node', ['scripts/candidates-mock.mjs'], { PORT: String(Number(port) + 2) });
   console.log('── mock:closure ──');
   await run(npm, ['run', 'mock:closure']);
   console.log('── mock:prompt ──');
@@ -55,6 +56,8 @@ try {
   await run(npm, ['run', 'mock:hide-closed']);
   console.log('── mock:list-fields ──');
   await run(npm, ['run', 'mock:list-fields']);
+  console.log('── mock:candtip ──');
+  await run(npm, ['run', 'mock:candtip']);
   console.log('── validate:samples ──');
   await run(npm, ['run', 'validate:samples']);
   console.log('── verify:package ──');

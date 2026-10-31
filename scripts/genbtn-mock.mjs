@@ -5,8 +5,10 @@
  *   node scripts/genbtn-mock.mjs
  *
  * 背景（2026-10-30 用户要求）：补齐缺失项原来只挂在详情卡标题行右侧，节点刚生成时
- * 在卡片上完全看不见。现在按钮落到节点卡 footer，紧跟确认收敛 / 确认达成右侧，
+ * 在卡片上完全看不见。现在按钮落到节点卡 footer，紧跟确认达成右侧，
  * 且「缺项 > 0 就高亮」——刚生成的节点天然字段全空，所以亮；补完自动变灰「无缺项」。
+ * 2026-10-31 树收敛成三层：里程碑缺 3 项（愿景 / 重要支撑 / 核心指标）、
+ * 支撑项缺 2 项（核心指标 / 实现思路）、执行记录缺 1 项（验证）。
  *
  * 做法与 closure-mock 一致：从 web/index.html 抠出纯函数与常量，放进 new Function 里跑。
  */
@@ -97,31 +99,40 @@ const { genBtnMarkup, GEN_FIELDS_CLIENT } = api;
 
 const node = (kind, raw = {}, title = '示例节点') => ({ id: 'n1', kind, title, raw });
 const p = { id: 'p1' };
-const msFull = { vision: '愿景', blockers: '1)缺 X', metrics: '1)指标' };
-const goalFull = { scenario: '1)操作', constraints: '不改 API', acceptance: 'GET /x 200' };
+const msFull = { vision: '愿景', supports: '1)重要支撑', metrics: '1)指标' };
+const supportFull = { support: '承接支撑项', necessity: '必要性', causal: '因果', metric: '指标', approach: '思路' };
+const recordNode = (action, raw = {}) => ({ id: 'r1', kind: 'exec', title: '执行', raw: { action, ...raw } });
 
 /* 1. 缺项 → 「生成 N 项」+ 高亮 */
 const msEmpty = genBtnMarkup(p, node('milestone', {}));
 check('里程碑全空 → 生成 3 项', msEmpty.includes('生成 3 项'), msEmpty);
 check('有缺项 → 高亮（is-hot）', msEmpty.includes('genbtn is-hot'), msEmpty);
 check('有缺项 → 可点（不带 disabled）', !msEmpty.includes('disabled'), msEmpty);
-check('里程碑缺项顺序 = 愿景 / 阻碍 / 指标', /里程碑愿景、阻碍项、核心指标/.test(msEmpty), msEmpty);
-const goalHalf = genBtnMarkup(p, node('goal', { scenario: '1)操作' }));
-check('目标缺 2 项 → 生成 2 项且高亮', goalHalf.includes('生成 2 项') && goalHalf.includes('is-hot'), goalHalf);
+check('里程碑缺项顺序 = 里程碑愿景 / 重要支撑 / 核心指标', /里程碑愿景、重要支撑、核心指标/.test(msEmpty), msEmpty);
+const supHalf = genBtnMarkup(p, node('support', { metric: '指标' }));
+check('支撑项缺 1 项 → 生成 1 项且高亮', supHalf.includes('生成 1 项') && supHalf.includes('is-hot'), supHalf);
+check('支撑项全空 → 生成 2 项', genBtnMarkup(p, node('support', {})).includes('生成 2 项'), genBtnMarkup(p, node('support', {})));
 
 /* 2. 补完 → 灰显「无缺项」、不再高亮 */
 const msDone = genBtnMarkup(p, node('milestone', msFull));
 check('里程碑补完 → 无缺项', msDone.includes('无缺项'), msDone);
 check('补完 → 不亮', !msDone.includes('is-hot'), msDone);
 check('补完 → disabled', msDone.includes('disabled'), msDone);
-check('目标补完 → 无缺项', genBtnMarkup(p, node('goal', goalFull)).includes('无缺项'));
+check('支撑项补完 → 无缺项', genBtnMarkup(p, node('support', supportFull)).includes('无缺项'));
+check('执行记录（带 action）不出补齐按钮', genBtnMarkup(p, recordNode('exec', {})) === '', genBtnMarkup(p, recordNode('exec', {})));
+const bareExec = { id: 'e1', kind: 'exec', title: '直接执行', raw: {} };
+check('无 action 的执行节点缺验证 → 生成 1 项', genBtnMarkup(p, bareExec).includes('生成 1 项'), genBtnMarkup(p, bareExec));
+check('无 action 的执行节点补完 → 无缺项', genBtnMarkup(p, { ...bareExec, raw: { verify: 'npm test' } }).includes('无缺项'));
 
 /* 3. 没标题 → 灰「生成」；没有可补字段的节点 → 不出现 */
-const noTitle = genBtnMarkup(p, { id: 'n1', kind: 'goal', title: '新目标（待命名）', raw: {} });
+const noTitle = genBtnMarkup(p, { id: 'n1', kind: 'support', title: '新支撑项（待命名）', raw: {} });
 check('标题是占位名 → 灰「生成」', noTitle.includes('>生成<') && noTitle.includes('disabled'), noTitle);
-check('构思没有可补字段 → 不出按钮', genBtnMarkup(p, node('idea', {})) === '');
-check('执行记录不出按钮', genBtnMarkup(p, { id: 'r1', kind: 'exec', title: '执行', raw: { action: 'plan' } }) === '');
-check('字段表：构思没有可补字段、执行记录只补 verify', GEN_FIELDS_CLIENT.idea.length === 0 && GEN_FIELDS_CLIENT.exec.join() === 'verify', JSON.stringify(GEN_FIELDS_CLIENT));
+check('未知 kind 没有可补字段 → 不出按钮', genBtnMarkup(p, node('idea', {})) === '', genBtnMarkup(p, node('idea', {})));
+check('字段表：里程碑 3 项 / 支撑项 2 项 / 执行记录 1 项',
+  GEN_FIELDS_CLIENT.milestone.join() === 'vision,supports,metrics'
+  && GEN_FIELDS_CLIENT.support.join() === 'metric,approach'
+  && GEN_FIELDS_CLIENT.exec.join() === 'verify', JSON.stringify(GEN_FIELDS_CLIENT));
+check('字段表不再有 goal / idea', !('goal' in GEN_FIELDS_CLIENT) && !('idea' in GEN_FIELDS_CLIENT), JSON.stringify(GEN_FIELDS_CLIENT));
 
 /* 4. 源码结构：卡片 footer 里「确认收敛 → 生成 N 项」的顺序、详情标题行不再挂它 */
 const leadAt = script.indexOf('const leadKids = [closeBtn, genBtn]');

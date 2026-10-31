@@ -5,7 +5,7 @@
   "workspace": "/Users/julian/agentic/projects/shadowing",
   "vision": "任意一条视频都能当教材：选一条就能逐句跟读，随时看到自己对齐了多少、还差哪几句。"
  },
- "updated": "2026-10-30T00:42:55.983Z",
+ "updated": "2026-10-31T00:00:00+08:00",
  "milestone": {
   "id": "sh-loop",
   "kind": "milestone",
@@ -14,86 +14,74 @@
   "closed_at": null,
   "children": [
    {
-    "id": "sh-g1",
-    "kind": "goal",
-    "title": "素材入库",
-    "acceptance": "链接解析 + 落盘可重复执行",
+    "id": "sh-i1",
+    "kind": "support",
+    "title": "链接解析 + 落盘",
+    "support": "素材入库链路",
+    "necessity": "跟读的所有环节都依赖素材先落到本地；入库不闭环，后面的词幕与对齐都只能拿 demo 数据演示。",
+    "causal": "链接解析不落盘 → 每次跟读都要重新抓 → 无法离线复用与断点续跑。",
+    "metric": "链接解析 + 落盘可重复执行，40 条视频 0 失败",
+    "approach": "yt-dlp 取字幕，落盘到 data/；入库命令可重复执行不产生重复素材。",
     "status": "done",
-    "closed_at": "2026-10-22T09:30:00+08:00",
+    "closed_at": "2026-10-22T09:20:00+08:00",
     "children": [
      {
-      "id": "sh-i1",
-      "kind": "idea",
-      "title": "链接解析 + 落盘",
-      "approach": "yt-dlp 取字幕，落盘到 data/",
+      "id": "sh-e1",
+      "kind": "exec",
+      "title": "入库 40 条视频",
+      "verify": "node scripts/ingest.mjs --dry",
       "status": "done",
-      "closed_at": "2026-10-22T09:20:00+08:00",
-      "children": [
-       {
-        "id": "sh-e1",
-        "kind": "exec",
-        "title": "入库 40 条视频",
-        "verify": "node scripts/ingest.mjs --dry",
-        "status": "done",
-        "closed_at": "2026-10-22T09:10:00+08:00",
-        "issues": [],
-        "proof": "40 条入库，0 失败"
-       }
-      ]
+      "closed_at": "2026-10-22T09:10:00+08:00",
+      "issues": [],
+      "proof": "40 条入库，0 失败"
      }
     ]
    },
    {
-    "id": "sh-g2",
-    "kind": "goal",
-    "title": "词幕加载展示",
-    "acceptance": "词幕逐句高亮且与音频对齐",
+    "id": "sh-i2",
+    "kind": "support",
+    "title": "字幕抓取 + 时间轴对齐",
+    "support": "词幕逐句高亮与对齐",
+    "necessity": "逐句跟读靠的是「当前这句在哪」，时间轴对不上，高亮就会提前或滞后，跟读体验直接失效。",
+    "causal": "自动字幕缺时间轴 → 词幕只能整段显示 → 无法逐句高亮 → 跟读退化成看字幕。",
+    "metric": "抽样 10 条视频，逐句高亮与音频偏差 < 120ms",
+    "approach": "优先用自动字幕时间轴；缺时间轴时走人工兜底，不让整条链路卡死。",
     "status": "doing",
     "closed_at": null,
+    "started_at": "2026-10-21T21:00:00+08:00",
     "children": [
      {
-      "id": "sh-i2",
-      "kind": "idea",
-      "title": "字幕抓取 + 时间轴对齐",
-      "approach": "自动字幕缺时间轴时走人工兜底",
+      "id": "sh-e2",
+      "kind": "exec",
+      "title": "对齐误差 < 120ms",
+      "verify": "node scripts/align-check.mjs",
       "status": "doing",
       "closed_at": null,
-      "children": [
+      "issues": [],
+      "proof": "实测 180ms",
+      "started_at": "2026-10-20T09:00:00+08:00"
+     },
+     {
+      "id": "sh-e3",
+      "kind": "exec",
+      "title": "自动字幕缺时间轴",
+      "verify": "node scripts/subtitle-check.mjs",
+      "status": "blocked",
+      "closed_at": null,
+      "issues": [
        {
-        "id": "sh-e2",
-        "kind": "exec",
-        "title": "对齐误差 < 120ms",
-        "verify": "node scripts/align-check.mjs",
-        "status": "doing",
-        "closed_at": null,
-        "issues": [],
-        "proof": "实测 180ms",
-        "started_at": "2026-10-20T09:00:00+08:00"
-       },
-       {
-        "id": "sh-e3",
-        "kind": "exec",
-        "title": "自动字幕缺时间轴",
-        "verify": "node scripts/subtitle-check.mjs",
-        "status": "blocked",
-        "closed_at": null,
-        "issues": [
-         {
-          "text": "长视频无自动字幕，需人工时间轴",
-          "at": "2026-10-26T20:05:00+08:00"
-         }
-        ],
-        "started_at": "2026-10-20T09:00:00+08:00"
+        "text": "长视频无自动字幕，需人工时间轴",
+        "at": "2026-10-26T20:05:00+08:00"
        }
       ],
-      "started_at": "2026-10-21T21:00:00+08:00"
+      "started_at": "2026-10-20T09:00:00+08:00"
      }
-    ],
-    "started_at": "2026-10-23T09:00:00+08:00"
+    ]
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
   "vision": "选一条视频就能逐句跟读并对齐",
+  "supports": "1)素材入库链路（链接解析 + 落盘可重复执行）\n2)字幕时间轴对齐（缺自动字幕时有人工兜底）",
   "metrics": "1)抽样 10 条视频，≥9 条字幕可渲染\n2)逐句高亮与音频偏差 < 200ms\n3)中途退出再回来，进度停在原句不丢"
  }
 }

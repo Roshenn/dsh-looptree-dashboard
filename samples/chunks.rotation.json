@@ -5,12 +5,12 @@
   "workspace": "/Users/julian/agentic/projects/chunks",
   "vision": "一套词块数据同时服务教与学两种用法：换教材只改数据、不改流程，两条路径都能独立交付。"
  },
- "updated": "2026-10-30T00:42:55.975Z",
+ "updated": "2026-10-31T00:00:00+08:00",
  "prompt_context": {
   "fields": [
    "project",
    "milestone",
-   "goal",
+   "support",
    "node"
   ],
   "siblings": 0
@@ -23,73 +23,60 @@
   "closed_at": null,
   "children": [
    {
-    "id": "ck-g1",
-    "kind": "goal",
-    "title": "教学轨可用",
-    "acceptance": "教学轨能按词频顺序推送词块",
+    "id": "ck-i1",
+    "kind": "support",
+    "title": "词频驱动词块顺序",
+    "support": "双轨共用的词块排序键",
+    "necessity": "词块按什么顺序推给学习者，决定教与学两条路径能不能共用同一份数据；没有统一排序就要各自维护一套。",
+    "causal": "词块数据没有统一排序键 → 教轨与学轨各自排序 → 换教材要改两处流程 → 双轨无法独立交付。",
+    "metric": "COCA 前 6000 命中 ≥ 90%，且教/学两轨读到同一排序结果",
+    "approach": "按 COCA 词频排序，优先级高于自定义顺序；排序结果作为只读字段落进词块数据。",
     "status": "doing",
     "closed_at": null,
+    "started_at": "2026-10-21T21:00:00+08:00",
     "children": [
      {
-      "id": "ck-i1",
-      "kind": "idea",
-      "title": "词频驱动词块顺序",
-      "approach": "按 COCA 词频排序，优先级高于自定义顺序",
+      "id": "ck-e1",
+      "kind": "exec",
+      "title": "COCA 前 6000 命中 ≥ 90%",
+      "verify": "npm run measure -- coca",
       "status": "doing",
       "closed_at": null,
-      "children": [
-       {
-        "id": "ck-e1",
-        "kind": "exec",
-        "title": "COCA 前 6000 命中 ≥ 90%",
-        "verify": "npm run measure -- coca",
-        "status": "doing",
-        "closed_at": null,
-        "issues": [],
-        "proof": "采样中",
-        "started_at": "2026-10-20T09:00:00+08:00"
-       }
-      ],
-      "started_at": "2026-10-21T21:00:00+08:00"
+      "issues": [],
+      "proof": "采样中",
+      "started_at": "2026-10-20T09:00:00+08:00"
      }
-    ],
-    "started_at": "2026-10-23T09:00:00+08:00"
+    ]
    },
    {
-    "id": "ck-g2",
-    "kind": "goal",
-    "title": "学习轨可用",
-    "acceptance": "学习轨能记录每块掌握度",
+    "id": "ck-i2",
+    "kind": "support",
+    "title": "语料词频现场计算",
+    "support": "两轨共享的数据与进度结构",
+    "necessity": "教与学各自记录进度，数据结构不统一时，换一套词块数据就得改两遍代码，双轨交付会互相拖住。",
+    "causal": "进度结构绑定在单条路径上 → 两轨无法共用同一组词块 → 换数据要同步改两处 → 双轨不能独立交付。",
+    "metric": "教/学两轨各走完 1 组词块，进度互不覆盖",
+    "approach": "用户语料现场计算，不依赖预生成表；进度按「轨道 + 词块 id」分开存。",
     "status": "ready",
     "closed_at": null,
+    "started_at": "2026-10-21T21:00:00+08:00",
     "children": [
      {
-      "id": "ck-i2",
-      "kind": "idea",
-      "title": "语料词频现场计算",
-      "approach": "用户语料现场计算，不依赖预生成表",
+      "id": "ck-e2",
+      "kind": "exec",
+      "title": "采样 1.2 万句完成",
+      "verify": "node scripts/sample.mjs --n 12000",
       "status": "ready",
       "closed_at": null,
-      "children": [
-       {
-        "id": "ck-e2",
-        "kind": "exec",
-        "title": "采样 1.2 万句完成",
-        "verify": "node scripts/sample.mjs --n 12000",
-        "status": "ready",
-        "closed_at": null,
-        "issues": [],
-        "started_at": "2026-10-20T09:00:00+08:00"
-       }
-      ],
-      "started_at": "2026-10-21T21:00:00+08:00"
+      "issues": [],
+      "started_at": "2026-10-20T09:00:00+08:00"
      }
-    ],
-    "started_at": "2026-10-23T09:00:00+08:00"
+    ]
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
   "vision": "教与学两条路径都能独立走完一组词块",
+  "supports": "1)词频驱动的词块顺序（教/学两轨共用同一份排序）\n2)两轨共享的数据与进度结构（换教材只改数据）",
   "metrics": "1)两轨各自走完 1 组词块，进度互不覆盖\n2)同一组词块在教/学两个入口都能打开，切换 ≤2 次点击\n3)换一套词块数据后，两轨都不改代码即可跑通"
  }
 }
