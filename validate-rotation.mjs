@@ -18,7 +18,8 @@ catch (e) { console.error(`无法读取 ${file}: ${e.message}`); process.exit(2)
 const { errors, warnings, stats } = validateCard(doc);
 
 if (!quiet) {
-  if (doc.loop) console.log(treeLines(doc.loop).join('\n'));
+  // validateCard 已把旧卡归一（loop→milestone、goal/idea→support），直接打归一后的树
+  if (doc.milestone) console.log(treeLines(doc.milestone).join('\n'));
   console.log('');
   console.log(`节点 ${stats.nodes} · 最大深度 ${stats.maxDepth} · 叶子 ${stats.leaves} · 已关闭 ${stats.closedLeaves}/${stats.leaves}`);
   console.log(`阻塞 ${stats.blocked} · 可关闭 ${stats.closable}`);
