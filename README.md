@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="assets/hero.png" alt="Looptree Dashboard — swimlane matrix of milestones, goals, ideas and execution records" width="100%">
+  <img src="assets/hero.png" alt="Looptree Dashboard — swimlanes of milestones, supports and execution records" width="100%">
 </div>
 
 <h1 align="center">Looptree Dashboard</h1>
 
 <p align="center">
   <b>Every project gets one milestone tree that can actually be closed.</b><br>
-  A DSH plugin that puts <code>Milestone → Goal → Idea → Execution</code> on one screen,
+  A DSH plugin that puts <code>project vision → milestone → support → execution</code> on one screen,
   gives every node a structured prompt, launches DSH sessions from the node that needs them,
   and reports the live status of the dev services behind it.
 </p>
@@ -38,35 +38,37 @@
 ## Why
 
 Agent sessions end and the reason for the work evaporates with them. A plan becomes a dozen commits
-nobody can trace back to a goal, and the next session starts by guessing what "done" was supposed to mean.
+nobody can trace back to a vision, and the next session starts by guessing what "done" was supposed to mean.
 
 Looptree Dashboard keeps that intent on disk, next to the code. Each project starts with a **project
-vision** and a `rotation/v1` card file with a milestone (vision + core metrics + blockers), the goals
-that remove those blockers, the single idea that will implement each goal, and the execution records
-of the sessions that did the work.
-The panel is the view; DSH is the engine.
+vision** and a `rotation/v1` card file: a milestone (milestone vision + core metrics + important
+supports), the **support items** that turn those supports into executable work (each with its own core
+metric and approach), the plans those supports generate, and the execution records of the sessions that
+did the work. The panel is the view; DSH is the engine.
 
 ## Features
 
-- **One swimlane per project.** Read every project in a workspace at a glance: milestone lane,
-  goal lane, idea lane, execution-record lane. Closed subtrees fold into a `▸ closed N` chip
-  instead of taking up space, and the **Hide closed** display-style toggle removes even that chip
-  (the count moves onto the card's chips); execution records never fold, so you always see what just ran.
-- **Vision first, blockers second.** A milestone starts with a 3–6 sentence vision (≤ 1000 chars) of
-  what the project should *become*, then 3–5 blockers: what is missing, which vision step it blocks,
-  which module it touches. While blockers exist, **Confirm reached** is disabled in every view —
-  that is the gate that stops a milestone from closing itself.
-- **Project vision on top, core metrics under it.** `project.vision` (≤ 1000 chars) says what the
-  whole project should become; it is edited from the project name's `⋯ → Project info` dialog. Each
-  milestone then carries 2–5 **core metrics** (one per line) — observable results that prove the
-  milestone vision was reached. Metrics measure the vision, they are not acceptance parameters:
-  acceptance still lives on goals (`goal.acceptance`) and execution records (`exec.verify`).
-- **One idea per goal.** The candidate pool is a comparison of routes for the *same* slot, not a list
-  of ideas to keep. Adopt one and the goal locks; generating or adopting a second returns `409 IDEA_EXISTS`.
-  A second idea on one goal is rejected with `422`.
-- **Plan, execute, reflect from the node.** **Generate plan** sends a structured prompt into a new DSH
-  session under `/plan`. **Execute plan** runs `/plan off` and `/goal <objective>` in the *same* session.
-  When the record finishes, reflection runs once more and stores lessons on the milestone.
+- **One swimlane per project.** Milestone, support and execution-record columns at a glance. Closed
+  supports fold into a `▸ closed N` chip instead of taking up space, and the **Hide closed** display-style
+  toggle removes even that chip (the count moves onto the card's chips); execution records never fold, so
+  you always see what just ran.
+- **Vision first, supports second.** A milestone starts with a 3–6 sentence vision (≤ 1000 chars) of what
+  the project should *become*, then 3–5 **important supports**: what must exist for that vision to hold,
+  ordered by importance and derived from first principles. The **确认达成** gate is **at least one support
+  child + every child closed** — it no longer depends on whether the supports list is filled.
+- **Two kinds of core metric.** `milestone.metrics` (2–5 lines) measure whether the **vision** was
+  reached; each support's own `metric` measures whether **that support** holds the milestone up and at
+  what point it counts as enough. The project vision sits above both: `project.vision` (≤ 1000 chars) is
+  edited from the project name's `⋯ → Project info` dialog.
+- **Candidate pool with reasoning, sorted by importance.** A milestone generates candidate supports that
+  carry support / necessity / causal / evidence / importance (1–5); they are stored in descending
+  importance order and each row reveals a hover card. Adopting writes only the **read-only trio**
+  (support / necessity / causal); the core metric and approach stay empty and are filled with
+  **Generate 2 items**.
+- **Plan, execute, reflect from the support.** Fill the core metric and approach to enable **Generate
+  plan** (`409 FILL_REQUIRED`); when a plan exists, **Execute plan** (`409 PLAN_MISSING`). Generate plan
+  sends `/plan`; execute runs `/plan off` then `/goal <objective>` in the *same* session. When the record
+  finishes, reflection runs once more and stores lessons on the milestone.
 - **Prompts are previewed before they are sent.** One implementation (`lib/prompt.mjs`) composes every
   prompt from the same four blocks — background, current node, task, output — and the panel shows the
   structure before sending. Per-node overrides beat card-level overrides, which beat built-ins.
@@ -79,9 +81,9 @@ The panel is the view; DSH is the engine.
   panel lists the collision (fail closed); services already up are skipped. **Stop all** kills whatever
   is listening on the configured loopback ports, including services you started in a terminal, and
   reports per-port failures instead of stopping the batch.
-- **Item fields are lists you edit in place.** Blocker, core-metric, acceptance and scenario editors
-  add and remove one item at a time (`+ Add one` / `×`), and renumber on save. There is no drag
-  ordering: the order you type is the order that is written back.
+- **Item fields are lists you edit in place.** Important-support and core-metric editors add and remove
+  one item at a time (`+ Add one` / `×`), and renumber on save. There is no drag ordering: the order you
+  type is the order that is written back.
 - **The arithmetic is on screen.** Convergence health, close span, close rate, in-flight ages, overdue
   count and ETA are computed from the tree, not typed in by hand. Formulas are in
   [rotation-card-spec.md](rotation-card-spec.md).
@@ -90,7 +92,7 @@ The panel is the view; DSH is the engine.
   a `ready` tag plus a teal rail on the card, `running N · ready N` in the lane head, and a clickable
   **idle branch →** footer that scrolls to it. A lone branch that is running lights nothing up; a lone
   idle branch gets a quiet emphasis. A parent whose children are running stays dark, so you never see
-  "milestone ready" next to three running goals. Single-versus-multiple is counted per project, and no
+  "milestone ready" next to three running supports. Single-versus-multiple is counted per project, and no
   new field is written to the card.
 
 ## See it work
@@ -98,7 +100,7 @@ The panel is the view; DSH is the engine.
 | Swimlane matrix | Node detail |
 |---|---|
 | ![Swimlane matrix](assets/hero.png) | ![Node detail card](assets/detail.png) |
-| Every project in one matrix: milestone → goal → idea → execution record. | Click any node for fields, issues, plan, execution records and prompts. |
+| Every project in one matrix: milestone → support → execution record. | Click any node for fields, issues, plan, execution records and prompts. |
 
 | Prompt structure before sending |
 |---|
@@ -112,7 +114,7 @@ The panel is the view; DSH is the engine.
 
 </details>
 
-<sub>Screenshots are the real panel at v0.12, running on the six sample cards in `samples/`.</sub>
+<sub>Screenshots are the real panel at v0.12 (the current panel is three columns), running on the sample cards in `samples/`.</sub>
 
 ## Installation
 
@@ -154,15 +156,15 @@ If `health` 404s the host half is not mounted — see [INSTALL.md](INSTALL.md).
 
 Three steps, once per day:
 
-1. **Read the lanes.** Blocked milestones are red, goals waiting on review are amber, execution records
-   show running / done / failed with the session result.
-2. **Close what is closed.** A goal whose children are all done is **待确认收敛** — confirm it to write
-   `closed_at`. A milestone whose blockers are empty is **待确认达成** — confirm it to snapshot it into
-   the milestone history and keep the project in the main lane. Both buttons sit at the card's left edge;
-   a goal that never spawned a child keeps its button greyed out — delete that node from its detail panel
-   instead of converging it.
-3. **Push the next step.** Every node has a prompt template; **发起** previews the prompt, then starts
-   a real DSH session in that project's `workspace`.
+1. **Read the lanes.** A milestone expands into its supports; execution records show running / done /
+   failed with the session result. Milestones waiting for review are amber, and execution records never fold.
+2. **Close what is closed.** Support records close themselves once every record is done; the milestone
+   enters **待确认达成** and only a click on **确认达成** writes `closed_at`, snapshots it into the milestone
+   history and keeps the project in the main lane. The gate is **at least one support child + every child
+   closed**; a milestone that never spawned a support keeps its button greyed out.
+3. **Push the next step.** Fill a support's **core metric + approach** (or press **Generate 2 items**),
+   then **Generate plan**; only after the plan is written can you **Execute plan**. Every node has a prompt
+   template; **发起** previews the prompt, then starts a real DSH session in that project's `workspace`.
 
 The panel writes back on every edit; the toolbar shows `已写入 <file> · <time>`.
 
@@ -170,6 +172,7 @@ The panel writes back on every edit; the toolbar shows `已写入 <file> · <tim
 
 ```
 ~/.dsh/rotation/registry.json          project registry: [{ id, name, workspace, file }]
+~/.dsh/rotation/candidates/            candidate pools: <card>__<node id>.json (runtime data, not in project git)
 <workspace>/.dsh/rotation.json         the card itself (rotation/v1, travels with the project)
 
 project (the card's `project` block)
@@ -177,14 +180,22 @@ project (the card's `project` block)
 
 milestone (one per card)
 ├── vision            3–6 sentences, ≤ 1000 chars
-├── metrics[]         2–5 core metrics: the observable result that proves the vision
-├── blockers[]        what is missing → which vision step it blocks → which module
-├── goals[]
-│   ├── scenario      3–5 steps: action / expected / experience — the only acceptance basis
-│   └── ideas[]       at most one; adopting one locks the goal
-│       └── exec records    one DSH session each: plan / exec / reflect + status + result
-└── closed_milestones[]    ≤ 10 snapshots, written on Confirm reached
+├── metrics[]         2–5 milestone core metrics: the observable result that proves the vision
+├── supports[]        3–5 important supports: what must exist for the vision to hold (importance order)
+├── children[]        support items (kind: support, depth 2)
+│   ├── support       the support entry it carries — copied verbatim (read-only, ≤ 80 chars)
+│   ├── necessity     why it helps the milestone (read-only, ≤ 200 chars)
+│   ├── causal        doing X → which step of the milestone becomes true (read-only, ≤ 200 chars)
+│   ├── metric        this support's core metric: how far it must go to hold the milestone up
+│   ├── approach      the implementation approach
+│   ├── plan          plan book, written by Generate plan
+│   └── children[]    execution records (kind: exec, depth 3+): one DSH session each
+└── closed_milestones[]    ≤ 10 snapshots, written on 确认达成
 ```
+
+A candidate row reveals a hover card (support / necessity / causal / evidence / importance); adopting
+writes only the read-only trio into the card, and the core metric + approach are filled with
+**Generate 2 items**.
 
 The registry is shared between machines (`~/.dsh` syncs through git) while `workspace` is a path that
 only exists on one machine. Entries whose workspace is missing here are treated as another machine's
@@ -273,6 +284,8 @@ Nothing leaves the machine except the model calls that DSH already routes.
 - The listener is loopback-only and unauthenticated by design (see above).
 - UI copy is Chinese-only for now; the data model and API are language-neutral.
 - Markdown in prompts is plain text on purpose — DSH chat bubbles do not render it.
+- Candidate pools are runtime data under `~/.dsh/rotation/candidates/` and are not synced through the
+  project's git: candidates do not follow you to another machine, only adopted support items do.
 - Stop all locates listeners by port: on Windows it uses `Get-NetTCPConnection` then `netstat` /
   `taskkill`, on macOS it needs `lsof` (bundled with the OS), on Linux it falls back to `ss` /
   `netstat`. Services whose URL is not a loopback address (`localhost`, `127.0.0.0/8`, `::1`) are
@@ -288,9 +301,11 @@ npm run check          # against a running DSH: health / panel / registry
 ```
 
 Individual suites: `npm run lint:plugin`, `mock:client`, `mock:session`, `mock:action`, `mock:prompt`,
-`mock:idea-lock`, `mock:closure`, `mock:registry`, `mock:services`, `mock:services-batch`, `mock:stale-run`,
-`validate:samples`. Migration scripts for older cards: `migrate`, `migrate:single-idea`,
-`migrate:blockers`, `migrate:milestone` — all dry-run by default, `--write` to persist.
+`mock:candidates`, `mock:genbtn`, `mock:closure`, `mock:registry`, `mock:services`, `mock:services-batch`,
+`mock:stale-run`, `validate:samples`. Migration for older cards: `npm run migrate:supports` — folds goals
+and ideas into support items and renames blockers to important supports; dry-run by default, `--write`
+persists and writes `<card>.supports-backup.json`. Cards older than 0.13 need `migrate`, `migrate:single-idea`,
+`migrate:blockers`, `migrate:milestone` first (also dry-run by default).
 
 Architecture, event flow and directory map: [docs/architecture.md](docs/architecture.md).
 

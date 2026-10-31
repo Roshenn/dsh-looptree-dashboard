@@ -30,11 +30,15 @@ DSH 进程
 |---|---|---|
 | 项目注册表 | `~/.dsh/rotation/registry.json` | host（POST /api/projects、迁移脚本） |
 | 卡片真身 | `<workspace>/.dsh/rotation.json` | host（PUT /api/cards）、可手改 |
+| 候选池 | `~/.dsh/rotation/candidates/<卡片文件>__<节点 id>.json` | host（`/api/candidates/generate` 写、`/adopt`/`/delete` 删）；按 `importance` 降序 |
 | 里程碑历史 | 同一卡片的 `closed_milestones[]`（压缩快照，≤10） | 面板「确认达成」时随整卡写回 |
 | 运行状态 | 进程内（内存） | runner；结束写回卡片的 `session` 字段 |
 | 服务进程 | 进程内（内存） | services；插件 dispose 时兜底杀掉 |
 
-卡片字段见 `rotation-card-spec.md`；注册表只有指针：`{ id, name, workspace, file }`。
+卡片字段见 `rotation-card-spec.md`；节点阶梯是 **`milestone`（深度 1）→ `support`（深度 2）→ `exec`（深度 3+）**，
+2026-10-31 由 `milestone → goal → idea → exec` 四层收敛而来：`goal` / `idea` 读入即折叠成 `support`
+（`lib/core.mjs` 的 `normalizeLegacyCard`），存量卡用 `npm run migrate:supports -- --write` 落盘。
+注册表只有指针：`{ id, name, workspace, file }`。
 注册表是多台机器共用的文件（`~/.dsh` 走 git 同步），但 `workspace` 是各机器的绝对路径；
 `lib/store.mjs` 用 `isLocalEntry` / `partitionRegistry` 按「`workspace` 目录在本机存在」区分两半：
 本机条目参与显示、查重、移除，另一台机器的条目既不显示也不占 id，写回时原样保留。
@@ -74,10 +78,10 @@ lib/prompt.mjs    prompt 唯一实现（结构规范 / 合成 / lint，host 与�
 lib/store.mjs     注册表 / 卡片读写
 lib/runner.mjs    会话执行器
 lib/services.mjs  服务探活、单个/批量拉起、按端口关闭（端口解析与冲突检测也在这里）
-lib/core.mjs      rotation/v1 校验（host 与 CLI 共用）
+lib/core.mjs      rotation/v1 校验（host 与 CLI 共用；含 goal/idea → support 的旧卡折叠）
 lib/client.js     浏览器侧入口
 web/              面板本体（index.html + cards.js 兜底数据）
-scripts/          dev-host / mock / lint / migrate / check-install
+scripts/          dev-host / mock / lint / migrate（含 migrate-supports）/ check-install
 samples/          5 张样例卡（也是校验样例）
 ```
 

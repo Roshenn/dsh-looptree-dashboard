@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 0.15.0 — 目标 / 构思两列合并成「支撑项」，闭环改成愿景驱动
+
+- **要求**（2026-10-31，用户拍板）：闭环太冗长——里程碑 → 目标 → 构思 → 执行四层，每层都要单独补字段、
+  单独确认，真正干活的只有最后一列。改成 **项目愿景 → 里程碑愿景 → 核心指标 → 重要支撑 → 支撑项
+  （核心指标 + 实现思路）→ 计划 / 执行 / 反馈**：里程碑只说「把项目带到哪」，重要支撑从第一性原理回答
+  「要什么才能让愿景成立」，支撑项承接一条支撑、自己带核心指标与实现思路，然后直接开计划与执行。
+- **破坏性变更**：
+  - **kind 阶梯**：`milestone → goal → idea → exec` 四层收敛为 `milestone → support → exec` 三层；
+    `goal` / `idea` 两种 kind 退役，旧卡读入即折叠成 `support`（`lib/core.mjs` 的 `normalizeLegacyCard`：
+    `goal.blocker → support.support`，`idea.approach/plan` 空时继承，`idea.children` 上提为支撑项子节点）。
+  - **`milestone.blockers` → `milestone.supports`**（阻碍项 → 重要支撑）：语义从「现在还差什么」改成
+    「要什么才能让愿景成立」，3–5 条、按重要性排序、一条一行；读入即改名，校验器只给警告、不阻断保存。
+  - **字段退役**：`scenario` / `constraints` / `acceptance` 不再使用——允许留在 JSON，只警告、
+    不显示、不校验、不进 prompt；业务语义改用里程碑核心指标 + 支撑项 `metric` / `approach` 表达。
+    `milestone.acceptance`（更早退役）同样只留警告。
+  - **面板三列**：里程碑 / 支撑项 / 执行验证反馈；里程碑「确认达成」闸门改为「至少 1 个支撑项子节点 +
+    子项全部闭环」，不再看 `supports` 是否非空；删除阻碍项闸门（`blockerGate`）。
+- **新增**：
+  - 候选池只剩「里程碑 → 支撑项」一种：候选带 `{ title, support, necessity, causal, importance(1–5), evidence }`，
+    host 解析后按 importance 降序稳定排序落盘；无 `supports` 时返回 `409 SUPPORTS_REQUIRED`，
+    缺 `necessity` / `causal` 的候选丢弃。
+  - 候选行**悬浮详情卡**：展示承接支撑项 / 必要性 / 因果 / 证据 / 重要性；滚动与窗口缩放时收起。
+  - 采纳只写**只读三件套**（`support` / `necessity` / `causal`），核心指标与实现思路留空，
+    用「生成 2 项」补（缺项 > 0 时按钮高亮）。
+  - 里程碑「AI 拆出重要支撑」：输出 `{"supports":[...]}`，预览勾选后写入 `milestone.supports`。
+  - 支撑项「生成计划」前置核心指标 + 实现思路（`409 FILL_REQUIRED`），「执行计划」前置计划
+    （`409 PLAN_MISSING`）；执行完自动反馈提炼写 `milestone.lessons`。
+  - `npm run migrate:supports`：默认 dry-run；`--write` 先备份 `<卡片>.supports-backup.json` 再原子写回，
+    幂等，逐卡报告不中断。
+- **配套实现**：`lib/core.mjs`（字段 / 不变量 / 旧卡折叠）、`lib/prompt.mjs`（候选 / 补全 / 拆解 / 计划四份契约）、
+  `lib/index.js`（候选池与动作链路）、`web/index.html`（三列 + 悬浮卡）、`samples/` 与 `templates/`、mock 套件。
+- **验证方式**：
+  - `npm run preflight`（新增 `mock:candidates` / `mock:candtip`，`mock:prompt` / `mock:genbtn` / `mock:closure`
+    收紧到新契约）；
+  - `npm run migrate:supports` 干跑看每张卡的迁移计划，`--write` 后用 `node validate-rotation.mjs <卡片>` 复查；
+  - 面板实测：三列布局、候选行悬浮卡、采纳后「生成 2 项」补齐、里程碑闸门、生成计划 → 执行计划 → 反馈提炼。
+- **文档**：`rotation-card-spec.md`、`docs/prompts.md`、`docs/architecture.md`、`docs/execution-records.md`
+  与两个 README 改成支撑项口径。
+
 ## 0.14.6 — 列表字段改 JSON 数组，阻碍项不再揉成一块
 
 - **问题**（2026-10-30，用户截图）：补全阻碍项后 5 条挤在编辑器的一个条目里。根因不是模型乱写——

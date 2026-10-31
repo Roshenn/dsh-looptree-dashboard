@@ -1,12 +1,13 @@
 # 执行验证反馈记录（action-records/v1）
 
-> 一句话：**构思列不再抽候选，直接开「生成计划 / 执行计划」两个手动动作；「执行验证反馈记录」列
+> 一句话：**支撑项不再抽候选，直接开「生成计划 / 执行计划」两个手动动作；「执行验证反馈记录」列
 > 只用来看落地过程——每次会话一条记录、带实时状态；任务跑完自动提炼经验写进里程碑。**
 
 ## 一、为什么改
 
-原来「构思」节点的下缘是 `生成候选 / 候选池`：先让模型吐一批候选执行项，人挑一个写进树。
-构思本身就是**实现的核心思路**，执行记录是它落地的过程，中间那层候选池只是多一次点击。
+候选池现在只服务「里程碑 → 支撑项」：支撑项本身就是**实现的核心思路**（承接一条重要支撑），
+执行记录是它落地的过程，中间再抽一层执行候选只是多一次点击。所以支撑项下缘直接是
+`生成计划 / 执行计划`，候选池留在里程碑卡（拆支撑项）。
 
 落地过程不再由面板自建编排器（波次、重试、tasks.json）驱动，而是**交给 DSH 自己的
 `/plan` 与 `/goal`**：面板只负责
@@ -19,9 +20,12 @@
 
 | 动作 | 触发 | 对 DSH 做的事 | 产出 |
 |---|---|---|---|
-| 生成计划 | 手动（构思卡） | 起会话（挂 DSH 默认 agent preset）→ `/plan` → 发计划任务；agent 用 exit_plan_mode 交计划，**拿到计划就中断审批回合（不执行）** | `idea.plan`（目标 / 验证命令 / 步骤 / 全文） |
-| 执行计划 | 手动（构思卡） | 同一会话 `/plan off` → `/goal <objective>`，由 goal 轮次驱动执行 | 执行记录 + 会话结果 |
+| 生成计划 | 手动（支撑项卡） | 起会话（挂 DSH 默认 agent preset）→ `/plan` → 发计划任务；agent 用 exit_plan_mode 交计划，**拿到计划就中断审批回合（不执行）** | `support.plan`（目标 / 验证命令 / 步骤 / 全文） |
+| 执行计划 | 手动（支撑项卡） | 同一会话 `/plan off` → `/goal <objective>`，由 goal 轮次驱动执行 | 执行记录 + 会话结果 |
 | 反馈提炼 | 自动（执行记录 done 后） | 同一会话追问「复盘踩坑，只输出 JSON」 | `milestone.lessons[]`（里程碑经验积累） |
+
+生成计划的前置是支撑项**核心指标 + 实现思路**都已补齐（否则 `409 FILL_REQUIRED`）；
+执行计划的前置是 `support.plan` 存在（否则 `409 PLAN_MISSING`）。
 
 ### 会话 preset：`/plan`、`/goal`、`exit_plan_mode` 从哪来
 
@@ -32,8 +36,8 @@ plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取�
 `undefined`，于是静默退回提示词——表现就是「会话开头没有 `/plan`、没有 plan 徽标、
 模型说工具集里没有 exit_plan_mode」。
 
-补全 / 候选 / 拆目标 / 反馈提炼这类提示词会话：走 `POST /api/run` 的（给出执行步骤、
-补齐证据、定位阻塞、拆目标）现在**也挂 preset**——它们要读仓库，不挂就只有记忆可用；
+补全 / 候选 / 拆重要支撑 / 反馈提炼这类提示词会话：走 `POST /api/run` 的（给出执行步骤、
+补齐证据、拆重要支撑）现在**也挂 preset**——它们要读仓库，不挂就只有记忆可用；
 `candidates` / `fill` / `services-collect` 三个端点仍按轻量工具集跑。
 同一个 `sessionId` 的计划 → 执行 → 反馈复用同一个 agent，preset 只在建 agent 时挂一次。
 
@@ -49,7 +53,7 @@ plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取�
 `rotation/v1` 只新增三个可选字段，老卡不用改：
 
 ```json
-// 构思：计划书
+// 支撑项：计划书
 "plan": {
   "goal": "一句话目标",
   "verify": ["npm run preflight"],
@@ -63,17 +67,17 @@ plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取�
 ```json
 // 里程碑：经验积累（反馈提炼写入，去重）
 "lessons": [
-  { "text": "面板与 host 共用口径时先定 JSON 形状，再写两侧", "from": "idea-id/record-id", "at": "…" }
+  { "text": "面板与 host 共用口径时先定 JSON 形状，再写两侧", "from": "support-id/record-id", "at": "…" }
 ]
 ```
 
 ```json
-// 执行记录：构思的 exec 子节点，一次会话一条
+// 执行记录：支撑项的 exec 子节点，一次会话一条
 {
-  "id": "idea-id-p1",          // p=plan / e=exec / r=reflect，序号自增
+  "id": "support-id-p1",       // p=plan / e=exec / r=reflect，序号自增
   "kind": "exec",
   "action": "plan",            // plan | exec | reflect
-  "title": "计划 · <构思标题>",
+  "title": "计划 · <支撑项标题>",
   "status": "doing",           // 开始时 doing；成功 done 并写 closed_at
   "started_at": "…",
   "closed_at": null,
@@ -89,18 +93,19 @@ plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取�
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
-| POST | `/rotation/api/action/plan` | `{file,nodeId}` 构思 id → 建记录 + 起会话出计划 |
-| POST | `/rotation/api/action/exec` | `{file,nodeId}` 需要已有 `idea.plan` → 同会话 `/goal` 执行 |
+| POST | `/rotation/api/action/plan` | `{file,nodeId}` 支撑项 id → 校验 `metric` + `approach` → 建记录 + 起会话出计划 |
+| POST | `/rotation/api/action/exec` | `{file,nodeId}` 需要已有 `support.plan` → 同会话 `/goal` 执行 |
 | POST | `/rotation/api/action/reflect` | `{file,nodeId}` 手动补跑一次反馈提炼 |
 
 返回 `{ ok, run, record }`；失败 `{ ok:false, error }`。
 
 | 情况 | 状态码 / code |
 |---|---|
-| 同一构思已有会话在跑（含回写中 `settling`） | 409 `RUN_ACTIVE` |
-| 执行计划时还没有 `idea.plan` | 409 `PLAN_MISSING` |
+| 同一支撑项已有会话在跑（含回写中 `settling`） | 409 `RUN_ACTIVE` |
+| 生成计划时缺核心指标或实现思路 | 409 `FILL_REQUIRED` |
+| 执行计划时还没有 `support.plan` | 409 `PLAN_MISSING` |
 | 面板数据与磁盘不一致，找不到节点 | 409 `NODE_NOT_FOUND` |
-| 给非构思节点发起动作 | 400 |
+| 给非支撑项节点发起动作 | 400 `NOT_SUPPORT` |
 
 超时：计划 20 分钟、执行 60 分钟、反馈提炼 15 分钟。goal 模式 30 秒内读不到目标状态即判失败
 （说明 `/goal` 没生效）；命令服务不可用或返回 `undefined` 时自动退回提示词，
@@ -108,21 +113,25 @@ plan / exec 会话时必须挂 preset（`ctx.get('agentPresets').resolve()` 取�
 
 ## 六、面板行为
 
-- 构思卡下缘：`生成计划`（无计划时）/ `执行计划`（有计划且空闲时）；运行中显示实时状态。
-- 构思状态跟着记录走：只生成过计划 = `规划中`；出现过执行记录 = `进行中`；
-  计划 / 执行 / 反馈都关闭且至少有一次执行 = `已闭环`（host 记录收尾时只自动收口构思本身）。
-  记录还没全闭环时构思不显示「完成」按钮；已闭环的构思再次发起动作会先重开它和上级。
-- 目标 / 里程碑**不自动关闭**：子项全部关闭后目标停在 `待确认收敛`、里程碑停在 `待确认达成`，人点了才写 `closed_at`；
-  之后目标折叠成「已闭环 N」chip、里程碑留在主泳道，可从「里程碑历史」只读回看或开新里程碑。
-- 目标卡 / 里程碑卡：仍保留 `生成候选 / 候选池`（拆目标、拆构思不变）。
+- 支撑项卡下缘：`生成计划`（无计划且缺项为 0 时）/ `执行计划`（有计划且空闲时）；运行中显示实时状态。
+  缺核心指标 / 实现思路时「生成计划」置灰，点一下提示先补这两项（`FILL_REQUIRED` 同义）。
+- 支撑项状态跟着记录走：只生成过计划 = `规划中`；出现过执行记录 = `进行中`；
+  计划 / 执行 / 反馈都关闭且至少有一次执行 = `已闭环`（host 记录收尾时只自动收口支撑项本身）。
+  记录还没全闭环时支撑项不显示「完成」按钮；已闭环的支撑项再次发起动作会先重开它和上级。
+- 没有执行记录的支撑项显示「完成」，由人手动收口。
+- 里程碑**不自动关闭**：子项全部关闭后停在 `待确认达成`，人点了才写 `closed_at`；
+  闸门 = **至少 1 个支撑项子节点 + 子项全部闭环**；之后里程碑留在主泳道，
+  可从「里程碑历史」只读回看或开新里程碑。
+- 里程碑卡：保留 `生成候选 / 候选池`（拆支撑项）；支撑项卡不再有候选池，只有计划 / 执行两个动作。
 - 「执行验证反馈记录」列：记录卡显示动作类型（计划 / 执行 / 反馈）+ 会话状态
   （启动中 / 运行中 / 完成 / 失败 / 已取消），完成的可折叠。
-- 构思详情卡：计划书三块（目标 / 验证命令 / 步骤）+ 两个动作按钮。
+- 支撑项详情卡：计划书三块（目标 / 验证命令 / 步骤）+ 核心指标 / 实现思路 + 两个动作按钮。
 - 里程碑详情卡与信息栏：经验积累列表。
 
 ## 七、验证方式
 
 ```bash
-npm run preflight          # lint + 契约 + 会话 mock + 样例校验 + 打包
+npm run preflight              # lint + 契约 + 会话 mock + 样例校验 + 打包
 node scripts/action-mock.mjs   # 假 agent 走通 计划→执行→提炼 三条链路
+node scripts/candidates-mock.mjs  # 候选生成/采纳与 409 SUPPORTS_REQUIRED
 ```
