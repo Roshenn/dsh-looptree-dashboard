@@ -61,11 +61,11 @@ const { parseItems, serializeItems } = new Function(`${src}
 return { parseItems, serializeItems };`)();
 
 /* ── 1. 生成端：列表字段 → 一条一行、每行带序号 ── */
-check('列表字段清单含重要支撑 supports、不再含里程碑 metrics', LIST_FIELDS.has('supports') && !LIST_FIELDS.has('metrics'), JSON.stringify([...LIST_FIELDS]));
+check('列表字段清单含 capabilities、不再含里程碑 metrics', LIST_FIELDS.has('capabilities') && !LIST_FIELDS.has('metrics'), JSON.stringify([...LIST_FIELDS]));
 
 const arr = ['缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」', '缺章节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」'];
 check('数组 → 一条一行且补序号', normalizeListValue(arr) === '1)缺分层采样（无 LOD 计算）→ 挡在「首屏 < 800ms」\n2)缺章节索引（src/plot/index.ts 无实现）→ 挡在「打开即见三层图」', normalizeListValue(arr));
-check('supports（重要支撑）走同一条一条一行口径',
+check('capabilities（主要能力闭环）走同一条一条一行口径',
   normalizeListValue(['章节→情节两层索引（src/plot/index.ts）→ 挡住「打开即见三层图」', '分层 SVG 绘制（每层一个 <g>）→ 挡住「首屏 < 800ms」'])
   === '1)章节→情节两层索引（src/plot/index.ts）→ 挡住「打开即见三层图」\n2)分层 SVG 绘制（每层一个 <g>）→ 挡住「首屏 < 800ms」',
   JSON.stringify(normalizeListValue(['章节→情节两层索引（src/plot/index.ts）→ 挡住「打开即见三层图」', '分层 SVG 绘制（每层一个 <g>）→ 挡住「首屏 < 800ms」'])));
@@ -97,7 +97,7 @@ const index = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8');
 const prompt = readFileSync(join(ROOT, 'lib', 'prompt.mjs'), 'utf8');
 check('host 回填对列表字段（含 supports）做归一', /LIST_FIELDS\.has\(field\)[\s\S]{0,40}?normalizeListValue\(patch\[field\]\)/.test(index), '');
 check('fill prompt 用数组契约（列表字段）', prompt.includes('["…", "…"]') && prompt.includes('LIST_FIELDS_ALL.has(f)'), '');
-check('fill prompt 的列表字段集合包含 supports', prompt.includes('LIST_FIELDS_ALL') && /supports/.test(prompt), '');
+check('fill prompt 的列表字段集合含 capabilities', /LIST_FIELDS_ALL/.test(prompt) && /const LIST_FIELDS_ALL = LIST_FIELDS/.test(prompt), '');
 check('fill prompt 写明一条一个元素', prompt.includes('一条一个元素'), '');
 check('fill prompt 禁止符号前缀', prompt.includes('行首不要加 ○ · • 这类符号'), '');
 

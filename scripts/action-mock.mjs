@@ -249,7 +249,7 @@ try {
   card.milestone.supports = '1)动作链路可跑通\n2)命令服务不可用时能回退';
   delete card.milestone.acceptance;
   card.milestone.children = [{
-    id: 'am-s1', kind: 'support', title: '支撑项动作与记录列', support: '动作链路可跑通',
+    id: 'am-s1', kind: 'support', title: '能力闭环动作与记录列', support: '动作链路可跑通',
     necessity: '面板动作要真正落到会话与执行记录上，否则卡片没有可核对的过程',
     causal: '动作不接会话 → 计划与执行断链 → 卡片只剩标题，没法验证做了什么',
     metric: '生成计划 → 执行 → 反馈三条记录全绿',
@@ -295,7 +295,7 @@ try {
   // 回归：/plan 带的是多行结构化正文，不是被压成一行的糊墙
   const planPrompt = planSess?.lastPlanPrompt || '';
   check('/plan 带多行正文', planPrompt.split('\n').length > 8, String(planPrompt.split('\n').length));
-  check('/plan 正文首行是任务标题', /^生成计划 · 支撑项「/.test(planPrompt.split('\n')[0]), planPrompt.split('\n')[0]);
+  check('/plan 正文首行是任务标题', /^生成计划 · 能力闭环「/.test(planPrompt.split('\n')[0]), planPrompt.split('\n')[0]);
   check('/plan 正文有空行分块', planPrompt.includes('\n\n背景\n'), '');
   check('/plan 正文不含 markdown 粗体', !planPrompt.includes('**'), '');
 
@@ -325,7 +325,7 @@ try {
   check('执行先关计划模式', offIndex >= 0 && goalIndex > offIndex, JSON.stringify(execCmds.slice(-2)));
   const goalObjective = execSess?.lastGoalObjective || '';
   check('执行发单行 /goal 目标', !!goalObjective && !goalObjective.includes('\n'), goalObjective.slice(0, 40));
-  check('/goal 目标以「执行支撑项」开头', goalObjective.startsWith('执行支撑项「'), goalObjective.slice(0, 20));
+  check('/goal 目标以「执行能力闭环」开头', goalObjective.startsWith('执行能力闭环「'), goalObjective.slice(0, 20));
 
   // ── 3. 反馈提炼（自动） ──
   const reflectRun = await waitRun((r) => r.taskId === 'action-reflect');
@@ -355,7 +355,7 @@ try {
   const fallbackRun = await waitRunKey(fallbackRes.body?.run?.key);
   ctx.commands = savedCommands;
   const fallbackText = (sessions.get(fallbackRun?.sessionId)?.followups || [])[0] || '';
-  check('命令不可用时退回正文', fallbackText.startsWith('生成计划 · 支撑项「回退路径」'), fallbackText.slice(0, 30));
+  check('命令不可用时退回正文', fallbackText.startsWith('生成计划 · 能力闭环「回退路径」'), fallbackText.slice(0, 30));
   check('退回正文同样分块', fallbackText.includes('\n\n背景\n'), '');
   check('退回正文由会话完成', !!fallbackRun && fallbackRun.status === 'done', fallbackRun?.status || 'timeout');
 

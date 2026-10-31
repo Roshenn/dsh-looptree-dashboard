@@ -46,7 +46,7 @@ const walk = (node, out = []) => {
   return out;
 };
 const lineOf = (text, index) => String(text).split('\n')[index] || '';
-const titleOk = (text) => /^.{2,40} · (里程碑|支撑项|执行)「.+」$/.test(lineOf(text, 0));
+const titleOk = (text) => /^.{2,40} · (里程碑|能力闭环|执行)「.+」$/.test(lineOf(text, 0));
 const blocksOk = (text) => {
   const lines = String(text).split('\n');
   return lines[1] === '' && lines.filter((line, i) => i > 1 && line.trim() === '').length > 0;
@@ -126,73 +126,77 @@ check('计划要「证据要求」块', planText.includes('\n证据要求\n'), '
 check('计划要 path:line 证据', planText.includes('path:line'), '');
 check('计划要「非目标」块', planText.includes('\n非目标\n'), '');
 check('计划步骤要文件+命令+预期+指标', planText.includes('改哪些文件 / 做什么 / 验证命令 / 预期结果 / 对应指标'), '');
-check('计划吃支撑项三件套', planText.includes('- 承接支撑项：') && planText.includes('  - 必要性：') && planText.includes('  - 因果：'), '');
+check('计划吃能力闭环的只读字段与落点', planText.includes('- 承接能力闭环：') && planText.includes('  - 与闭环的关系：') && planText.includes('  - 功能模块：'), '');
 check('计划不出现已退役的验收判据', !planText.includes('## 验收') && !planText.includes('达成判据'), '');
 const reflectText = composeActionPrompt({ ...fxArgs, action: 'reflect' });
 check('反馈提炼要 JSON lessons', reflectText.includes('{"lessons"'));
 
-/* ── 3.5 拆重要支撑：只输出 {"supports":[...]} ── */
+/* ── 3.5 拆主要能力闭环：只输出 {"capabilities":[...]} ── */
 const splitText = composeSplitPrompt({ ...fxArgs, nodeId: 'sw-loop' });
-check('拆重要支撑输出 {"supports"', splitText.includes('{"supports"'));
-check('拆重要支撑注入已有重要支撑', splitText.includes('- 已有重要支撑：') && splitText.includes('章节→情节两层索引'), '');
-check('拆重要支撑按重要性排序', splitText.includes('按重要性'), '');
-check('拆重要支撑不写解法 / 验收', splitText.includes('不写解法、步骤、工期、验收、指标'), '');
+check('拆主要能力闭环输出 {"capabilities"', splitText.includes('{"capabilities"'));
+check('拆主要能力闭环注入已有条目', splitText.includes('- 已有主要能力闭环：') && splitText.includes('章节→情节两层索引'), '');
+check('拆主要能力闭环按重要性排序', splitText.includes('按重要性'), '');
+check('拆主要能力闭环不写模块路径 / 解法 / 验收', splitText.includes('不写模块路径、解法、步骤、工期、验收、指标'), '');
 check('拆重要支撑 lint', lintPrompt(splitText).warnings.length === 0, JSON.stringify(lintPrompt(splitText).warnings.slice(0, 2)));
 let splitOnSupport = null;
 try { composeSplitPrompt({ ...fxArgs, nodeId: 'sw-i1' }); } catch (error) { splitOnSupport = error; }
-check('支撑项不能再拆支撑（NOT_MILESTONE）', !!splitOnSupport && splitOnSupport.code === 'NOT_MILESTONE', String(splitOnSupport && splitOnSupport.code));
+check('能力闭环不能再拆（NOT_MILESTONE）', !!splitOnSupport && splitOnSupport.code === 'NOT_MILESTONE', String(splitOnSupport && splitOnSupport.code));
 
-/* ── 3.6 候选支撑项：按重要性 / 必要性 / 因果 + SUPPORTS_REQUIRED ── */
+/* ── 3.6 候选能力闭环：模块归属 / 缺失影响 / 协同面 + CAPABILITIES_REQUIRED ── */
 const candText = composeCandidatePrompt({ ...fxArgs, nodeId: 'sw-loop', count: 3 });
 check('候选含「按重要性」', candText.includes('按重要性'), '');
 check('候选要求必要性', candText.includes('必要性') && candText.includes('"necessity"'), '');
-check('候选要求因果', candText.includes('因果') && candText.includes('"causal"'), '');
-check('候选要承接支撑项 support', candText.includes('"support"') && candText.includes('照抄'),
-  candText.split('\n').filter((x) => x.includes('support')).slice(0, 2).join(' | '));
+check('候选要求与闭环的关系', candText.includes('与闭环的关系') && candText.includes('"causal"'), '');
+check('候选要求缺失影响', candText.includes('缺失影响') && candText.includes('"gap"'), '');
+check('候选要求功能模块', candText.includes('功能模块') && candText.includes('"module"'), '');
+check('候选要求改造还是新增', candText.includes('改造还是新增') && candText.includes('"module_mode"'), '');
+check('候选要求协同面', candText.includes('协同面') && candText.includes('"collaboration"'), '');
+check('候选要承接能力闭环条目', candText.includes('"capability"') && candText.includes('照抄'),
+  candText.split('\n').filter((x) => x.includes('capability')).slice(0, 2).join(' | '));
 check('候选要 importance 排序字段', candText.includes('"importance"'), '');
 check('候选要证据要求块', candText.includes('\n证据要求\n'), '');
 check('候选是 JSON 数组契约', candText.includes('[{"title"'), '');
 check('候选没有旧的 strength / 差异轴口径', !candText.includes('"strength"') && !candText.includes('差异轴'), '');
 check('候选 lint 全绿', lintPrompt(candText).warnings.length === 0, JSON.stringify(lintPrompt(candText).warnings.slice(0, 2)));
 const candClamped = composeCandidatePrompt({ ...fxArgs, nodeId: 'sw-loop', count: 6 });
-check('候选条数不超过重要支撑条数（4 条支撑）', candClamped.includes('给出 4 条'), candClamped.split('\n').find((x) => x.includes('给出')) || '');
+check('候选条数不超过主要能力闭环条数', candClamped.includes('给出 4 条'), candClamped.split('\n').find((x) => x.includes('给出')) || '');
 const noSupportCard = JSON.parse(JSON.stringify(fx));
-noSupportCard.milestone.supports = '';
+noSupportCard.milestone.capabilities = '';
 let noSupportErr = null;
 try { composeCandidatePrompt({ ...fxArgs, card: noSupportCard, nodeId: 'sw-loop' }); } catch (error) { noSupportErr = error; }
-check('无重要支撑 → SUPPORTS_REQUIRED', !!noSupportErr && noSupportErr.code === 'SUPPORTS_REQUIRED', String(noSupportErr && noSupportErr.code));
+check('无主要能力闭环 → CAPABILITIES_REQUIRED', !!noSupportErr && noSupportErr.code === 'CAPABILITIES_REQUIRED', String(noSupportErr && noSupportErr.code));
 let candOnSupport = null;
 try { composeCandidatePrompt({ ...fxArgs, nodeId: 'sw-i1' }); } catch (error) { candOnSupport = error; }
-check('支撑项不能再生成候选（NOT_MILESTONE）', !!candOnSupport && candOnSupport.code === 'NOT_MILESTONE', String(candOnSupport && candOnSupport.code));
+check('能力闭环不能再生成候选（NOT_MILESTONE）', !!candOnSupport && candOnSupport.code === 'NOT_MILESTONE', String(candOnSupport && candOnSupport.code));
 
-/* ── 3.7 补全：里程碑出 supports，支撑项只出 metric + approach ── */
-const msFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-loop', fields: ['vision', 'supports'] });
+/* ── 3.7 补全：里程碑出 capabilities，能力闭环只出 metric + approach ── */
+const msFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-loop', fields: ['vision', 'capabilities'] });
 check('里程碑补全带愿景规则', msFill.includes('里程碑愿景 3–6 句'), '');
 check('里程碑补全愿景上限 1000', msFill.includes('里程碑愿景 ≤1000 字'), '');
 check('里程碑补全愿景要宏大叙事', msFill.includes('宏大叙事') && msFill.includes('不写功能清单'), '');
-check('里程碑补全要重要支撑 3–5 条', msFill.includes('重要支撑 3–5 条'), '');
-check('重要支撑按第一性原理', msFill.includes('从第一性原理') && msFill.includes('必须有哪些东西存在'), '');
-check('重要支撑按重要性排序', msFill.includes('按重要性排序'), '');
-check('重要支撑要「证据要求」块', msFill.includes('\n证据要求\n') && msFill.includes('确实不存在'), '');
+check('里程碑补全要主要能力闭环 3–5 条', msFill.includes('主要能力闭环 3–5 条'), '');
+check('主要能力闭环按第一性原理', msFill.includes('第一性原理') && msFill.includes('必须形成哪几段'), '');
+check('主要能力闭环按重要性排序', msFill.includes('按重要性排序'), '');
+check('主要能力闭环要「证据要求」块', msFill.includes('\n证据要求\n') && msFill.includes('确实不存在'), '');
 check('里程碑补全不再要核心指标', !msFill.includes('核心指标 2–5 条') && !msFill.includes('"metrics"'), '');
 check('里程碑补全不再产出阻碍项 / 验收', !msFill.includes('阻碍项 3–5 条') && !msFill.includes('验收 3–5 条'), '');
-check('里程碑补全 JSON 契约：愿景字符串、重要支撑数组',
-  msFill.includes('"vision": "…"') && msFill.includes('"supports": ["…", "…"]'),
-  msFill.split('\n').filter((x) => x.includes('supports')).join(' | '));
+check('里程碑补全 JSON 契约：愿景字符串、主要能力闭环数组',
+  msFill.includes('"vision": "…"') && msFill.includes('"capabilities": ["…", "…"]'),
+  msFill.split('\n').filter((x) => x.includes('capabilities')).join(' | '));
 check('列表字段写明「一条一个元素」', msFill.includes('一条一个元素'), '');
 check('列表字段禁止符号前缀', msFill.includes('行首不要加 ○ · • 这类符号'), '');
 check('里程碑补全 lint', lintPrompt(msFill).warnings.length === 0, JSON.stringify(lintPrompt(msFill).warnings.slice(0, 2)));
 
 const supFill = composeFillPrompt({ ...fxArgs, nodeId: 'sw-i1', fields: ['metric', 'approach'] });
-check('支撑项补全只出核心指标 + 实现思路', supFill.includes('只补这几项：核心指标、实现思路'), supFill.split('\n').find((x) => x.includes('只补')) || '');
-check('支撑项核心指标要到什么程度算撑住', supFill.includes('到什么程度算撑住'), '');
-check('支撑项实现思路不写步骤清单', supFill.includes('实现思路') && supFill.includes('不写步骤清单'), '');
-check('支撑项补全注入只读三件套', supFill.includes('- 承接支撑项：') && supFill.includes('  - 必要性：') && supFill.includes('  - 因果：'), '');
-check('支撑项补全不再要重要支撑 / 里程碑愿景', !supFill.includes('重要支撑 3–5 条') && !supFill.includes('里程碑愿景 3–6 句'), '');
-check('支撑项补全 JSON 契约', supFill.includes('"metric": "…"') && supFill.includes('"approach": "…"'), '');
-check('支撑项补全 lint', lintPrompt(supFill).warnings.length === 0, JSON.stringify(lintPrompt(supFill).warnings.slice(0, 2)));
+check('能力闭环补全只出核心指标 + 实现思路', supFill.includes('只补这几项：核心指标、实现思路'), supFill.split('\n').find((x) => x.includes('只补')) || '');
+check('能力闭环核心指标要到什么程度算撑住', supFill.includes('到什么程度算撑住'), '');
+check('能力闭环实现思路不写步骤清单', supFill.includes('实现思路') && supFill.includes('不写步骤清单'), '');
+check('能力闭环补全注入只读字段', supFill.includes('- 承接能力闭环：') && supFill.includes('  - 必要性：') && supFill.includes('  - 与闭环的关系：'), '');
+check('能力闭环补全不再要主要能力闭环 / 里程碑愿景', !supFill.includes('主要能力闭环 3–5 条') && !supFill.includes('里程碑愿景 3–6 句'), '');
+check('能力闭环补全 JSON 契约', supFill.includes('"metric": "…"') && supFill.includes('"approach": "…"'), '');
+check('能力闭环补全 lint', lintPrompt(supFill).warnings.length === 0, JSON.stringify(lintPrompt(supFill).warnings.slice(0, 2)));
 
-/* ── 3.8 上下文注入：重要支撑 / 支撑项三件套 / 同级 ── */
+/* ── 3.8 上下文注入：主要能力闭环 / 能力闭环只读项 / 同级 ── */
 const withCtx = JSON.parse(JSON.stringify(fx));
 withCtx.prompt_context = { fields: ['project', 'node', 'refs'], refs: ['sw-e4'] };
 const ctxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
@@ -200,21 +204,22 @@ check('prompt_context.fields 生效', ctxText.includes('- 项目：X') && !ctxTe
 check('prompt_context.refs 生效', ctxText.includes('- 引用：') && ctxText.includes('sw-e4'), '');
 withCtx.prompt_context = { fields: ['node', 'siblings'], siblings: 1 };
 const sibText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
-check('siblings 条数生效', sibText.includes('- 同级支撑项：') && sibText.includes('分层 SVG 绘制'), sibText.split('\n').find((l) => l.includes('同级')) || '');
-withCtx.prompt_context = { fields: ['milestone', 'milestone.vision', 'milestone.supports', 'milestone.metrics'] };  // 旧键保留只为不报未知字段
+check('siblings 条数生效', sibText.includes('- 同级能力闭环：') && sibText.includes('分层 SVG 绘制'), sibText.split('\n').find((l) => l.includes('同级')) || '');
+withCtx.prompt_context = { fields: ['milestone', 'milestone.vision', 'milestone.capabilities', 'milestone.metrics'] };  // 旧键保留只为不报未知字段
 const msCtxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-i1', taskId: 'plan' });
 check('里程碑愿景进上下文', msCtxText.includes('- 里程碑愿景：'), '');
-check('重要支撑进上下文', msCtxText.includes('- 重要支撑：') && msCtxText.includes('章节→情节两层索引'), '');
+check('主要能力闭环进上下文', msCtxText.includes('- 主要能力闭环：') && msCtxText.includes('章节→情节两层索引'), '');
 check('里程碑核心指标已退役：旧键不再注入', !msCtxText.includes('里程碑核心指标') && !msCtxText.includes('三层图各 ≥8 节点'), '');
-withCtx.prompt_context = { fields: ['support', 'support.necessity', 'support.causal', 'support.metric', 'support.approach'] };
+withCtx.prompt_context = { fields: ['capability', 'capability.necessity', 'capability.causal', 'capability.gap', 'capability.module', 'capability.metric', 'capability.approach'] };
 const supCtxText = composeTaskPrompt({ projectName: 'X', card: withCtx, nodeId: 'sw-e1', taskId: 'plan' });
-check('支撑项三件套 + 指标思路进下级上下文',
-  supCtxText.includes('- 支撑项：章节 → 情节两层索引')
-  && supCtxText.includes('  - 必要性：') && supCtxText.includes('  - 因果：')
+check('能力闭环只读项 + 指标思路进下级上下文',
+  supCtxText.includes('- 能力闭环：章节 → 情节两层索引')
+  && supCtxText.includes('  - 必要性：') && supCtxText.includes('  - 与闭环的关系：')
+  && supCtxText.includes('  - 缺失影响：') && supCtxText.includes('  - 功能模块：')
   && supCtxText.includes('  - 核心指标：章节与情节两层索引可双向查询')
   && supCtxText.includes('  - 实现思路：章节表 + 情节表'),
-  supCtxText.split('\n').filter((l) => /支撑项|必要性|因果|核心指标|实现思路/.test(l)).join(' | '));
-check('node.metric / node.approach 进支撑项上下文',
+  supCtxText.split('\n').filter((l) => /能力闭环|必要性|与闭环|缺失影响|功能模块|核心指标|实现思路/.test(l)).join(' | '));
+check('node.metric / node.approach 进能力闭环上下文',
   composeTaskPrompt({ projectName: 'X', card: { ...fx, prompt_context: { fields: ['node.metric', 'node.approach'] } }, nodeId: 'sw-i1', taskId: 'plan' }).includes('- 核心指标：章节与情节两层索引可双向查询'));
 
 /* ── 4. 模板优先级 ── */

@@ -4,12 +4,12 @@
  *
  *   node scripts/candtip-mock.mjs
  *
- * 候选行在面板上只留 序号 + 重要性 + 标题 + 承接支撑项；必要性 / 因果 / 证据 / 重要性
+ * 候选行在面板上只留 序号 + 重要性 + 标题 + 承接条目 + 模块徽标；其余字段
  * 放进 body 级悬浮卡 #cand-tip，避免把弹窗撑爆。这里沿用 genbtn/list-fields 的手法：
  * 从 web/index.html 抠出 candTipHtml / candImpOf / candRowHtml 纯函数，放进 new Function 跑。
  *
  * 断言：
- *   · candTipHtml 含 承接支撑项 / 必要性 / 因果 / 证据 / 重要性；
+ *   · candTipHtml 含 承接能力闭环 / 必要性 / 与闭环的关系 / 缺失影响 / 功能模块 / 协同面 / 证据；
  *   · 所有字段都过 esc：<script> 标签不会原样进 HTML；
  *   · 空字段降级成「（未生成）」，重要性缺失同样降级；
  *   · candRowHtml 不再展示 acceptance / strength，缺承接支撑项时给降级文案；
@@ -90,7 +90,8 @@ const ESC_STUB = `const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']
   (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));`;
 // candRowHtml 只依赖 candUid 生成行内唯一 id，这里给等价替身（原实现是模块级计数器）
 const UID_STUB = `let CAND_UID = 0;
-const candUid = (c) => c.__uid || (c.__uid = ++CAND_UID);`;
+const candUid = (c) => c.__uid || (c.__uid = ++CAND_UID);
+const MODULE_MODE_LABEL = { existing: '改造现有', new: '新增' };`;
 
 const rowSrc = [
   ESC_STUB, UID_STUB, grab('candImpOf'), grab('candTipHtml'), grab('candRowHtml'),
@@ -101,29 +102,39 @@ check('悬浮卡逻辑不碰 DOM（可离线跑）', !/\bdocument\b|\bwindow\b/.
 const api = new Function(`${rowSrc}
 return { candTipHtml, candRowHtml, candImpOf };`)();
 
-/* ── 1. 内容：承接支撑项 / 必要性 / 因果 / 证据 / 重要性 ── */
+/* ── 1. 内容：承接 / 必要性 / 与闭环的关系 / 缺失影响 / 功能模块 / 协同面 / 证据 ── */
 const full = {
   title: '统一索引层',
-  support: '章节→情节两层索引',
+  capability: '章节→情节两层索引',
   necessity: '没有索引，情节图只能读临时数据',
   causal: '索引落地后，情节图第一次能挂在真实章节上',
+  gap: '缺它三层图没有数据源，评审只能看截图',
+  module: 'src/plot/index.ts（情节索引层）',
+  module_mode: 'existing',
+  collaboration: '读章节源文件；向渲染层提供 plot tree',
   evidence: 'src/plot/index.ts:1',
   importance: 4,
 };
 const tip = api.candTipHtml(full);
-check('悬浮卡含「承接支撑项」', tip.includes('承接支撑项'), tip.slice(0, 120));
+check('悬浮卡含「承接能力闭环」', tip.includes('承接能力闭环'), tip.slice(0, 120));
 check('悬浮卡含「必要性」', tip.includes('必要性'), '');
-check('悬浮卡含「因果」', tip.includes('因果'), '');
+check('悬浮卡含「与闭环的关系」', tip.includes('与闭环的关系'), '');
+check('悬浮卡含「缺失影响」', tip.includes('缺失影响'), '');
+check('悬浮卡含「功能模块」与改造/新增', tip.includes('功能模块') && tip.includes('改造现有'), '');
+check('悬浮卡含「协同面」', tip.includes('协同面'), '');
 check('悬浮卡含「证据」', tip.includes('证据'), '');
 check('悬浮卡显示重要性 4 / 5', tip.includes('重要性') && tip.includes('4 / 5'), tip.slice(0, 120));
-check('必要性与因果的原文都进了卡', tip.includes('没有索引，情节图只能读临时数据') && tip.includes('索引落地后'), '');
+check('缺失影响与模块原文都进了卡', tip.includes('缺它三层图没有数据源') && tip.includes('src/plot/index.ts'), '');
 
 /* ── 2. XML 转义：标签不会原样进 HTML ── */
 const nasty = {
   title: '<script>alert(1)</script>',
-  support: '<b>支撑</b>',
+  capability: '<b>能力</b>',
   necessity: 'need <img src=x onerror=alert(1)>',
   causal: 'cause & "quote"',
+  gap: '<i>gap</i>',
+  module: '<u>mod</u>',
+  collaboration: '<s>col</s>',
   evidence: '<i>ev</i>',
   importance: 2,
 };
@@ -140,12 +151,13 @@ check('只传空对象也不崩', api.candTipHtml(null).includes('（未生成�
 
 /* ── 4. 候选行：瘦身 + 不再含退役字段 ── */
 const row = api.candRowHtml(full, { id: 'p1' }, { id: 'n1' }, 0);
-check('候选行含序号 / 重要性 / 标题 / 承接支撑项', row.includes('cand-idx') && row.includes('data-imp="4"') && row.includes('统一索引层') && row.includes('章节→情节两层索引'), row.slice(0, 200));
+check('候选行含序号 / 重要性 / 标题 / 承接条目 / 模块徽标', row.includes('cand-idx') && row.includes('data-imp="4"') && row.includes('统一索引层') && row.includes('章节→情节两层索引') && row.includes('cand-mod'), row.slice(0, 260));
 check('候选行含添加 / 删除操作', row.includes('data-cand-adopt') && row.includes('data-cand-del'), '');
-check('候选行不再含 acceptance / strength', !row.includes('acceptance') && !row.includes('strength'), row);
+check('候选行不再含退役的 acceptance / strength', !row.includes('acceptance') && !row.includes('strength'), row);
 check('候选行标题同样过 esc', !api.candRowHtml(nasty, { id: 'p' }, { id: 'n' }, 0).includes('<script>'), '');
 const rowSparse = api.candRowHtml({ title: 'x' }, { id: 'p' }, { id: 'n' }, 0);
-check('候选行缺承接支撑项 → 降级文案', rowSparse.includes('承接支撑项未生成'), rowSparse.slice(0, 160));
+check('候选行缺承接条目 → 降级文案', rowSparse.includes('承接能力闭环未生成'), rowSparse.slice(0, 160));
+check('候选行缺模块 → 降级文案', rowSparse.includes('模块未标注'), rowSparse.slice(0, 200));
 
 /* ── 5. 结构：body 级单例 + 悬停 / 聚焦委托 ── */
 check('页面有 #cand-tip 单例', /id="cand-tip"/.test(html), '');

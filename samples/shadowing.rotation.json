@@ -15,9 +15,9 @@
   "children": [
    {
     "id": "sh-i1",
-    "kind": "support",
+    "kind": "capability",
     "title": "链接解析 + 落盘",
-    "support": "素材入库链路",
+    "capability": "素材入库链路",
     "necessity": "跟读的所有环节都依赖素材先落到本地；入库不闭环，后面的词幕与对齐都只能拿 demo 数据演示。",
     "causal": "链接解析不落盘 → 每次跟读都要重新抓 → 无法离线复用与断点续跑。",
     "metric": "链接解析 + 落盘可重复执行，40 条视频 0 失败",
@@ -35,13 +35,17 @@
       "issues": [],
       "proof": "40 条入库，0 失败"
      }
-    ]
+    ],
+    "module": "src/ingest/yt（素材入队）",
+    "module_mode": "existing",
+    "gap": "缺它粘链接没反应，后面所有步骤都起不来",
+    "collaboration": "调 yt-dlp；向字幕层传视频 id 与临时目录"
    },
    {
     "id": "sh-i2",
-    "kind": "support",
+    "kind": "capability",
     "title": "字幕抓取 + 时间轴对齐",
-    "support": "词幕逐句高亮与对齐",
+    "capability": "词幕逐句高亮与对齐",
     "necessity": "逐句跟读靠的是「当前这句在哪」，时间轴对不上，高亮就会提前或滞后，跟读体验直接失效。",
     "causal": "自动字幕缺时间轴 → 词幕只能整段显示 → 无法逐句高亮 → 跟读退化成看字幕。",
     "metric": "抽样 10 条视频，逐句高亮与音频偏差 < 120ms",
@@ -76,11 +80,15 @@
       ],
       "started_at": "2026-10-20T09:00:00+08:00"
      }
-    ]
+    ],
+    "module": "src/subtitle/align（对齐层）",
+    "module_mode": "existing",
+    "gap": "缺它逐句高亮全歪，跟读失去意义",
+    "collaboration": "读字幕轨；向播放器提供逐句时间轴"
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
   "vision": "选一条视频就能逐句跟读并对齐",
-  "supports": "1)素材入库链路（链接解析 + 落盘可重复执行）\n2)字幕时间轴对齐（缺自动字幕时有人工兜底）"
+  "capabilities": "1)素材入库链路（链接解析 + 落盘可重复执行）\n2)字幕时间轴对齐（缺自动字幕时有人工兜底）"
  }
 }

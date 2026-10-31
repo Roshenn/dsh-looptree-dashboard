@@ -52,7 +52,7 @@ function extractFn(source, name) {
 }
 
 const kindsLine = /const IDLE_KINDS = \[[^\]]*\];/.exec(html);
-ok('IDLE_KINDS 已定义（里程碑 / 支撑项）', !!kindsLine && kindsLine[0].includes("'support'"), kindsLine ? kindsLine[0] : '未找到');
+ok('IDLE_KINDS 已定义（里程碑 / 能力闭环）', !!kindsLine && kindsLine[0].includes("'capability'"), kindsLine ? kindsLine[0] : '未找到');
 
 const src = extractFn(html, 'idleModelOf');
 ok('idleModelOf() 已抠出', src.includes('ancestorBusy'));
@@ -84,7 +84,7 @@ ok('单条分支空闲 → mode=modest', mIdle.mode === 'modest', mIdle.mode);
 ok('单条分支空闲 → 空闲 1 条且是里程碑', mIdle.idle.length === 1 && mIdle.idleIds.has('m'));
 
 /* ─── 3) 两条分支：一条在跑，另一条强高亮 ─── */
-const pair = project(node('m', 'milestone', { kids: [node('s1', 'support'), node('s2', 'support')] }));
+const pair = project(node('m', 'milestone', { kids: [node('s1', 'capability'), node('s2', 'capability')] }));
 const mPair = idleModelOf(pair, (n) => n.id === 's2', none);
 ok('两条分支 → mode=strong', mPair.mode === 'strong', mPair.mode);
 ok('在跑的 s2 记 running，且不在空闲集合', mPair.running.length === 1 && !mPair.idleIds.has('s2'));
@@ -92,15 +92,15 @@ ok('有子节点在跑 → 里程碑不算空闲（只剩 s1）', !mPair.idleIds
 ok('父节点记 descendant-running', mPair.rows.find((r) => r.node.id === 'm').state === 'descendant-running');
 
 /* ─── 3b) 子节点在跑时，父节点不再出现「可开工」（否则一边可开工、一边子集在跑，自相矛盾） ─── */
-const runningKid = project(node('m', 'milestone', { kids: [node('s1', 'support'), node('s2', 'support')] }));
+const runningKid = project(node('m', 'milestone', { kids: [node('s1', 'capability'), node('s2', 'capability')] }));
 const mRunningKid = idleModelOf(runningKid, (n) => n.id === 's1', none);
 ok('一个子节点在跑 → 父节点 descendant-running', mRunningKid.rows.find((r) => r.node.id === 'm').state === 'descendant-running');
 ok('另一个没跑的子节点仍可开工', mRunningKid.idleIds.has('s2') && !mRunningKid.idleIds.has('m'), [...mRunningKid.idleIds].join(','));
 
 /* ─── 3c) 更深一层在跑 → 祖先也不算可开工（执行记录不在分支里，但会把忙碌往上带） ─── */
-const nested = project(node('m', 'milestone', { kids: [node('s1', 'support', { kids: [node('e1', 'exec')] })] }));
+const nested = project(node('m', 'milestone', { kids: [node('s1', 'capability', { kids: [node('e1', 'exec')] })] }));
 const mNested = idleModelOf(nested, (n) => n.id === 'e1', none);
-ok('执行记录在跑 → 支撑项 descendant-running', mNested.rows.find((r) => r.node.id === 's1').state === 'descendant-running');
+ok('执行记录在跑 → 能力闭环 descendant-running', mNested.rows.find((r) => r.node.id === 's1').state === 'descendant-running');
 ok('执行记录在跑 → 里程碑 descendant-running', mNested.rows.find((r) => r.node.id === 'm').state === 'descendant-running');
 ok('子孙在跑 → 整条链都不算空闲', mNested.idle.length === 0 && mNested.mode === 'none', [...mNested.idleIds].join(','));
 
@@ -110,23 +110,23 @@ ok('子节点全部跑完 → 父节点重新 idle', mKidDone.idleIds.has('m') &
 
 /* ─── 4) 祖先在跑 → 后代 frozen，不算空闲（并行规范的核心） ─── */
 const mFrozen = idleModelOf(pair, (n) => n.id === 'm', none);
-ok('里程碑在跑 → 支撑项全部 frozen', mFrozen.rows.filter((r) => r.state === 'frozen').length === 2, JSON.stringify(mFrozen.rows.map((r) => r.state)));
+ok('里程碑在跑 → 能力闭环全部 frozen', mFrozen.rows.filter((r) => r.state === 'frozen').length === 2, JSON.stringify(mFrozen.rows.map((r) => r.state)));
 ok('里程碑在跑 → 空闲 0 条（子集起不了会话）', mFrozen.idle.length === 0 && mFrozen.mode === 'none');
 
 /* ─── 5) 已关闭节点 / 执行记录不算分支 ─── */
 const mixed = project(node('m', 'milestone', {
   kids: [
-    node('s1', 'support', { closed: true }),
-    node('s2', 'support', { kids: [node('e1', 'exec')] }),
+    node('s1', 'capability', { closed: true }),
+    node('s2', 'capability', { kids: [node('e1', 'exec')] }),
   ],
 }));
 const mMixed = idleModelOf(mixed, none, none);
-ok('已关闭支撑项不算分支', !mMixed.rows.some((r) => r.node.id === 's1'), ids(mMixed.rows));
+ok('已关闭能力闭环不算分支', !mMixed.rows.some((r) => r.node.id === 's1'), ids(mMixed.rows));
 ok('执行记录不算分支', !mMixed.rows.some((r) => r.node.id === 'e1'), ids(mMixed.rows));
-ok('里程碑 + 支撑项各算一条分支', mMixed.rows.length === 2 && mMixed.mode === 'strong', ids(mMixed.rows));
+ok('里程碑 + 能力闭环各算一条分支', mMixed.rows.length === 2 && mMixed.mode === 'strong', ids(mMixed.rows));
 
 /* ─── 6) 有未处置 issues → blocked，不算空闲 ─── */
-const withIssues = project(node('m', 'milestone', { kids: [node('s1', 'support', { issues: 1 }), node('s2', 'support')] }));
+const withIssues = project(node('m', 'milestone', { kids: [node('s1', 'capability', { issues: 1 }), node('s2', 'capability')] }));
 const mIssues = idleModelOf(withIssues, none, hasIssue);
 ok('有 issues 的分支记 blocked', mIssues.rows.find((r) => r.node.id === 's1').state === 'blocked');
 ok('blocked 不进空闲集合', !mIssues.idleIds.has('s1') && mIssues.idleIds.has('s2'), [...mIssues.idleIds].join(','));
@@ -137,7 +137,7 @@ ok('全部关闭 → 0 条分支且 mode=none', mClosed.rows.length === 0 && mCl
 
 /* ─── 8) 两个项目各自判定，互不影响 ─── */
 const pA = project(node('ma', 'milestone'));
-const pB = project(node('mb', 'milestone', { kids: [node('sb1', 'support'), node('sb2', 'support')] }));
+const pB = project(node('mb', 'milestone', { kids: [node('sb1', 'capability'), node('sb2', 'capability')] }));
 const mA = idleModelOf(pA, none, none);
 const mB = idleModelOf(pB, none, none);
 ok('A 项目单分支空闲 → modest', mA.mode === 'modest', mA.mode);

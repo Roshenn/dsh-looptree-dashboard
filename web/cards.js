@@ -12,7 +12,7 @@ window.ROTATION_CARDS = [
    "fields": [
     "project",
     "milestone",
-    "support",
+    "capability",
     "node"
    ],
    "siblings": 0
@@ -26,9 +26,9 @@ window.ROTATION_CARDS = [
    "children": [
     {
      "id": "ck-i1",
-     "kind": "support",
+     "kind": "capability",
      "title": "词频驱动词块顺序",
-     "support": "双轨共用的词块排序键",
+     "capability": "双轨共用的词块排序键",
      "necessity": "词块按什么顺序推给学习者，决定教与学两条路径能不能共用同一份数据；没有统一排序就要各自维护一套。",
      "causal": "词块数据没有统一排序键 → 教轨与学轨各自排序 → 换教材要改两处流程 → 双轨无法独立交付。",
      "metric": "COCA 前 6000 命中 ≥ 90%，且教/学两轨读到同一排序结果",
@@ -48,13 +48,17 @@ window.ROTATION_CARDS = [
        "proof": "采样中",
        "started_at": "2026-10-20T09:00:00+08:00"
       }
-     ]
+     ],
+     "module": "src/order/rank.ts（排序层）",
+     "module_mode": "existing",
+     "gap": "缺它只能手排，换教材要重排一遍",
+     "collaboration": "读词块数据与 COCA 词频表；向教/学两轨输出同一份排序"
     },
     {
      "id": "ck-i2",
-     "kind": "support",
+     "kind": "capability",
      "title": "语料词频现场计算",
-     "support": "两轨共享的数据与进度结构",
+     "capability": "两轨共享的数据与进度结构",
      "necessity": "教与学各自记录进度，数据结构不统一时，换一套词块数据就得改两遍代码，双轨交付会互相拖住。",
      "causal": "进度结构绑定在单条路径上 → 两轨无法共用同一组词块 → 换数据要同步改两处 → 双轨不能独立交付。",
      "metric": "教/学两轨各走完 1 组词块，进度互不覆盖",
@@ -73,12 +77,16 @@ window.ROTATION_CARDS = [
        "issues": [],
        "started_at": "2026-10-20T09:00:00+08:00"
       }
-     ]
+     ],
+     "module": "src/corpus/coca.ts（语料层）",
+     "module_mode": "new",
+     "gap": "缺它排序依赖离线表，新教材进不来",
+     "collaboration": "由排序层调用；结果缓存给导出脚本"
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
    "vision": "教与学两条路径都能独立走完一组词块",
-   "supports": "1)词频驱动的词块顺序（教/学两轨共用同一份排序）\n2)两轨共享的数据与进度结构（换教材只改数据）"
+   "capabilities": "1)词频驱动的词块顺序（教/学两轨共用同一份排序）\n2)两轨共享的数据与进度结构（换教材只改数据）"
   }
  },
  {
@@ -111,9 +119,9 @@ window.ROTATION_CARDS = [
    "children": [
     {
      "id": "xr-i1",
-     "kind": "support",
+     "kind": "capability",
      "title": "外部链接自动补全卡片元信息",
-     "support": "外部链接元信息自动补全",
+     "capability": "外部链接元信息自动补全",
      "necessity": "没有自动补全，用户粘链接后要自己填标题、时长、字幕可用性， 90 秒出练习卡不成立。",
      "causal": "链接页只有 videoId → 练习卡首屏缺标题/时长/字幕 → 用户手工补 → 出卡时间超过 90 秒。",
      "metric": "粘贴链接后 60 秒内出现练习卡，字幕缺失时走降级入口",
@@ -217,9 +225,9 @@ window.ROTATION_CARDS = [
     },
     {
      "id": "xr-i2",
-     "kind": "support",
+     "kind": "capability",
      "title": "单句循环跟读与计数",
-     "support": "逐句跟读与计数",
+     "capability": "逐句跟读与计数",
      "necessity": "跟读次数是学习闭环的度量；不计数的话，练习有没有发生、发生了多少都无法验证。",
      "causal": "计数只存在内存 → 刷新即丢 → 学习进度无法验证 → 跟读闭环缺证据。",
      "metric": "同一句反复跟读，次数可靠累计，刷新后不丢",
@@ -264,7 +272,7 @@ window.ROTATION_CARDS = [
     }
    ],
    "vision": "粘贴一个 YouTube 链接，就能得到一张可直接跟读的逐句练习卡",
-   "supports": "1)外部链接元信息自动补全（标题/时长/字幕，90 秒内出卡）\n2)逐句跟读与计数（localStorage 持久化，刷新不丢）"
+   "capabilities": "1)外部链接元信息自动补全（标题/时长/字幕，90 秒内出卡）\n2)逐句跟读与计数（localStorage 持久化，刷新不丢）"
   }
  },
  {
@@ -284,9 +292,9 @@ window.ROTATION_CARDS = [
    "children": [
     {
      "id": "kg-i1",
-     "kind": "support",
+     "kind": "capability",
      "title": "官网 + 文档抓取",
-     "support": "竞品数据的统一入库",
+     "capability": "竞品数据的统一入库",
      "necessity": "四款竞品的功能与定价散在各自官网和文档里，不先统一入库，图谱就没有可对比的同一套字段。",
      "causal": "各站点字段名与结构不同 → 直接对比会错位 → 需要适配器把四款数据抓成同一张表。",
      "metric": "4 款竞品全量入图，功能点可追到出处，0 手工补录",
@@ -304,13 +312,17 @@ window.ROTATION_CARDS = [
        "issues": [],
        "proof": "4 款入库"
       }
-     ]
+     ],
+     "module": "src/ingest（采集层）",
+     "module_mode": "existing",
+     "gap": "缺它图谱只有空壳，4 款竞品里哪款都进不来",
+     "collaboration": "拉官网与文档；归一到统一节点 schema 后写库"
     },
     {
      "id": "kg-i2",
-     "kind": "support",
+     "kind": "capability",
      "title": "节点连线 + 过滤",
-     "support": "图谱交互可用",
+     "capability": "图谱交互可用",
      "necessity": "数据入图只是原料，能按类别过滤并看清连线，才让「单屏对比」这件事成立。",
      "causal": "只有散点没有连线与过滤 → 用户仍要自己脑补竞品关系 → 对比退化成翻页。",
      "metric": "单屏看完 4 款核心差异，任一功能点能追到出处",
@@ -328,11 +340,15 @@ window.ROTATION_CARDS = [
        "issues": [],
        "proof": "切换 < 200ms"
       }
-     ]
+     ],
+     "module": "src/graph/view（图谱渲染层）",
+     "module_mode": "existing",
+     "gap": "缺它只能看列表，追不到出处也算不出差异",
+     "collaboration": "读图谱数据；向过滤面板暴露节点/边查询"
     }
    ],
    "vision": "竞品功能和交互能在一个图谱里横向对比",
-   "supports": "1)竞品数据的统一入库（4 款官网 + 文档抓成同一套字段）\n2)图谱交互（节点连线 + 过滤，切换不重新布局）"
+   "capabilities": "1)竞品数据的统一入库（4 款官网 + 文档抓成同一套字段）\n2)图谱交互（节点连线 + 过滤，切换不重新布局）"
   }
  },
  {
@@ -352,9 +368,9 @@ window.ROTATION_CARDS = [
    "children": [
     {
      "id": "nf-i1",
-     "kind": "support",
+     "kind": "capability",
      "title": "抓取 → 聚类 → 打分",
-     "support": "小红书抓取链路的稳定性",
+     "capability": "小红书抓取链路的稳定性",
      "necessity": "整条需求发现链路都挂在小红书数据上；抓取段不稳定，后面的聚类和打分再准也没有原料。",
      "causal": "扫码登录 6 小时失效 → 抓取中断 → 当天需求池为空 → 选题链路停摆。",
      "metric": "抓取段单次运行完整跑完，登录态保活 ≥ 6h",
@@ -378,13 +394,17 @@ window.ROTATION_CARDS = [
        ],
        "started_at": "2026-10-16T00:30:00+08:00"
       }
-     ]
+     ],
+     "module": "src/collect/xhs（采集链路）",
+     "module_mode": "existing",
+     "gap": "缺它每天跑不出新需求，选题只能靠猜",
+     "collaboration": "接登录态；向下游输出原始贴，交给聚类打分"
     },
     {
      "id": "nf-i2",
-     "kind": "support",
+     "kind": "capability",
      "title": "需求去重",
-     "support": "端到端产出可验证的需求列表",
+     "capability": "端到端产出可验证的需求列表",
      "necessity": "同一痛点会被多人重复发帖，不去重就凑不够 10 条真正不同的需求，产出不可用。",
      "causal": "原帖重复度高 → 直接排序会得到一堆同义条目 → 需要按语义相似度去重再排序。",
      "metric": "去重后 ≥10 条需求，每条带原帖出处链接",
@@ -402,12 +422,16 @@ window.ROTATION_CARDS = [
        "closed_at": null,
        "issues": []
       }
-     ]
+     ],
+     "module": "src/rank/dedupe（去重与打分）",
+     "module_mode": "new",
+     "gap": "缺它同一条需求出现三次，排序失去意义",
+     "collaboration": "读采集层原始贴；向周报脚本输出排序结果"
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
    "vision": "从小红书真实讨论里端到端产出可验证的需求列表",
-   "supports": "1)小红书抓取链路的登录态与稳定性（决定当天有没有原料）\n2)需求去重与排序（决定产出是不是 10 条真正不同的需求）"
+   "capabilities": "1)小红书抓取链路的登录态与稳定性（决定当天有没有原料）\n2)需求去重与排序（决定产出是不是 10 条真正不同的需求）"
   }
  },
  {
@@ -427,9 +451,9 @@ window.ROTATION_CARDS = [
    "children": [
     {
      "id": "sh-i1",
-     "kind": "support",
+     "kind": "capability",
      "title": "链接解析 + 落盘",
-     "support": "素材入库链路",
+     "capability": "素材入库链路",
      "necessity": "跟读的所有环节都依赖素材先落到本地；入库不闭环，后面的词幕与对齐都只能拿 demo 数据演示。",
      "causal": "链接解析不落盘 → 每次跟读都要重新抓 → 无法离线复用与断点续跑。",
      "metric": "链接解析 + 落盘可重复执行，40 条视频 0 失败",
@@ -447,13 +471,17 @@ window.ROTATION_CARDS = [
        "issues": [],
        "proof": "40 条入库，0 失败"
       }
-     ]
+     ],
+     "module": "src/ingest/yt（素材入队）",
+     "module_mode": "existing",
+     "gap": "缺它粘链接没反应，后面所有步骤都起不来",
+     "collaboration": "调 yt-dlp；向字幕层传视频 id 与临时目录"
     },
     {
      "id": "sh-i2",
-     "kind": "support",
+     "kind": "capability",
      "title": "字幕抓取 + 时间轴对齐",
-     "support": "词幕逐句高亮与对齐",
+     "capability": "词幕逐句高亮与对齐",
      "necessity": "逐句跟读靠的是「当前这句在哪」，时间轴对不上，高亮就会提前或滞后，跟读体验直接失效。",
      "causal": "自动字幕缺时间轴 → 词幕只能整段显示 → 无法逐句高亮 → 跟读退化成看字幕。",
      "metric": "抽样 10 条视频，逐句高亮与音频偏差 < 120ms",
@@ -488,12 +516,16 @@ window.ROTATION_CARDS = [
        ],
        "started_at": "2026-10-20T09:00:00+08:00"
       }
-     ]
+     ],
+     "module": "src/subtitle/align（对齐层）",
+     "module_mode": "existing",
+     "gap": "缺它逐句高亮全歪，跟读失去意义",
+     "collaboration": "读字幕轨；向播放器提供逐句时间轴"
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
    "vision": "选一条视频就能逐句跟读并对齐",
-   "supports": "1)素材入库链路（链接解析 + 落盘可重复执行）\n2)字幕时间轴对齐（缺自动字幕时有人工兜底）"
+   "capabilities": "1)素材入库链路（链接解析 + 落盘可重复执行）\n2)字幕时间轴对齐（缺自动字幕时有人工兜底）"
   }
  },
  {
@@ -505,7 +537,7 @@ window.ROTATION_CARDS = [
   },
   "updated": "2026-10-31T00:00:00+08:00",
   "prompts": {
-   "support": [
+   "capability": [
     {
      "id": "regen",
      "title": "重新生成实现思路（保留核心指标）",
@@ -529,11 +561,11 @@ window.ROTATION_CARDS = [
     "milestone",
     "milestone.vision",
     "milestone.supports",
-    "support",
-    "support.necessity",
-    "support.causal",
-    "support.metric",
-    "support.approach",
+    "capability",
+    "capability.necessity",
+    "capability.causal",
+    "capability.metric",
+    "capability.approach",
     "siblings",
     "node",
     "node.metric",
@@ -572,9 +604,9 @@ window.ROTATION_CARDS = [
    "children": [
     {
      "id": "sw-i1",
-     "kind": "support",
+     "kind": "capability",
      "title": "章节 → 情节两层索引",
-     "support": "章节→情节两层索引",
+     "capability": "章节→情节两层索引",
      "necessity": "三层图的数据底座：没有两层索引，上面两层只能靠章节文本硬猜位置，切换章节时对不上。",
      "causal": "章节表与情节表没有共享 id → 无法双向查询 → 三层图无法按章节重组 → 打开即见三层图落空。",
      "metric": "章节与情节两层索引可双向查询，构建后校验全绿",
@@ -593,13 +625,17 @@ window.ROTATION_CARDS = [
        "closed_at": "2026-10-24T10:30:00+08:00",
        "issues": []
       }
-     ]
+     ],
+     "module": "src/plot/index.ts（情节索引层）",
+     "module_mode": "existing",
+     "gap": "缺它三层图没有数据源，改完章节图不更新",
+     "collaboration": "读章节源文件；向下向渲染层提供 plot tree；与大纲共用章节 id"
     },
     {
      "id": "sw-i2",
-     "kind": "support",
+     "kind": "capability",
      "title": "分层 SVG 绘制",
-     "support": "分层 SVG 绘制（每层一个 <g>）",
+     "capability": "分层 SVG 绘制（每层一个 <g>）",
      "necessity": "三层图要能各自独立更新，又必须叠在一起对齐；不先分层，任何一层的改动都会牵动整图。",
      "causal": "三层画在同一图层 → 改一层要整图重绘 → 单层 100 节点也画不快 → 首屏 800ms 达不到。",
      "metric": "单层渲染 100 节点 < 300ms，三层叠加位置对齐",
@@ -628,13 +664,17 @@ window.ROTATION_CARDS = [
         "result": "已给单层渲染拆出 3 步：先建 layer 容器，再复用节点缓存，最后接通 hover。bench 210ms → 96ms。"
        }
       }
-     ]
+     ],
+     "module": "src/render/svg（渲染层）",
+     "module_mode": "existing",
+     "gap": "缺它图只能看不能点，评审仍要截图对稿",
+     "collaboration": "从索引层取 plot tree；向交互层暴露节点命中区域"
     },
     {
      "id": "sw-i3",
-     "kind": "support",
+     "kind": "capability",
      "title": "分层绘制 + 缓存",
-     "support": "章节 id 缓存与首屏测量",
+     "capability": "章节 id 缓存与首屏测量",
      "necessity": "首屏 800ms 的瓶颈在重复绘制；不按章节缓存已绘制的层，切换章节就会把三层全部重画一遍。",
      "causal": "每次切章节重画三层 → 首屏实测 1.1s → 需要按章节 id 缓存层，并用 cache hit rate 证明优化有效。",
      "metric": "首屏 3 层 < 800ms，章节切换不闪烁",
@@ -698,13 +738,17 @@ window.ROTATION_CARDS = [
         }
        ]
       }
-     ]
+     ],
+     "module": "src/render/cache（渲染层缓存）",
+     "module_mode": "new",
+     "gap": "缺它首屏 > 800ms，超出等待阈值",
+     "collaboration": "拦截渲染层绘制调用；命中缓存时跳过重排"
     },
     {
      "id": "sw-i4",
-     "kind": "support",
+     "kind": "capability",
      "title": "复用既有地图图层",
-     "support": "既有地图图层复用",
+     "capability": "既有地图图层复用",
      "necessity": "地图图层已经跑通；重写一遍不仅重复劳动，还会撞上节点位置与情节层的对齐问题。",
      "causal": "新画地图图层 → 节点位置与情节层对不齐 → 需要重新做对齐 → 直接复用老 layer 实例省掉这段成本。",
      "metric": "地图图层可复用，节点位置稳定",
@@ -722,7 +766,11 @@ window.ROTATION_CARDS = [
        "closed_at": "2026-10-24T17:30:00+08:00",
        "issues": []
       }
-     ]
+     ],
+     "module": "src/map/layers（地图图层）",
+     "module_mode": "existing",
+     "gap": "缺它每个视图各画一份，切视图要等重绘",
+     "collaboration": "与渲染层共用图层协议；向导航层提供图层列表"
     }
    ],
    "started_at": "2026-10-24T21:00:00+08:00",
@@ -739,7 +787,7 @@ window.ROTATION_CARDS = [
     }
    ],
    "vision": "打开项目就能看到三层情节图，不用读代码",
-   "supports": "1)章节→情节两层索引（src/plot/index.ts，三层图的数据底座）\n2)分层 SVG 绘制（每层一个 <g>，独立更新且叠加对齐）\n3)章节 id 缓存与首屏测量（首屏 < 800ms 的瓶颈在这里）\n4)既有地图图层复用（省掉节点对齐成本）"
+   "capabilities": "1)章节→情节两层索引（src/plot/index.ts，三层图的数据底座）\n2)分层 SVG 绘制（每层一个 <g>，独立更新且叠加对齐）\n3)章节 id 缓存与首屏测量（首屏 < 800ms 的瓶颈在这里）\n4)既有地图图层复用（省掉节点对齐成本）"
   }
  }
 ];

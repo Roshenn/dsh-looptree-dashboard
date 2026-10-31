@@ -99,8 +99,8 @@ const { genBtnMarkup, GEN_FIELDS_CLIENT } = api;
 
 const node = (kind, raw = {}, title = '示例节点') => ({ id: 'n1', kind, title, raw });
 const p = { id: 'p1' };
-const msFull = { vision: '愿景', supports: '1)重要支撑' };
-const supportFull = { support: '承接支撑项', necessity: '必要性', causal: '因果', metric: '指标', approach: '思路' };
+const msFull = { vision: '愿景', capabilities: '1)主要能力闭环' };
+const capabilityFull = { capability: '承接条目', necessity: '必要性', causal: '与闭环的关系', gap: '缺失影响', module: 'src/plot', module_mode: 'existing', collaboration: '协同面', metric: '指标', approach: '思路' };
 const recordNode = (action, raw = {}) => ({ id: 'r1', kind: 'exec', title: '执行', raw: { action, ...raw } });
 
 /* 1. 缺项 → 「生成 N 项」+ 高亮 */
@@ -108,31 +108,31 @@ const msEmpty = genBtnMarkup(p, node('milestone', {}));
 check('里程碑全空 → 生成 2 项', msEmpty.includes('生成 2 项'), msEmpty);
 check('有缺项 → 高亮（is-hot）', msEmpty.includes('genbtn is-hot'), msEmpty);
 check('有缺项 → 可点（不带 disabled）', !msEmpty.includes('disabled'), msEmpty);
-check('里程碑缺项顺序 = 里程碑愿景 / 重要支撑（不再有核心指标）', /里程碑愿景、重要支撑/.test(msEmpty) && !/核心指标/.test(msEmpty), msEmpty);
-const supHalf = genBtnMarkup(p, node('support', { metric: '指标' }));
-check('支撑项缺 1 项 → 生成 1 项且高亮', supHalf.includes('生成 1 项') && supHalf.includes('is-hot'), supHalf);
-check('支撑项全空 → 生成 2 项', genBtnMarkup(p, node('support', {})).includes('生成 2 项'), genBtnMarkup(p, node('support', {})));
+check('里程碑缺项顺序 = 里程碑愿景 / 主要能力闭环（不再有核心指标）', /里程碑愿景、主要能力闭环/.test(msEmpty) && !/核心指标/.test(msEmpty), msEmpty);
+const capHalf = genBtnMarkup(p, node('capability', { ...capabilityFull, gap: '' }));
+check('能力闭环缺 1 项 → 生成 1 项且高亮', capHalf.includes('生成 1 项') && capHalf.includes('is-hot'), capHalf);
+check('能力闭环全空 → 生成 9 项', genBtnMarkup(p, node('capability', {})).includes('生成 9 项'), genBtnMarkup(p, node('capability', {})));
 
 /* 2. 补完 → 灰显「无缺项」、不再高亮 */
 const msDone = genBtnMarkup(p, node('milestone', msFull));
 check('里程碑补完 → 无缺项', msDone.includes('无缺项'), msDone);
 check('补完 → 不亮', !msDone.includes('is-hot'), msDone);
 check('补完 → disabled', msDone.includes('disabled'), msDone);
-check('支撑项补完 → 无缺项', genBtnMarkup(p, node('support', supportFull)).includes('无缺项'));
+check('能力闭环补完 → 无缺项', genBtnMarkup(p, node('capability', capabilityFull)).includes('无缺项'));
 check('执行记录（带 action）不出补齐按钮', genBtnMarkup(p, recordNode('exec', {})) === '', genBtnMarkup(p, recordNode('exec', {})));
 const bareExec = { id: 'e1', kind: 'exec', title: '直接执行', raw: {} };
 check('无 action 的执行节点缺验证 → 生成 1 项', genBtnMarkup(p, bareExec).includes('生成 1 项'), genBtnMarkup(p, bareExec));
 check('无 action 的执行节点补完 → 无缺项', genBtnMarkup(p, { ...bareExec, raw: { verify: 'npm test' } }).includes('无缺项'));
 
 /* 3. 没标题 → 灰「生成」；没有可补字段的节点 → 不出现 */
-const noTitle = genBtnMarkup(p, { id: 'n1', kind: 'support', title: '新支撑项（待命名）', raw: {} });
+const noTitle = genBtnMarkup(p, { id: 'n1', kind: 'capability', title: '新能力闭环（待命名）', raw: {} });
 check('标题是占位名 → 灰「生成」', noTitle.includes('>生成<') && noTitle.includes('disabled'), noTitle);
 check('未知 kind 没有可补字段 → 不出按钮', genBtnMarkup(p, node('idea', {})) === '', genBtnMarkup(p, node('idea', {})));
-check('字段表：里程碑 3 项 / 支撑项 2 项 / 执行记录 1 项',
-  GEN_FIELDS_CLIENT.milestone.join() === 'vision,supports'
-  && GEN_FIELDS_CLIENT.support.join() === 'metric,approach'
+check('字段表：里程碑 2 项 / 能力闭环 9 项 / 执行记录 1 项',
+  GEN_FIELDS_CLIENT.milestone.join() === 'vision,capabilities'
+  && GEN_FIELDS_CLIENT.capability.join() === 'capability,necessity,causal,gap,module,module_mode,collaboration,metric,approach'
   && GEN_FIELDS_CLIENT.exec.join() === 'verify', JSON.stringify(GEN_FIELDS_CLIENT));
-check('字段表不再有 goal / idea', !('goal' in GEN_FIELDS_CLIENT) && !('idea' in GEN_FIELDS_CLIENT), JSON.stringify(GEN_FIELDS_CLIENT));
+check('字段表不再有 support / goal / idea', !('goal' in GEN_FIELDS_CLIENT) && !('idea' in GEN_FIELDS_CLIENT), JSON.stringify(GEN_FIELDS_CLIENT));
 
 /* 4. 源码结构：卡片 footer 里「确认收敛 → 生成 N 项」的顺序、详情标题行不再挂它 */
 const leadAt = script.indexOf('const leadKids = [closeBtn, genBtn]');

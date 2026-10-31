@@ -10,7 +10,7 @@
   "fields": [
    "project",
    "milestone",
-   "support",
+   "capability",
    "node"
   ],
   "siblings": 0
@@ -24,9 +24,9 @@
   "children": [
    {
     "id": "ck-i1",
-    "kind": "support",
+    "kind": "capability",
     "title": "词频驱动词块顺序",
-    "support": "双轨共用的词块排序键",
+    "capability": "双轨共用的词块排序键",
     "necessity": "词块按什么顺序推给学习者，决定教与学两条路径能不能共用同一份数据；没有统一排序就要各自维护一套。",
     "causal": "词块数据没有统一排序键 → 教轨与学轨各自排序 → 换教材要改两处流程 → 双轨无法独立交付。",
     "metric": "COCA 前 6000 命中 ≥ 90%，且教/学两轨读到同一排序结果",
@@ -46,13 +46,17 @@
       "proof": "采样中",
       "started_at": "2026-10-20T09:00:00+08:00"
      }
-    ]
+    ],
+    "module": "src/order/rank.ts（排序层）",
+    "module_mode": "existing",
+    "gap": "缺它只能手排，换教材要重排一遍",
+    "collaboration": "读词块数据与 COCA 词频表；向教/学两轨输出同一份排序"
    },
    {
     "id": "ck-i2",
-    "kind": "support",
+    "kind": "capability",
     "title": "语料词频现场计算",
-    "support": "两轨共享的数据与进度结构",
+    "capability": "两轨共享的数据与进度结构",
     "necessity": "教与学各自记录进度，数据结构不统一时，换一套词块数据就得改两遍代码，双轨交付会互相拖住。",
     "causal": "进度结构绑定在单条路径上 → 两轨无法共用同一组词块 → 换数据要同步改两处 → 双轨不能独立交付。",
     "metric": "教/学两轨各走完 1 组词块，进度互不覆盖",
@@ -71,11 +75,15 @@
       "issues": [],
       "started_at": "2026-10-20T09:00:00+08:00"
      }
-    ]
+    ],
+    "module": "src/corpus/coca.ts（语料层）",
+    "module_mode": "new",
+    "gap": "缺它排序依赖离线表，新教材进不来",
+    "collaboration": "由排序层调用；结果缓存给导出脚本"
    }
   ],
   "started_at": "2026-10-24T21:00:00+08:00",
   "vision": "教与学两条路径都能独立走完一组词块",
-  "supports": "1)词频驱动的词块顺序（教/学两轨共用同一份排序）\n2)两轨共享的数据与进度结构（换教材只改数据）"
+  "capabilities": "1)词频驱动的词块顺序（教/学两轨共用同一份排序）\n2)两轨共享的数据与进度结构（换教材只改数据）"
  }
 }

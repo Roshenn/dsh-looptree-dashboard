@@ -1,7 +1,7 @@
 {
   "name": "dsh-looptree-dashboard",
-  "version": "0.15.1",
-  "description": "Looptree Dashboard for DSH: one swimlane per project (project vision → milestone → goal → idea → execution records) with node sessions, structured prompts and one-click service control",
+  "version": "0.16.0",
+  "description": "Looptree Dashboard for DSH: one swimlane per project (project vision → milestone → capability loop → execution records) with node sessions, structured prompts and one-click service control",
   "license": "MIT",
   "author": "jrri",
   "repository": {
@@ -81,6 +81,7 @@
     "mock:client": "node scripts/dev-client-mock.mjs",
     "lint:plugin": "node scripts/lint-plugin.mjs",
     "preflight": "node scripts/preflight.mjs",
-    "verify:package": "node scripts/verify-package.mjs"
+    "verify:package": "node scripts/verify-package.mjs",
+    "migrate:capabilities": "node scripts/migrate-capabilities.mjs"
   }
 }
