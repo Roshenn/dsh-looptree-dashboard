@@ -520,9 +520,9 @@
   .editval:hover{background:var(--hover);color:var(--tx1)}
   .editval.empty{color:var(--tx4);border:1px dashed var(--b2);text-align:center;font-size:11px}
   .editval{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  /* 愿景 / 重要支撑都是多行内容，默认 2 行只剩开头一半 → 单独放宽 */
+  /* 愿景 / 主要能力闭环都是多行内容，默认 2 行只剩开头一半 → 单独放宽 */
   .editval[data-edit="vision"]{-webkit-line-clamp:5}
-  .editval[data-edit="supports"]{-webkit-line-clamp:4}
+  .editval[data-edit="capabilities"]{-webkit-line-clamp:4}
   .detail-row .fielddd{display:flex;gap:6px;align-items:flex-start}
   .detail-row .fielddd .editval{flex:1;min-width:0}
   /* 卡片下缘 / 详情动作行的「生成 N 项」：按标题补齐缺失字段 */
@@ -609,7 +609,7 @@
   .cand-empty{padding:16px 4px 10px;text-align:center;font-size:11.5px;color:var(--tx4);line-height:1.6}
   .cand-main{flex:1;min-width:0;transition:opacity 200ms var(--ease-out)}
   .cand-title{font-size:12px;color:var(--tx1);font-weight:500}
-  /* 候选行瘦身：序号 + 重要性徽标 + 标题 + 承接支撑项一行；其它字段走 #cand-tip 悬浮卡 */
+  /* 候选行瘦身：序号 + 重要性徽标 + 标题 + 承接能力闭环一行；其它字段走 #cand-tip 悬浮卡 */
   .cand-idx{flex:0 0 18px;padding-top:1px;text-align:right;font-size:10.5px;color:var(--tx4);font-variant-numeric:tabular-nums}
   .cand-imp{flex:0 0 auto;min-width:20px;height:18px;display:inline-grid;place-items:center;border-radius:5px;
     font-size:10px;color:var(--tx3);border:1px solid var(--b2);background:var(--l3);font-variant-numeric:tabular-nums}
@@ -618,6 +618,11 @@
   .cand-sup{font-size:10.5px;color:var(--tx4);margin-top:3px;line-height:1.45;
     overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;
     padding-left:7px;border-left:2px solid color-mix(in srgb,var(--brand) 36%,transparent)}
+  /* 模块徽标：改造现有 / 新增 · 模块名；一行截断，完整值在 title 与悬浮卡里 */
+  .cand-mod{margin-top:3px;font-size:10px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:inline-block;max-width:100%;padding:1px 6px;border-radius:5px;
+    border:1px solid color-mix(in srgb,var(--blue-300) 30%,transparent);
+    background:color-mix(in srgb,var(--blue-300) 10%,transparent)}
   .sess-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
   .sess-pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left}
   .sess-log{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
@@ -777,7 +782,7 @@
       <button class="chip" data-filter="open" aria-pressed="false">未关闭</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="density" aria-pressed="true">紧凑</button>
-      <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的支撑项 / 执行记录（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
+      <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的能力闭环 / 执行记录（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="back-to-dsh" hidden title="返回到 DSH">← 返回</button>
       <button class="chip" id="add-project">+ 项目</button>
@@ -792,7 +797,7 @@
     </div>
     <div class="grow"></div>
     <div id="focus-switch" class="chipbar" hidden></div>
-    <span class="hint" id="toolbar-hint">里程碑 → 支撑项 → 执行记录；支撑项记录全闭环自动完成，支撑项全部关闭后点「确认达成」</span>
+    <span class="hint" id="toolbar-hint">里程碑 → 能力闭环 → 执行记录；能力闭环记录全闭环自动完成，能力闭环全部关闭后点「确认达成」</span>
   </div>
 
   <main class="scroll" id="stage">
@@ -923,16 +928,18 @@
 /* ─────────── 常量 ─────────── */
 const STAGES = [
   { key:'milestone', label:'里程碑',         en:'MILESTONE', color:'var(--brand)' },
-  { key:'support',   label:'支撑项',         en:'Support',   color:'var(--blue-300)' },
+  { key:'capability',   label:'能力闭环',         en:'Capability', color:'var(--blue-300)' },
   { key:'exec',      label:'执行验证反馈记录', en:'Records',   color:'var(--green)' },
 ];
-const KIND = { milestone:'里程碑', support:'支撑项', exec:'执行' };
+const KIND = { milestone:'里程碑', capability:'能力闭环', exec:'执行' };
+/** module_mode：改造还是新增（与 host / prompt 的 MODULE_MODE_LABEL 同口径） */
+const MODULE_MODE_LABEL = { existing:'改造现有', new:'新增' };
 /** 执行记录按 action 区分显示（计划 / 执行 / 反馈）；老记录没有 action 仍显示「执行」 */
 const ACTION_LABEL = { plan:'计划', exec:'执行', reflect:'反馈' };
 const isRecord = (n) => !!(n && n.kind === 'exec' && n.raw && n.raw.action);
 const recordActionOf = (n) => ((n && isRecord(n)) ? n.raw.action : '');
 const kindLabel = (n) => isRecord(n) ? (ACTION_LABEL[n.raw.action] || '执行') : (KIND[n.kind] || n.kind);
-const KIND_TONE = { milestone:'var(--brand)', support:'var(--blue-300)', exec:'var(--green)' };
+const KIND_TONE = { milestone:'var(--brand)', capability:'var(--blue-300)', exec:'var(--green)' };
 const STATUS = {
   doing:{ label:'执行中', tone:'var(--brand-2)' },
   ready:{ label:'就绪',   tone:'var(--tx3)' },
@@ -955,22 +962,26 @@ const MOCK_PROJECTS = [
     ],
     trail:[
       {at:'22:41',status:'doing',act:'执行记录：情节层数据结构设计',note:'回合 3'},
-      {at:'21:07',status:'doing',act:'支撑项：三层叠渲染管线',note:'新增 3 条执行记录'},
-      {at:'19:32',status:'ready',act:'重要支撑定稿：章节 → 情节两层索引',note:'备选方案保留'},
-      {at:'10:24',status:'done',act:'支撑项完成：地图图层复用',note:'执行记录全闭环后自动收口'},
+      {at:'21:07',status:'doing',act:'能力闭环：三层叠渲染管线',note:'新增 3 条执行记录'},
+      {at:'19:32',status:'ready',act:'主要能力闭环定稿：章节 → 情节两层索引',note:'备选方案保留'},
+      {at:'10:24',status:'done',act:'能力闭环完成：地图图层复用',note:'执行记录全闭环后自动收口'},
     ],
     root: N('sw-loop','milestone','3 情节层渲染可视化', {
       vision:'打开项目就能看到三层情节图，不用读代码；作者改一段情节，视觉与结构同时更新，评审不用再截图对稿。',
-      supports:'章节 → 情节两层索引\n三层叠渲染管线\n地图图层复用',
+      capabilities:'章节 → 情节两层索引\n三层叠渲染管线\n地图图层复用',
       lessons:[
         {text:'先做索引再画图，返工少一半',at:'2026-10-25T10:00:00.000Z'},
         {text:'渲染性能先量再优化，别猜',at:'2026-10-26T09:12:00.000Z'},
       ],
       children:[
-        N('sw-s1','support','情节数据模型可用', {
-          support:'章节 → 情节两层索引',
+        N('sw-s1','capability','情节数据模型可用', {
+          capability:'章节 → 情节两层索引',
           necessity:'没有索引，情节无法定位到章节，三层图无从画起',
           causal:'索引一乱，情节渲染与结构树同时对不上',
+          gap:'缺它三层图没有数据源，改完章节图不更新',
+          module:'src/plot/index.ts（情节索引层）',
+          module_mode:'existing',
+          collaboration:'读章节源文件；向渲染层提供 plot tree；与大纲共用章节 id',
           metric:'索引构建 4 个测试用例通过',
           approach:'先建章节 → 情节两层 Map，再按层采样渲染',
           children:[
@@ -979,8 +990,12 @@ const MOCK_PROJECTS = [
             N('sw-r3','exec','反馈：采样粒度再细一档', { action:'reflect', closed:true, status:'done' }),
           ],
         }),
-        N('sw-s2','support','三层叠渲染管线', {
-          support:'三层叠渲染首屏可用',
+        N('sw-s2','capability','三层叠渲染管线', {
+          gap:'缺它首屏 > 800ms，评审还在等出图',
+          module:'src/render/cache（渲染层缓存）',
+          module_mode:'new',
+          collaboration:'拦截渲染层绘制调用；命中缓存时跳过重排',
+          capability:'三层叠渲染首屏可用',
           necessity:'三层图必须一次画完，逐层加载会让人等三次',
           causal:'渲染管线一慢，前面索引做得再准也看不出效果',
           metric:'首屏 3 层 < 800ms',
@@ -991,9 +1006,9 @@ const MOCK_PROJECTS = [
             N('sw-r6','exec','反馈：缓存命中率偏低', { action:'reflect', status:'plan' }),
           ],
         }),
-        N('sw-s3','support','地图图层复用', {
+        N('sw-s3','capability','地图图层复用', {
           closed:true,
-          support:'复用既有地图图层',
+          capability:'复用既有地图图层',
           necessity:'重画一套地图要两周，复用现成图层一天就能接上',
           causal:'图层不复用，地图与情节会各画一套坐标系',
           metric:'图层复用接入后地图加载 < 300ms',
@@ -1015,15 +1030,19 @@ const MOCK_PROJECTS = [
     ],
     trail:[
       {at:'22:58',status:'doing',act:'执行记录：COCA 六万词顺序',note:'采样 1.2 万句'},
-      {at:'20:40',status:'ready',act:'重要支撑：语料词频现场计算',note:'主选方案'},
+      {at:'20:40',status:'ready',act:'主要能力闭环：语料词频现场计算',note:'主选方案'},
       {at:'17:05',status:'plan',act:'立项：双轨学习里程碑',note:'教 / 学两条路径'},
     ],
     root: N('ck-loop','milestone','双轨学习里程碑', {
       vision:'教与学两条路径都能用同一套词块数据跑通，换教材不用重排词表。',
-      supports:'教学轨可用\n学习轨可用',
+      capabilities:'教学轨可用\n学习轨可用',
       children:[
-        N('ck-s1','support','教学轨可用', {
-          support:'教学轨能用词频驱动词块顺序',
+        N('ck-s1','capability','教学轨可用', {
+          gap:'缺它只能手排，换教材要重排一遍',
+          module:'src/order/rank.ts（排序层）',
+          module_mode:'existing',
+          collaboration:'读词块数据与 COCA 词频表；向教/学两轨输出同一份排序',
+          capability:'教学轨能用词频驱动词块顺序',
           necessity:'教材词表顺序不靠谱，学生先学的词用不上',
           causal:'词频顺序错了，后面的复习计划全部要重排',
           metric:'COCA 前 6000 命中 ≥ 90%',
@@ -1033,8 +1052,8 @@ const MOCK_PROJECTS = [
             N('ck-r2','exec','执行：COCA 前 6000 命中 ≥ 90%', { action:'exec', status:'doing', verify:'采样 3000/6000', proof:'' }),
           ],
         }),
-        N('ck-s2','support','学习轨可用', {
-          support:'学习轨能用同一套词块数据',
+        N('ck-s2','capability','学习轨可用', {
+          capability:'学习轨能用同一套词块数据',
           necessity:'教学与学习共用一份数据，才不用维护两套词表',
           causal:'数据分叉会让两条轨道的进度对不上',
           metric:'采样 1.2 万句完成',
@@ -1055,15 +1074,15 @@ const MOCK_PROJECTS = [
     ],
     trail:[
       {at:'23:12',status:'blocked',act:'标记阻塞：登录态 6h 失效',note:'需人工扫码'},
-      {at:'22:46',status:'doing',act:'支撑项：端到端 10 条真实需求',note:'验收从 5 条提到 10 条'},
+      {at:'22:46',status:'doing',act:'能力闭环：端到端 10 条真实需求',note:'验收从 5 条提到 10 条'},
       {at:'19:02',status:'plan',act:'立项：NeedsFinder 需求里程碑',note:'来源：小红书搜索'},
     ],
     root: N('nf-loop','milestone','需求发现里程碑', {
       vision:'每天自动从小红书捞出真实需求，按痛点排序，选题不再靠猜。',
-      supports:'小红书链路跑通\n端到端产出 10 条需求',
+      capabilities:'小红书链路跑通\n端到端产出 10 条需求',
       children:[
-        N('nf-s1','support','小红书链路跑通', {
-          support:'抓取 → 聚类 → 打分整条链路可跑',
+        N('nf-s1','capability','小红书链路跑通', {
+          capability:'抓取 → 聚类 → 打分整条链路可跑',
           necessity:'链路跑不通就没有需求来源，后面全是空转',
           causal:'登录态一失效，抓取、聚类、打分同时中断',
           metric:'登录态保活 6h',
@@ -1073,8 +1092,8 @@ const MOCK_PROJECTS = [
             N('nf-r2','exec','执行：登录态保活 6h', { action:'exec', status:'blocked', verify:'', issues:['扫码登录 6 小时后失效，抓取链路中断'] }),
           ],
         }),
-        N('nf-s2','support','端到端产出 10 条需求', {
-          support:'去重后仍有 10 条真实需求',
+        N('nf-s2','capability','端到端产出 10 条需求', {
+          capability:'去重后仍有 10 条真实需求',
           necessity:'少于 10 条说明样本不够，排序结论不可信',
           causal:'需求不去重，同一条会被算成多条，排序失真',
           metric:'去重率 < 20%，需求 ≥ 10 条',
@@ -1095,15 +1114,15 @@ const MOCK_PROJECTS = [
     ],
     trail:[
       {at:'22:20',status:'doing',act:'执行记录：自动字幕时间轴兜底',note:'需人工字幕兜底'},
-      {at:'18:44',status:'done',act:'支撑项完成：素材入库',note:'40 条视频'},
+      {at:'18:44',status:'done',act:'能力闭环完成：素材入库',note:'40 条视频'},
     ],
     root: N('sh-loop','milestone','youtube 跟读里程碑', {
       vision:'任意 YouTube 视频粘链接就能逐句跟读，练完进度可恢复。',
-      supports:'素材入库\n字幕加载与时间轴对齐',
+      capabilities:'素材入库\n字幕加载与时间轴对齐',
       children:[
-        N('sh-s1','support','素材入库', {
+        N('sh-s1','capability','素材入库', {
           closed:true,
-          support:'链接解析 + 落盘',
+          capability:'链接解析 + 落盘',
           necessity:'没有本地素材，每次跟读都要重新联网拉视频',
           causal:'素材不全，后面字幕对齐没有可练的对象',
           metric:'入库 40 条视频',
@@ -1114,8 +1133,8 @@ const MOCK_PROJECTS = [
             N('sh-r3','exec','反馈：按视频 id 去重够用', { action:'reflect', closed:true, status:'done' }),
           ],
         }),
-        N('sh-s2','support','字幕加载与时间轴对齐', {
-          support:'字幕抓取 + 时间轴对齐',
+        N('sh-s2','capability','字幕加载与时间轴对齐', {
+          capability:'字幕抓取 + 时间轴对齐',
           necessity:'没有逐句时间轴，跟读只能整段播，练不了单句',
           causal:'对齐误差一大，跟读就会落后半句，体验直接崩',
           metric:'对齐误差 < 120ms',
@@ -1133,18 +1152,18 @@ const MOCK_PROJECTS = [
     id:'graph', name:'竞品知识图谱', tag:'已归档 · 2026-10-18', session:'session-71bd…0c33',
     sessions:[{id:'kg-s1',title:'竞品图谱四款数据入库',at:'10-18'}],
     trail:[
-      {at:'10-18',status:'done',act:'里程碑达成：竞品知识图谱',note:'2/2 支撑项关闭'},
-      {at:'10-16',status:'done',act:'支撑项完成：图谱交互',note:'4 款竞品可切换'},
+      {at:'10-18',status:'done',act:'里程碑达成：竞品知识图谱',note:'2/2 能力闭环关闭'},
+      {at:'10-16',status:'done',act:'能力闭环完成：图谱交互',note:'4 款竞品可切换'},
     ],
     root: N('kg-loop','milestone','竞品知识图谱里程碑', {
       closed:true, convergedAt:'2026-10-18 16:40',
       vision:'四款竞品的知识图谱可查可看，选型对比一屏完成。',
-      supports:'四款竞品数据入库\n图谱交互可用',
+      capabilities:'四款竞品数据入库\n图谱交互可用',
       lessons:[{text:'数据先结构化成节点，图谱交互就是纯前端活',at:'2026-10-18T16:40:00.000Z'}],
       children:[
-        N('kg-s1','support','四款竞品数据入库', {
+        N('kg-s1','capability','四款竞品数据入库', {
           closed:true,
-          support:'官网 + 文档抓取',
+          capability:'官网 + 文档抓取',
           necessity:'没有结构化数据，图谱没有可展示的节点',
           causal:'入库字段一乱，后面的连线与过滤全要重做',
           metric:'入库 4 款竞品',
@@ -1154,9 +1173,9 @@ const MOCK_PROJECTS = [
             N('kg-r2','exec','执行：入库 4 款竞品', { action:'exec', closed:true, status:'done', verify:'4/4 入库' }),
           ],
         }),
-        N('kg-s2','support','图谱交互可用', {
+        N('kg-s2','capability','图谱交互可用', {
           closed:true,
-          support:'节点连线 + 过滤',
+          capability:'节点连线 + 过滤',
           necessity:'只有节点没有交互，选型对比还是得来回翻文档',
           causal:'交互卡顿会让人放弃使用，图谱等于没做',
           metric:'切换 4 款不卡顿',
@@ -1200,30 +1219,32 @@ function summarizeField(text, label){
 }
 
 /**
- * 载入兜底：把旧卡片（goal / idea / blockers）折叠成三列契约，幂等。
+ * 载入兜底：把旧卡片（goal / idea / support / blockers）折叠成三列契约，幂等。
  * 只在传入 card 的深拷贝上操作，不回写原对象引用；折叠后的结果就是写盘用的 card。
- *   blockers → supports（里程碑文本）
- *   深 2 goal → support；goal.blocker → support.support
- *   goal 下的 idea → 折进支撑项：approach / plan 空时补，idea.children 上提为执行记录
+ *   blockers / supports → capabilities（里程碑文本）
+ *   深 2 goal / idea / support → capability；blocker / support → capability.capability
+ *   深 2 节点下的 idea → 折进能力闭环：approach / plan 空时补，idea.children 上提为执行记录
  */
 function foldLegacyKinds(card){
   const out = JSON.parse(JSON.stringify(card || {}));
   const ms = out.milestone;
   if (!ms || typeof ms !== 'object') return out;
   ms.kind = 'milestone';
-  if (!String(ms.supports || '').trim() && String(ms.blockers || '').trim()) ms.supports = ms.blockers;
-  delete ms.blockers;
+  if (!String(ms.capabilities || '').trim() && String(ms.blockers || '').trim()) ms.capabilities = ms.blockers;
+  if (!String(ms.capabilities || '').trim() && String(ms.supports || '').trim()) ms.capabilities = ms.supports;
+  delete ms.blockers; delete ms.supports;
   delete ms.scenario; delete ms.constraints; delete ms.acceptance;
-  const foldSupport = (node) => {
-    node.kind = 'support';
-    if (!String(node.support || '').trim() && String(node.blocker || '').trim()) node.support = node.blocker;
-    delete node.blocker;
+  const foldCapability = (node) => {
+    node.kind = 'capability';
+    if (!String(node.capability || '').trim() && String(node.support || '').trim()) node.capability = node.support;
+    if (!String(node.capability || '').trim() && String(node.blocker || '').trim()) node.capability = node.blocker;
+    delete node.support; delete node.blocker;
     delete node.scenario; delete node.constraints; delete node.acceptance;
     const kept = [];
     for (const kid of (Array.isArray(node.children) ? node.children : [])){
       if (!kid || typeof kid !== 'object') continue;
       if (kid.kind === 'idea'){
-        // 构思折进支撑项：没有实现思路就借构思标题，计划对象空着就继承
+        // 构思折进能力闭环：没有实现思路就借构思标题，计划对象空着就继承
         if (!String(node.approach || '').trim()) node.approach = String(kid.approach || kid.title || '').trim();
         if (!node.plan && kid.plan) node.plan = kid.plan;
         (kid.children || []).forEach((c) => { if (c && typeof c === 'object' && c.kind === 'exec') kept.push(c); });
@@ -1235,15 +1256,15 @@ function foldLegacyKinds(card){
     if (execs.length) node.children = execs; else delete node.children;
     return node;
   };
-  const supports = [];
+  const capabilities = [];
   for (const child of (Array.isArray(ms.children) ? ms.children : [])){
     if (!child || typeof child !== 'object') continue;
-    if (child.kind === 'support' || child.kind === 'goal') supports.push(foldSupport(child));
-    else if (child.kind === 'idea') supports.push(foldSupport({ id: child.id, title: child.title, children: child.children }));
-    else if (child.kind === 'exec') supports.push(foldSupport({ id: child.id + '-s', title: child.title, children: [child] }));
-    else supports.push(foldSupport(child));
+    if (child.kind === 'capability' || child.kind === 'goal' || child.kind === 'support') capabilities.push(foldCapability(child));
+    else if (child.kind === 'idea') capabilities.push(foldCapability({ id: child.id, title: child.title, children: child.children }));
+    else if (child.kind === 'exec') capabilities.push(foldCapability({ id: child.id + '-s', title: child.title, children: [child] }));
+    else capabilities.push(foldCapability(child));
   }
-  if (supports.length) ms.children = supports; else delete ms.children;
+  if (capabilities.length) ms.children = capabilities; else delete ms.children;
   return out;
 }
 
@@ -1263,15 +1284,20 @@ function cardToProject(card, file){
     title: n.title,
     status: n.status || 'plan',
     closed: !!n.closed_at,
-    metaFull: isRec ? '' : (n.kind === 'exec' ? (n.verify || '') : (n.kind === 'milestone' ? (n.vision || '') : (n.support || n.necessity || ''))),
+    metaFull: isRec ? '' : (n.kind === 'exec' ? (n.verify || '') : (n.kind === 'milestone' ? (n.vision || '') : (n.capability || n.necessity || ''))),
     chips: (() => {
       if (isRec) return [];
       const out = [];
       if (n.kind === 'milestone') {
-        // 重要支撑按行数算：一行一条，不要求带编号标记（核心指标只挂在支撑项上）
-        const supItems = lineCount(n.supports);
-        if (supItems) out.push(`重要支撑 ${supItems} 条`);
-      } else if (n.kind === 'support') {
+        // 主要能力闭环按行数算：一行一条，不要求带编号标记（核心指标只挂在能力闭环上）
+        const supItems = lineCount(n.capabilities);
+        if (supItems) out.push(`主要能力闭环 ${supItems} 条`);
+      } else if (n.kind === 'capability') {
+        const mode = MODULE_MODE_LABEL[n.module_mode] || '';
+        const mod = String(n.module || '').trim();
+        if (mod) out.push(`${mode ? mode + ' · ' : ''}${mod}`);
+        else if (mode) out.push(mode);
+        else out.push('模块未标注');
         out.push(`核心指标${String(n.metric || '').trim() ? '有' : '无'}`);
         const recCount = (n.children || []).filter((k) => k && k.kind === 'exec').length;
         if (recCount) out.push(`子记录 ${recCount}`);
@@ -1282,13 +1308,13 @@ function cardToProject(card, file){
       ? summarizeField(n.verify, '验证')
       : (n.kind === 'milestone'
         ? summarizeField(n.vision, '里程碑愿景')
-        : summarizeField(n.support || n.necessity, '承接支撑项'))),
+        : summarizeField(n.capability || n.necessity, '承接能力闭环'))),
     issues: (n.issues || []).filter(i => !i.resolved_at).map(i => i.text),
     children: (n.children || []).map(conv),
     };
   };
   const root = conv(card.milestone);
-  autoCloseTree(root);   // 旧数据里「执行记录全闭环但没关」的支撑项，进入面板时先按结构补正
+  autoCloseTree(root);   // 旧数据里「执行记录全闭环但没关」的能力闭环，进入面板时先按结构补正
   if (card.milestone.closed_at) root.convergedAt = new Date(card.milestone.closed_at).toLocaleString('sv-SE').slice(0,16);
   const proj = {
     id: 'card-' + root.id,
@@ -1317,8 +1343,8 @@ function countExecItems(root){
 /** 历史快照只保留回看需要的字段：结构完整，不背 session / 计划全文 */
 function compactMilestoneSnapshot(node){
   if (!node || typeof node !== 'object') return null;
-  // 新旧字段都留着：老快照只读回看，新快照要能完整还原支撑项
-  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','vision','supports','metrics','support','necessity','causal','metric','approach','acceptance','blockers','blocker','verify','proof','action','lessons'];
+  // 新旧字段都留着：老快照只读回看，新快照要能完整还原能力闭环
+  const KEEP = ['id','kind','title','status','closed_at','started_at','intent','vision','capabilities','metrics','capability','necessity','causal','gap','module','module_mode','collaboration','metric','approach','acceptance','blockers','blocker','verify','proof','action','lessons'];
   const out = {};
   KEEP.forEach((k) => { if (node[k] != null) out[k] = node[k]; });
   if (Array.isArray(node.issues) && node.issues.length){
@@ -1343,8 +1369,8 @@ function pushClosedMilestone(p, root, at){
     title: raw.title || root.title || '未命名里程碑',
     closed_at: raw.closed_at || at || new Date().toISOString(),
     archived_at: new Date().toISOString(),
-    // 字段名沿用历史 schema 的 goals，口径换成支撑项（closed_milestones 随卡片走 git，不改键）
-    goals: (raw.children || []).filter((k) => k && (k.kind === 'support' || k.kind === 'goal')).length,
+    // 字段名沿用历史 schema 的 goals，口径换成能力闭环（closed_milestones 随卡片走 git，不改键）
+    goals: (raw.children || []).filter((k) => k && (k.kind === 'capability' || k.kind === 'goal')).length,
     execs: countExecItems(root),
     snapshot: compactMilestoneSnapshot(raw),
   };
@@ -1409,7 +1435,7 @@ function staticRun(n){
 function runFor(p, n){
   const direct = runMap.get(runKey(p, n));
   if (direct) return direct;
-  // 动作会话的 nodeId 是支撑项 id、recordId 是记录 id：支撑项卡与记录卡都要认领同一个 run
+  // 动作会话的 nodeId 是能力闭环 id、recordId 是记录 id：能力闭环卡与记录卡都要认领同一个 run
   for (const r of runMap.values()){
     if (r.nodeId === n.id || (r.recordId && r.recordId === n.id)) return r;
   }
@@ -1439,7 +1465,7 @@ function activeAncestorOf(p, n){
  * 这里不新增规则、不新增字段，只把同一条判定翻过来用于渲染：没在跑、祖先也没在跑的就高亮。
  * 注意：卡片跨机器同步来的 running 已被 staticRun 降级成 stale，所以旧快照不会被算成「忙」。
  */
-const IDLE_KINDS = ['milestone', 'support'];   // 执行记录是日志，不算分支
+const IDLE_KINDS = ['milestone', 'capability'];   // 执行记录是日志，不算分支
 /**
  * 项目内的可开工分支模型（纯函数：isBusy / isBlocked 外部注入，mock 直接抽这段跑断言）。
  *   running            = 自身有 live run
@@ -1624,8 +1650,8 @@ function hasIssues(n){ return nodeIssues(n).length > 0; }
 function anyBlocked(n){ let h=false; walk(n, x=>{ if(hasIssues(x) && !x.closed) h=true; }); return h; }
 function blockCount(n){ let c=0; walk(n, x=>{ if(hasIssues(x) && !x.closed) c++; }); return c; }
 // 「有信息」：标题以外任意内容字段非空 → 说明已经开始想这件事
-// 三列口径：里程碑看愿景 / 重要支撑；支撑项看承接支撑项 / 核心指标 / 实现思路 / 必要性 / 因果；记录看验证与证据
-const INFO_FIELDS = ['vision','supports','support','metric','approach','necessity','causal','verify','proof'];
+// 三列口径：里程碑看愿景 / 主要能力闭环；能力闭环看承接能力闭环 / 核心指标 / 实现思路 / 必要性 / 因果；记录看验证与证据
+const INFO_FIELDS = ['vision','capabilities','capability','metric','approach','necessity','causal','gap','module','collaboration','verify','proof'];
 // 面板给新建节点塞的占位（新目标（待命名）/（待补）验收方式…）不算「有内容」
 const PLACEHOLDER_RE = /^[（(]待补[）)]/;
 function isFilled(v){
@@ -1639,7 +1665,7 @@ function hasInfo(n){
 /* 五种状态，全部由结构派生（不再手改）：
    未开始 = 只有标题；规划中 = 有内容但还没执行；进行中 = 有工作子节点/执行记录未全闭环；
    待确认 = 里程碑「待确认达成」/ 目标「待确认收敛」，等人工确认；已闭环 = 人工确认过
-   （里程碑叫「已达成」，支撑项 / 执行记录叫「已闭环」，由 stateOf 按 kind 换词） */
+   （里程碑叫「已达成」，能力闭环 / 执行记录叫「已闭环」，由 stateOf 按 kind 换词） */
 const STATE_DEF = {
   todo:   { label:'未开始', tone:'var(--tx4)' },
   plan:   { label:'规划中', tone:'var(--tx3)' },
@@ -1647,19 +1673,19 @@ const STATE_DEF = {
   review: { label:'待确认收敛', tone:'var(--amber)' },
   closed: { label:'已闭环', tone:'var(--green)' },
 };
-/** 关闭按钮文案：里程碑「确认达成」，支撑项 / 执行记录「完成」 */
+/** 关闭按钮文案：里程碑「确认达成」，能力闭环 / 执行记录「完成」 */
 function closeLabelOf(n){
   if (!n) return '完成';
   if (n.kind === 'milestone') return '确认达成';
   return '完成';
 }
 /**
- * 达成闸门：只对里程碑生效——至少 1 个支撑项子节点 + 支撑项全部闭环（不再看 supports 文本是否非空）。
+ * 达成闸门：只对里程碑生效——至少 1 个能力闭环子节点 + 能力闭环全部闭环（不再看 capabilities 文本是否非空）。
  * 判据取原节点 (n.src)：折叠克隆会把已闭环子节点藏掉，看可见 kids 会把正常达成路径一起灰掉。
  * 返回 { state, label, tip }：
- *   ready   可点（支撑项全关闭）
- *   no-kids 灰（还没有支撑项）
- *   hidden  不显示（支撑项 / 执行记录 / 已闭环 / 子项还没关完）
+ *   ready   可点（能力闭环全关闭）
+ *   no-kids 灰（还没有能力闭环）
+ *   hidden  不显示（能力闭环 / 执行记录 / 已闭环 / 子项还没关完）
  */
 function convergeGate(n){
   if (!n || n.closed) return { state: 'hidden', label: '', tip: '' };
@@ -1668,7 +1694,7 @@ function convergeGate(n){
   const label = closeLabelOf(src);
   const kids = workKids(src);
   if (!kids.length){
-    return { state: 'no-kids', label, tip: '还没有支撑项子节点，没衍生出去就没有可收口的分支。里程碑根节点不能删：先给它加支撑项，或从项目列表移除这张卡' };
+    return { state: 'no-kids', label, tip: '还没有能力闭环子节点，没衍生出去就没有可收口的分支。里程碑根节点不能删：先给它加能力闭环，或从项目列表移除这张卡' };
   }
   if (!kids.every(k => k.closed)) return { state: 'hidden', label, tip: '' };
   return { state: 'ready', label, tip: '' };
@@ -1684,12 +1710,12 @@ function convergeBtnMarkup(n, tone){
   return `<button class="tbtn is-locked" data-close="${n.id}" aria-disabled="true" title="${esc(g.tip)}">${g.label}</button>`;
 }
 /**
- * 支撑项的「记录全闭环」判据（与 host 的 supportRecordsDone 同口径）：
+ * 能力闭环的「记录全闭环」判据（与 host 的 capabilityRecordsDone 同口径）：
  * 子记录全部关闭，且至少出现过一条 exec 与一条 reflect。
  * 只生成过计划、没执行过 → 仍算规划中；没有子记录 → false，交给「完成」按钮手动收口。
  */
-function supportRecordsDone(n){
-  if (!n || n.kind !== 'support') return false;
+function capabilityRecordsDone(n){
+  if (!n || n.kind !== 'capability') return false;
   const kids = n.children || [];
   if (!kids.length || !kids.every(k => k.closed)) return false;
   const actions = kids.map(k => recordActionOf(k));
@@ -1702,13 +1728,13 @@ function deriveState(node){
   const wk = workKids(n);
   if (wk.length){
     const allClosed = wk.every(k => k.closed);
-    // 里程碑不自动收口：支撑项全关闭后停在「待确认」，等人工确认
+    // 里程碑不自动收口：能力闭环全关闭后停在「待确认」，等人工确认
     if (n.kind === 'milestone') return allClosed ? 'review' : 'doing';
     return allClosed ? 'closed' : 'doing';
   }
-  // 支撑项的子节点全是执行记录：有执行过 = 进行中，记录全闭环 = 已闭环（autoCloseTree 会落 closed）
-  if (n.kind === 'support'){
-    if (supportRecordsDone(n)) return 'closed';
+  // 能力闭环的子节点全是执行记录：有执行过 = 进行中，记录全闭环 = 已闭环（autoCloseTree 会落 closed）
+  if (n.kind === 'capability'){
+    if (capabilityRecordsDone(n)) return 'closed';
     if ((n.children || []).some(k => recordActionOf(k) === 'exec')) return 'doing';
     return (hasInfo(n) || (n.raw && n.raw.plan)) ? 'plan' : 'todo';
   }
@@ -1720,7 +1746,7 @@ function deriveState(node){
 function stateOf(n){
   const key = deriveState(n);
   const d = STATE_DEF[key];
-  // 里程碑用「达成」，支撑项 / 执行记录保持「闭环」
+  // 里程碑用「达成」，能力闭环 / 执行记录保持「闭环」
   const label = n && n.kind === 'milestone'
     ? (key === 'review' ? '待确认达成' : key === 'closed' ? '已达成' : d.label)
     : d.label;
@@ -1734,14 +1760,14 @@ function nodeTone(n){
   return KIND_TONE[n.kind];
 }
 /**
- * 自动收口**只作用于支撑项**：执行记录全部闭环 → 支撑项自动完成。
- * 没有执行记录的支撑项不自动收口，给它「完成」按钮手动收口；里程碑必须由人「确认达成」。
+ * 自动收口**只作用于能力闭环**：执行记录全部闭环 → 能力闭环自动完成。
+ * 没有执行记录的能力闭环不自动收口，给它「完成」按钮手动收口；里程碑必须由人「确认达成」。
  */
 function autoCloseTree(root){
   walk(root, (x)=>{
     const kids = x.children || [];
-    if (x.closed || x.kind !== 'support' || !kids.length || !kids.every(k => k.closed)) return;
-    if (!supportRecordsDone(x)) return;
+    if (x.closed || x.kind !== 'capability' || !kids.length || !kids.every(k => k.closed)) return;
+    if (!capabilityRecordsDone(x)) return;
     x.closed = true;
     if (x.raw) x.raw.closed_at = new Date().toISOString();
   });
@@ -1769,8 +1795,8 @@ function syncRawStatus(root){
       n.raw.status = wk.every(k => k.closed) ? 'done' : 'doing';
       return;
     }
-    // 支撑项：执行记录里有执行就算 doing，只出计划/还没动作算 plan
-    if (n.kind === 'support'){
+    // 能力闭环：执行记录里有执行就算 doing，只出计划/还没动作算 plan
+    if (n.kind === 'capability'){
       n.raw.status = (n.children || []).some(k => recordActionOf(k) === 'exec') ? 'doing' : 'plan';
       return;
     }
@@ -1837,10 +1863,10 @@ function laneServices(p){
 
 /* ─────────── 项目统计 ─────────── */
 function projectStats(p){
-  // 三列口径：里程碑 / 支撑项 / 执行记录都算节点（执行列现在就是记录本身）
+  // 三列口径：里程碑 / 能力闭环 / 执行记录都算节点（执行列现在就是记录本身）
   const all = [];
   walk(p.root, n => { all.push(n); });
-  const kind = { milestone:0, support:0, exec:0 };
+  const kind = { milestone:0, capability:0, exec:0 };
   const stat = { doing:0, review:0, plan:0, todo:0, blocked:0, closed:0 };
   let issues = 0, noVerify = 0, noProof = 0, folded = 0;
   const closedAt = [];
@@ -1859,8 +1885,8 @@ function projectStats(p){
     if (n.raw && n.depth < 3 && (n.children || []).length) folded += 0;
     if (n.closed && n.raw && n.raw.closed_at) closedAt.push(Date.parse(n.raw.closed_at));
   });
-  const supports = p.root.children || [];
-  const supportsClosed = supports.filter(g => g.closed).length;
+  const capabilities = p.root.children || [];
+  const capabilitiesClosed = capabilities.filter(g => g.closed).length;
   const execs = all.filter(n => n.kind === 'exec');
   const execDone = execs.filter(n => n.closed).length;
 
@@ -1892,7 +1918,7 @@ function projectStats(p){
     .sort((a, b) => b.days - a.days);
   const avgInflight = inflight.length ? inflight.reduce((a, x) => a + x.days, 0) / inflight.length : null;
   const overdue = inflight.filter(x => x.days > 7).length;
-  return { all, kind, stat, issues, noVerify, noProof, supports, supportsClosed, execs, execDone, closedNodes: closedAt.length, blockedExec,
+  return { all, kind, stat, issues, noVerify, noProof, capabilities, capabilitiesClosed, execs, execDone, closedNodes: closedAt.length, blockedExec,
            inflight, avgInflight, overdue,
            spanDays, rate, remain, etaDays, conf, score, health, lastClosed: closedAt.length ? closedAt[closedAt.length-1] : null };
 }
@@ -1976,7 +2002,7 @@ function laneStats(p){
       <div class="info-k">收敛健康度</div>
       <div class="health" style="--tone:${s0.health.tone}">
         <span class="num">${s0.score}</span>
-        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.supportsClosed}/${s0.supports.length} 支撑项</span>
+        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.capabilitiesClosed}/${s0.capabilities.length} 能力闭环</span>
       </div>
       <div class="ibar" title="完成度 / 进行中 / 阻塞">
         <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(s0.stat.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(s0.stat.blocked / (s0.execs.length||1) * 100)}%"></i>
@@ -1984,7 +2010,7 @@ function laneStats(p){
     </div>
     <div class="info-sec">
       <div class="info-k">节点</div>
-      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>里程碑 / 支撑项<b>${s0.kind.milestone} / ${s0.kind.support}</b></div>
+      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>里程碑 / 能力闭环<b>${s0.kind.milestone} / ${s0.kind.capability}</b></div>
       <div class="info-row"><span class="d" style="--tone:var(--green)"></span>执行记录<b>${s0.kind.exec}</b></div>
       <div class="info-row"><span class="d" style="--tone:var(--tx4)"></span>合计<b>${nodes}</b></div>
       <div class="info-row" style="font-size:11px">进行中 ${s0.stat.doing} · 待确认 ${s0.stat.review} · 规划中 ${s0.stat.plan} · 未开始 ${s0.stat.todo} · 阻塞 ${s0.stat.blocked} · 已关闭 ${s0.stat.closed}</div>
@@ -2029,7 +2055,7 @@ function infoMarkup(p){
     : `<div class="info-empty">执行记录完成后自动提炼</div>`;
   const guideHtml = guide.length
     ? guide.slice(0,2).map(g => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:11.5px">${g.text}</span></div>`).join('')
-    : `<div class="info-empty">无待办 · 支撑项全部关闭时，点「确认达成」收口</div>`;
+    : `<div class="info-empty">无待办 · 能力闭环全部关闭时，点「确认达成」收口</div>`;
   return `<div class="info">
     ${laneStats(p)}
 
@@ -2096,11 +2122,11 @@ function runBadge(p, n){
     <i class="rdot"></i>${RUN_LABEL[r.status] || r.status}${el ? ' · ' + el : ''}</span></div>`;
 }
 
-/** 卡片与详情卡共用的会话 id：运行中的优先，其次卡片落盘的 session，最后支撑项的计划会话 */
+/** 卡片与详情卡共用的会话 id：运行中的优先，其次卡片落盘的 session，最后能力闭环的计划会话 */
 function sessionIdOf(p, n){
   const r = p ? runFor(p, n) : null;
   const cardSess = n && n.raw && n.raw.session;
-  const planSess = n && n.kind === 'support' && n.raw && n.raw.plan && n.raw.plan.session;
+  const planSess = n && n.kind === 'capability' && n.raw && n.raw.plan && n.raw.plan.session;
   return (r && r.sessionId) || (cardSess && cardSess.id)
     || (typeof planSess === 'string' ? planSess : (planSess && planSess.id)) || '';
 }
@@ -2124,21 +2150,21 @@ function nodeMarkup(n, p){
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
   const isContainer = n.kind === 'milestone';
-  // 支撑项：有未闭环的执行记录时不给关（父节点关闭会 422）；记录全闭环由 autoCloseTree 自动收口，
+  // 能力闭环：有未闭环的执行记录时不给关（父节点关闭会 422）；记录全闭环由 autoCloseTree 自动收口，
   // 但「记录都关了却没凑齐 exec+reflect」时留一个手动「完成」出口，避免节点永远关不掉
-  const recordOpen = n.kind === 'support' && (n.children || []).some(k => !k.closed);
+  const recordOpen = n.kind === 'capability' && (n.children || []).some(k => !k.closed);
   const leafCanClose = !isContainer && !n.closed && !recordOpen;
-  // 达成按钮（只有里程碑有）独占 footer 左端；支撑项「完成」仍在原来的按钮组位置
+  // 达成按钮（只有里程碑有）独占 footer 左端；能力闭环「完成」仍在原来的按钮组位置
   const closeBtn = isContainer ? convergeBtnMarkup(n, 'primary-converge') : '';
   const leafCloseBtn = leafCanClose
     ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>`
     : '';
   // 「生成 N 项」紧跟确认达成右侧（按钮位置沿用 2026-10-30 的约定）
   const genBtn = (isContainer && p) ? genBtnMarkup(p, n) : '';
-  // 候选池只留给里程碑：候选是「重要支撑」的候选；支撑项改用「生成计划 / 执行计划」
+  // 候选池只留给里程碑：候选是「主要能力闭环」的候选；能力闭环改用「生成计划 / 执行计划」
   const poolCount = (isContainer && p) ? candidateCount(p, n) : 0;
   const genTitle = poolCount ? '候选池还有未处理的候选'
-      : `让会话给出若干候选${KIND.support}，挑完再写入卡片`;
+      : `让会话给出若干候选${KIND.capability}，挑完再写入卡片`;
   const candGen = isContainer
     ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
          title="${esc(genTitle)}">生成候选</button>`
@@ -2147,7 +2173,7 @@ function nodeMarkup(n, p){
     ? `<button class="tbtn" data-cand-pool="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? '' : 'disabled'}
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
-  const planActs = n.kind === 'support' && p ? supportActionButtons(p, n, 'card') : '';
+  const planActs = n.kind === 'capability' && p ? capabilityActionButtons(p, n, 'card') : '';
   // 「查看会话」放卡片下缘：点它直接切到 DSH 里这条会话的对话页（独立打开时退化为看全文）
   const sessId = p ? sessionIdOf(p, n) : '';
   const viewSess = sessId
@@ -2292,7 +2318,7 @@ function layoutCanvas(project, canvas, cols){
   svg.setAttribute('viewBox', `0 0 ${canvas.clientWidth} ${canvas.clientHeight}`);
   let out = '';
   const anchors = [];
-  const SW = { milestone:2.2, support:1.8, exec:1.2 };
+  const SW = { milestone:2.2, capability:1.8, exec:1.2 };
 
   const rootNode = nodes.find(n=>n.depth===0);
   if (rootNode){
@@ -2362,7 +2388,7 @@ function laneMarkup(p){
   const pr = progressOf(p.root);
   const rootState = stateOf(p.root);
   const closed = !!p.root.closed;
-  const canConverge = !closed && rootState.key === 'review';   // 支撑项全关闭 → 可确认达成
+  const canConverge = !closed && rootState.key === 'review';   // 能力闭环全关闭 → 可确认达成
   const dotCls = closed ? 'done' : (rootState.key === 'review' ? 'review' : (hasBlocked(p) ? 'blocked' : 'doing'));
   const stateChip = `<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>`;
   const headerActs = closed
@@ -2377,7 +2403,7 @@ function laneMarkup(p){
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-live mono" data-lane-live${laneLive ? '' : ' hidden'}>${laneLive}</div>
-      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 支撑项${closed ? ' · 已达成' : (canConverge ? ' · 待确认达成' : '关闭')}</div>
+      <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 能力闭环${closed ? ' · 已达成' : (canConverge ? ' · 待确认达成' : '关闭')}</div>
       ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
       ${laneServices(p)}
       ${laneTime(p)}
@@ -2471,7 +2497,7 @@ function renderFocus(){
   wrap.innerHTML = `
     <div class="focus-summary">
       <div class="sumbox"><div class="k">当前里程碑</div><div class="v">${p.root.title}</div></div>
-      <div class="sumbox"><div class="k">达成进度</div><div class="v">${pr.closed}/${pr.kids} 支撑项闭环 · ${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div></div>
+      <div class="sumbox"><div class="k">达成进度</div><div class="v">${pr.closed}/${pr.kids} 能力闭环闭环 · ${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div></div>
       <div class="sumbox" data-tone="${st.key==='closed'?'ok':(st.key==='review'?'review':(hasBlocked(p)?'issue':''))}"><div class="k">里程碑状态</div><div class="v">${st.label}</div></div>
       <div class="sumbox" data-tone="${hasBlocked(p)?'issue':''}"><div class="k">阻断项</div><div class="v">${hasBlocked(p)?'存在阻塞，需先处置':'无'}</div></div>
     </div>
@@ -2546,7 +2572,7 @@ function render(){
   const src = $('#data-src');
   if (src) src.textContent = USING_REAL ? `数据源：${CARDS.length} 张 rotation/v1 卡` : '数据源：内置 mock';
   $('#toolbar-hint').textContent = state.view==='matrix'
-    ? '里程碑 → 支撑项 → 执行记录；支撑项记录全闭环自动完成，支撑项全部关闭后点「确认达成」'
+    ? '里程碑 → 能力闭环 → 执行记录；能力闭环记录全闭环自动完成，能力闭环全部关闭后点「确认达成」'
     : '聚焦单项目：从执行记录开始，一层层确认关闭，直到里程碑达成';
   focusSwitch();
   const emptyEl = $('#empty'), matrixEl = $('#matrix'), focusEl = $('#focus');
@@ -2763,20 +2789,20 @@ function doClose(id){
     n.raw.closed_at = now;
     if (n.raw.kind === 'exec' && !n.raw.proof) n.raw.proof = '（面板关闭，未附证据）';
   }
-  // 只补支撑项（执行记录全闭环自动收口）；里程碑不再级联，由人确认达成
+  // 只补能力闭环（执行记录全闭环自动收口）；里程碑不再级联，由人确认达成
   autoCloseTree(p.root);
   if (n.kind === 'milestone'){
     p.root.convergedAt = now.slice(0, 16).replace('T', ' ');
     pushClosedMilestone(p, n, now);          // 收进项目里程碑历史
     toast(`「${n.title}」已达成 · 项目留在泳道，可从 ⋯ 查看里程碑历史或开新里程碑`);
-  } else if (n.kind === 'support'){
+  } else if (n.kind === 'capability'){
     toast(state.hideClosed
       ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
       : `「${n.title}」已完成 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`);
   } else {
     toast(state.hideClosed
       ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
-      : `「${n.title}」已完成 · 已折叠进支撑项的「已闭环 N」`);
+      : `「${n.title}」已完成 · 已折叠进能力闭环的「已闭环 N」`);
   }
   render();
   pulseFoldChip(parent && parent.id);
@@ -2809,12 +2835,12 @@ function addChild(id){
   const p = findProjectByNode(id); if (!p) return;
   const n = findNode(p.root, id);
   const wasRootClosed = !!p.root.closed;
-  const kind = n.kind==='milestone' ? 'support' : n.kind==='support' ? 'exec' : null;
+  const kind = n.kind==='milestone' ? 'capability' : n.kind==='capability' ? 'exec' : null;
   if (!kind) return toast('执行记录不能再往下加');
-  const title = kind==='support' ? '新支撑项（待命名）' : '新执行记录（待命名）';
+  const title = kind==='capability' ? '新能力闭环（待命名）' : '新执行记录（待命名）';
   n.children = n.children || [];
   const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null };
-  if (kind === 'support'){ rawChild.support = ''; rawChild.necessity = ''; rawChild.causal = ''; rawChild.metric = ''; rawChild.approach = ''; }
+  if (kind === 'capability'){ rawChild.capability = ''; rawChild.necessity = ''; rawChild.causal = ''; rawChild.metric = ''; rawChild.approach = ''; }
   if (kind === 'exec'){ rawChild.issues = []; rawChild.verify = '（待补）验证命令'; }
   n.children.push({ id: rawChild.id, kind, title, status:'plan', closed:false, raw: rawChild, children:[] });
   n.raw.children = n.raw.children || [];
@@ -2829,7 +2855,7 @@ function addChild(id){
   persist(p);
 }
 
-/* ─────────── 加法菜单 + AI 拆重要支撑 ─────────── */
+/* ─────────── 加法菜单 + AI 拆主要能力闭环 ─────────── */
 const SPLIT_TASK = 'split-goals';   // 沿用 host 已注册的拆分任务 id（契约未改 taskId）
 let addMenuCtx = null;              // { pid, nid, btn }
 
@@ -2839,14 +2865,14 @@ function openAddMenu(btn){
   if (!p || !n || n.kind === 'exec') return;
   const menu = $('#addmenu');
   const isMilestone = n.kind === 'milestone';
-  // 里程碑：AI 拆出重要支撑（写进 milestone.supports）/ 手动添加支撑项
-  // 支撑项：执行记录由「生成计划 / 执行计划」产生，这里只留手动添加
+  // 里程碑：AI 拆出主要能力闭环（写进 milestone.capabilities）/ 手动添加能力闭环
+  // 能力闭环：执行记录由「生成计划 / 执行计划」产生，这里只留手动添加
   menu.innerHTML = isMilestone
     ? `<button type="button" class="am-ai" data-aim="ai" role="menuitem">
-        <span>AI 拆出重要支撑</span><span class="am-sub">生成 3 条，勾选后写进「重要支撑」</span>
+        <span>AI 拆出主要能力闭环</span><span class="am-sub">生成 3 条，勾选后写进「主要能力闭环」</span>
       </button>
       <div class="am-sep"></div>
-      <button type="button" data-aim="manual" role="menuitem"><span>手动添加支撑项</span></button>`
+      <button type="button" data-aim="manual" role="menuitem"><span>手动添加能力闭环</span></button>`
     : `<button type="button" data-aim="manual" role="menuitem"><span>手动添加执行记录</span></button>`;
   addMenuCtx = { pid: p.id, nid: n.id, btn };
   btn.setAttribute('aria-expanded', 'true');
@@ -2879,7 +2905,7 @@ function chooseAddMenu(which){
   if (which === 'manual') return addChild(ctx.nid);
   if (which === 'ai'){
     const p = PROJECTS.find(x => x.id === ctx.pid), n = p && findNode(p.root, ctx.nid);
-    return (n && n.kind === 'milestone') ? aiSplitSupports(ctx.pid, ctx.nid) : toast('只有里程碑能拆重要支撑');
+    return (n && n.kind === 'milestone') ? aiSplitCapabilities(ctx.pid, ctx.nid) : toast('只有里程碑能拆主要能力闭环');
   }
 }
 
@@ -2975,7 +3001,7 @@ function removeProjectConfirm(p){
 
 /* ─────────── 里程碑历史（只读回看） ─────────── */
 // 历史快照是只读回看：老快照里的 goal / idea 仍按旧标签显示，不参与新树
-const HISTORY_KIND = { milestone:'里程碑', support:'支撑项', goal:'目标', idea:'构思', exec:'执行' };
+const HISTORY_KIND = { milestone:'里程碑', capability:'能力闭环', goal:'目标', idea:'构思', exec:'执行' };
 let historyCtx = null;   // { pid, list, view }
 function fmtHistTime(iso){
   try { return new Date(iso).toLocaleString('sv-SE').slice(0, 16); } catch { return iso || '—'; }
@@ -3007,12 +3033,12 @@ function openProjectHistory(p){
         <div class="hist-row" role="button" tabindex="0" data-hist-view="${i}" aria-label="查看里程碑历史 ${esc(e.title || e.id)}">
           <div class="hist-main">
             <span class="hist-title">${esc(e.title || e.id)}</span>
-            <span class="hist-meta">收敛于 ${esc(fmtHistTime(e.closed_at))} · ${e.goals || 0} 支撑项 · ${e.execs || 0} 执行记录</span>
+            <span class="hist-meta">收敛于 ${esc(fmtHistTime(e.closed_at))} · ${e.goals || 0} 能力闭环 · ${e.execs || 0} 执行记录</span>
           </div>
           <span class="tbtn">查看</span>
         </div>`).join('')}</div>
        <div class="mnote">历史随项目卡片（<code>.dsh/rotation.json</code> 的 <code>closed_milestones</code>）一起走 git，最多保留 10 条。</div>`
-    : `<div class="hist-empty">还没有已达成的里程碑。<br>支撑项全部闭环后，在泳道头点「确认达成」就会收进这里。</div>`;
+    : `<div class="hist-empty">还没有已达成的里程碑。<br>能力闭环全部闭环后，在泳道头点「确认达成」就会收进这里。</div>`;
   showModal($('#history'));
 }
 function openHistorySnapshot(entry){
@@ -3303,8 +3329,8 @@ async function putServices(p, list){
   }
 }
 
-/** 从模型输出里抠出重要支撑数组（标题 / 必要性 / 因果；容忍 ```json 围栏与多余文字） */
-function parseSupports(text){
+/** 从模型输出里抠出主要能力闭环数组（标题 / 必要性 / 因果；容忍 ```json 围栏与多余文字） */
+function parseCapabilities(text){
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const cand = fenced ? fenced[1] : (raw.match(/\{[\s\S]*\}/) || [])[0];
@@ -3312,11 +3338,11 @@ function parseSupports(text){
   try { data = cand ? JSON.parse(cand) : null; } catch { data = null; }
   if (!data){ try { data = JSON.parse(raw); } catch { return []; } }
   const arr = Array.isArray(data) ? data
-    : (data && Array.isArray(data.supports) ? data.supports
+    : (data && Array.isArray(data.capabilities) ? data.capabilities
       : (data && Array.isArray(data.goals) ? data.goals : null));   // 老 prompt 仍可能吐 goals 键
   if (!arr) return [];
   return arr.map(x => ({
-    title: String((x && (x.title || x.name || x.support)) || '').trim(),
+    title: String((x && (x.title || x.name || x.capability)) || '').trim(),
     necessity: String((x && (x.necessity || x.why)) || '').trim(),
     causal: String((x && (x.causal || x.causality)) || '').trim(),
   })).filter(x => x.title).slice(0, 3);
@@ -3344,24 +3370,24 @@ async function notifyPendingSplits(){
   try {
     const j = await fetch(api('/splits')).then(r => r.json());
     const n = (j.drafts || []).length;
-    if (n) toast(`有 ${n} 条 AI 拆解结果待确认：点里程碑卡的添加菜单 →「AI 拆出重要支撑」查看`);
+    if (n) toast(`有 ${n} 条 AI 拆解结果待确认：点里程碑卡的添加菜单 →「AI 拆出主要能力闭环」查看`);
   } catch { /* 忽略 */ }
 }
 
-/** 发起 AI 拆重要支撑会话 → 轮询到结束 → 弹预览（预览确认后写进 milestone.supports） */
-async function aiSplitSupports(pid, nid, opts = {}){
+/** 发起 AI 拆主要能力闭环会话 → 轮询到结束 → 弹预览（预览确认后写进 milestone.capabilities） */
+async function aiSplitCapabilities(pid, nid, opts = {}){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
   if (!p || !n) return;
-  if (n.kind !== 'milestone') return toast('只有里程碑能拆重要支撑');
+  if (n.kind !== 'milestone') return toast('只有里程碑能拆主要能力闭环');
   if (!p.file) return toast('该项目没有可写回的卡片文件');
-  if (!API_BASE) return toast('未连接服务，AI 拆重要支撑不可用');
+  if (!API_BASE) return toast('未连接服务，AI 拆主要能力闭环不可用');
   // 先看有没有上次没确认的草稿：有就直接恢复，不重复烧一次会话
   if (!opts.skipDraft){
     const draft = await fetchSplitDraft(p.file, n.id);
-    const list = draft ? parseSupports(draft.result) : [];
+    const list = draft ? parseCapabilities(draft.result) : [];
     if (list.length){
       toast('已恢复上次未确认的拆解结果');
-      return openSupportsPreview(pid, nid, list, draft);
+      return openCapabilitiesPreview(pid, nid, list, draft);
     }
   }
   let run = null;
@@ -3377,7 +3403,7 @@ async function aiSplitSupports(pid, nid, opts = {}){
     return toast('发起失败：' + error.message);
   }
   const key = (run && run.key) || (p.file + '::' + n.id);
-  toast('已发起 AI 拆重要支撑（约 10–30 秒），结果先给你挑');
+  toast('已发起 AI 拆主要能力闭环（约 10–30 秒），结果先给你挑');
   const deadline = Date.now() + 180000;
   while (Date.now() < deadline){
     await new Promise(r => setTimeout(r, 1800));
@@ -3388,20 +3414,20 @@ async function aiSplitSupports(pid, nid, opts = {}){
     const hit = runs.find(r => r.key === key);
     if (!hit) continue;
     if (hit.status === 'done'){
-      const list = parseSupports(hit.result);
-      if (!list.length) return toast('AI 没返回可用的支撑项，可再点一次或手动添加');
-      return openSupportsPreview(pid, nid, list);
+      const list = parseCapabilities(hit.result);
+      if (!list.length) return toast('AI 没返回可用的能力闭环，可再点一次或手动添加');
+      return openCapabilitiesPreview(pid, nid, list);
     }
     if (hit.status === 'failed' || hit.status === 'cancelled'){
-      return toast('AI 拆重要支撑失败：' + (hit.error || hit.status));
+      return toast('AI 拆主要能力闭环失败：' + (hit.error || hit.status));
     }
   }
-  toast('AI 拆重要支撑超时（3 分钟）：可在节点的「会话」里看进展');
+  toast('AI 拆主要能力闭环超时（3 分钟）：可在节点的「会话」里看进展');
 }
 
-/** 预览：默认全选，标题可改；确认后写进里程碑的「重要支撑」（一行一条），不再造子节点 */
+/** 预览：默认全选，标题可改；确认后写进里程碑的「主要能力闭环」（一行一条），不再造子节点 */
 let lastSplitCtx = null;            // { pid, nid, file }：供「重新生成」用
-function openSupportsPreview(pid, nid, list, draft = null){
+function openCapabilitiesPreview(pid, nid, list, draft = null){
   const p0 = PROJECTS.find(x => x.id === pid);
   lastSplitCtx = p0 ? { pid, nid, file: p0.file } : null;
   const rows = list.map((g, i) => `
@@ -3417,7 +3443,7 @@ function openSupportsPreview(pid, nid, list, draft = null){
     ? `<div class="mnote">这是上次未确认的结果（${new Date(draft.at).toLocaleString('sv-SE').slice(0,16)} 生成）·
          <button type="button" class="tbtn" id="split-regen" style="margin-left:2px">重新生成</button></div>`
     : '';
-  askConfirm('AI 拆出的重要支撑', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。写进里程碑的「重要支撑」，一行一条，不造子节点。</div>`, '写入选中的', () => {
+  askConfirm('AI 拆出的主要能力闭环', `${rows}${recovered}<div class="mnote">默认全选；取消勾选的不写入。写进里程碑的「主要能力闭环」，一行一条，不造子节点。</div>`, '写入选中的', () => {
     const picked = [];
     list.forEach((g, i) => {
       const box = document.querySelector(`#ask-body [data-gpick="${i}"]`);
@@ -3426,8 +3452,8 @@ function openSupportsPreview(pid, nid, list, draft = null){
       const title = titleEl ? titleEl.value.trim() : '';
       if (title) picked.push(title);
     });
-    if (!picked.length) return toast('没有勾选任何支撑项');
-    applySupports(pid, nid, picked);
+    if (!picked.length) return toast('没有勾选任何能力闭环');
+    applyCapabilities(pid, nid, picked);
   });
 }
 
@@ -3436,25 +3462,25 @@ function regenSplit(){
   const ctx = lastSplitCtx;
   hideModal($('#ask'));
   if (!ctx) return;
-  dropSplitDraft(ctx.file, ctx.nid).then(() => aiSplitSupports(ctx.pid, ctx.nid, { skipDraft: true }));
+  dropSplitDraft(ctx.file, ctx.nid).then(() => aiSplitCapabilities(ctx.pid, ctx.nid, { skipDraft: true }));
 }
 
-/** 把选中的支撑项追加进里程碑的「重要支撑」（一行一条、去重） */
-function applySupports(pid, nid, titles){
+/** 把选中的能力闭环追加进里程碑的「主要能力闭环」（一行一条、去重） */
+function applyCapabilities(pid, nid, titles){
   const p = PROJECTS.find(x => x.id === pid), n = p && findNode(p.root, nid);
   if (!p || !n || n.kind !== 'milestone') return;
-  n.raw.supports = n.raw.supports || '';
-  const merged = String(n.raw.supports || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  n.raw.capabilities = n.raw.capabilities || '';
+  const merged = String(n.raw.capabilities || '').split('\n').map((x) => x.trim()).filter(Boolean);
   titles.forEach((t) => {
     const s = String(t || '').trim();
     if (s && !merged.includes(s)) merged.push(s);
   });
-  n.raw.supports = merged.join('\n');
+  n.raw.capabilities = merged.join('\n');
   reopenChain(p.root, n.id);
   render();
   persist(p).then(res => {
     if (!res.ok) return toast('写入失败：' + res.error);
-    toast(`已写入 ${titles.length} 条重要支撑`);
+    toast(`已写入 ${titles.length} 条主要能力闭环`);
     dropSplitDraft(p.file, n.id);   // 已消费掉草稿，避免下次又弹出来
     reloadProjects();
   });
@@ -3467,11 +3493,12 @@ const isBlankTitle = (t) => {
   const s = String(t || '').trim();
   return !s || /^(待命名|未命名)/.test(s) || /[（(]待命名[)）]/.test(s);
 };
-/* 可点开直接改的字段：支撑项的承接支撑项 / 必要性 / 因果只读，核心指标与实现思路可写 */
-const EDIT_FIELDS = { milestone:['vision','supports'], support:['metric','approach'], exec:['verify','proof'] };
+/* 可点开直接改的字段：能力闭环的承接能力闭环 / 必要性 / 因果只读，核心指标与实现思路可写 */
+const EDIT_FIELDS = { milestone:['vision','capabilities'], capability:['metric','approach'], exec:['verify','proof'] };
 const FIELD_LABEL = {
-  'title':'标题', vision:'里程碑愿景', supports:'重要支撑', metrics:'核心指标', metric:'核心指标',
-  support:'承接支撑项', necessity:'必要性', causal:'因果', approach:'实现思路',
+  'title':'标题', vision:'里程碑愿景', capabilities:'主要能力闭环', metrics:'核心指标', metric:'核心指标',
+  capability:'承接能力闭环', necessity:'必要性', causal:'与闭环的关系', gap:'缺失影响',
+  module:'功能模块', module_mode:'改造还是新增', collaboration:'协同面', approach:'实现思路',
   verify:'验证', proof:'证据',
   // 老快照只读回看用，不再出现在编辑入口
   blocker:'对应阻碍', blockers:'阻碍项', constraints:'约束', acceptance:'验收', scenario:'落地场景流程',
@@ -3638,7 +3665,7 @@ function sessionMarkup(p, n, opts){
   const compact = !!(opts && opts.compact);   // 记录卡已有自己的「动作 / 会话 / 状态 / 耗时」，这里只补按钮与就近状态
   const r = runFor(p, n);
   const cardSess = n.raw && n.raw.session;
-  const planSess = n.kind === 'support' && n.raw && n.raw.plan && n.raw.plan.session;
+  const planSess = n.kind === 'capability' && n.raw && n.raw.plan && n.raw.plan.session;
   const sessId = sessionIdOf(p, n);
   const st = r ? (RUN_LABEL[r.status] || r.status) : (sessId ? '已完成（记录在卡片）' : '无会话');
   const tone = r ? (RUN_TONE[r.status] || 'var(--tx3)') : 'var(--tx4)';
@@ -3663,15 +3690,15 @@ function sessionMarkup(p, n, opts){
   </div>`;
 }
 
-/* ─────────── 支撑项动作与执行记录（action-records/v1） ─────────── */
+/* ─────────── 能力闭环动作与执行记录（action-records/v1） ─────────── */
 function fmtElapsed(ms){
   const s = Math.max(0, Math.round((ms || 0) / 1000));
   return s >= 60 ? `${Math.floor(s/60)}m${s%60}s` : `${s}s`;
 }
 
-/** 支撑项卡 / 详情卡的动作按钮：生成计划 → 执行计划；前置条件是「核心指标 + 实现思路」都非空 */
-function supportActionButtons(p, n, where){
-  if (!p || !n || n.kind !== 'support') return '';
+/** 能力闭环卡 / 详情卡的动作按钮：生成计划 → 执行计划；前置条件是「核心指标 + 实现思路」都非空 */
+function capabilityActionButtons(p, n, where){
+  if (!p || !n || n.kind !== 'capability') return '';
   const plan = (n.raw && n.raw.plan) || null;
   const steps = plan && Array.isArray(plan.steps) ? plan.steps.length : 0;
   const raw = n.raw || {};
@@ -3681,9 +3708,9 @@ function supportActionButtons(p, n, where){
   const up = activeAncestorOf(p, n);
   const dis = busy || !!up || !hasBasis;
   const basisTip = '先填「核心指标」和「实现思路」，再生成计划';
-  const planBtn = `<button class="tbtn primary" data-support-act="plan" data-nid="${n.id}" data-proj="${p.id}" ${dis ? 'disabled' : ''}
+  const planBtn = `<button class="tbtn primary" data-capability-act="plan" data-nid="${n.id}" data-proj="${p.id}" ${dis ? 'disabled' : ''}
       title="${!hasBasis ? basisTip : busy ? '会话进行中，等它跑完' : (plan ? '已有计划：再生成一次会覆盖当前计划' : '起会话让 DSH 交计划：目标 / 验证命令 / 步骤')}">${busy && !plan ? '生成中…' : (plan ? '重新生成计划' : '生成计划')}</button>`;
-  const execBtn = `<button class="tbtn primary" data-support-act="exec" data-nid="${n.id}" data-proj="${p.id}" ${(!plan || dis) ? 'disabled' : ''}
+  const execBtn = `<button class="tbtn primary" data-capability-act="exec" data-nid="${n.id}" data-proj="${p.id}" ${(!plan || dis) ? 'disabled' : ''}
       title="${!hasBasis ? basisTip : !plan ? '先「生成计划」，有目标才能执行' : (busy ? '会话进行中，等它跑完' : '按计划执行，跑完自动提炼经验写进里程碑')}">${busy && plan ? '执行中…' : '执行计划'}</button>`;
   const chip = steps ? `<span class="tchip" title="计划 ${steps} 步">计划 ${steps} 步</span>` : (plan ? `<span class="tchip">已有计划</span>` : '');
   if (where === 'card') return plan ? `${execBtn}${chip}` : planBtn;
@@ -3702,7 +3729,7 @@ function recordErrorLine(n){
 
 /** 计划书：只读展示目标 / 验证命令 / 步骤（不在这里编辑，改了就失去和会话计划的对应） */
 function planMarkup(p, n){
-  if (!n || n.kind !== 'support') return '';
+  if (!n || n.kind !== 'capability') return '';
   const plan = (n.raw && n.raw.plan) || null;
   if (!plan){
     return `<div class="detail-sec">
@@ -3780,11 +3807,21 @@ function detailMarkup(p, n){
        <dd class="fielddd"><button class="editval${r[f] ? '' : ' empty'}" data-edit="${f}">${r[f] ? esc(r[f]) : '点击填写'}</button></dd>
      </div>`;
   });
-  // 支撑项的三个只读来源行：承接支撑项 / 必要性 / 因果（由 AI 拆解或载入折叠时写入，不可改）
-  const readonlyRows = (n.kind === 'support' ? [
-    ['承接支撑项', r.support],
+  // 能力闭环的六个只读来源行：承接条目 / 必要性 / 与闭环的关系 / 缺失影响 /
+  // 功能模块（含改造还是新增）/ 协同面——都来自候选，采纳后不改
+  const moduleText = (() => {
+    const mode = MODULE_MODE_LABEL[r.module_mode] || '';
+    const mod = String(r.module || '').trim();
+    if (!mode && !mod) return '';
+    return `${mode ? mode + ' · ' : ''}${mod || '（未标注模块）'}`;
+  })();
+  const readonlyRows = (n.kind === 'capability' ? [
+    ['承接能力闭环', r.capability],
     ['必要性', r.necessity],
-    ['因果', r.causal],
+    ['与闭环的关系', r.causal],
+    ['缺失影响', r.gap],
+    ['功能模块', moduleText],
+    ['协同面', r.collaboration],
   ].map(([k, v]) => `<div class="detail-row"><dt>${k}</dt><dd>${String(v || '').trim() ? esc(v) : '<span class="mnote" style="margin:0;border:0;padding:0">（未生成）</span>'}</dd></div>`).join('') : '');
   const editable = readonlyRows + editableRows.join('');
   const timeRows = [];
@@ -3813,21 +3850,21 @@ function detailMarkup(p, n){
         }).join('')}
       </div></div>`
     : '';
-  // 里程碑：支撑项全关闭后由人确认；支撑项：记录全闭环自动收口，记录都关了但没凑齐
+  // 里程碑：能力闭环全关闭后由人确认；能力闭环：记录全闭环自动收口，记录都关了但没凑齐
   // exec+reflect 时仍可手动「完成」（有未闭环记录时不给关，否则父节点关闭会 422）
   const detailContainer = n.kind === 'milestone';
-  const detailRecordOpen = n.kind === 'support' && (n.children || []).some(k => !k.closed);
+  const detailRecordOpen = n.kind === 'capability' && (n.children || []).some(k => !k.closed);
   // 里程碑与节点卡共用 convergeGate：卡片上灰掉的，详情页不会突然变可点
   const canClose = !detailContainer && !n.closed && !detailRecordOpen;
-  const childKind = { milestone: 'support', support: 'exec' }[n.kind] || null;
+  const childKind = { milestone: 'capability', capability: 'exec' }[n.kind] || null;
   const poolCount = detailContainer ? candidateCount(p, n) : 0;
   const addBtn = childKind
     ? `<button class="tbtn ghost" data-manual-add="1" data-nid="${n.id}" data-proj="${p.id}">手动添加${KIND[childKind]}</button>`
     : '';
-  // 支撑项：生成计划 / 执行计划；里程碑：候选池（候选 = 重要支撑）
-  const planActs = n.kind === 'support' ? supportActionButtons(p, n, 'detail') : '';
+  // 能力闭环：生成计划 / 执行计划；里程碑：候选池（候选 = 主要能力闭环）
+  const planActs = n.kind === 'capability' ? capabilityActionButtons(p, n, 'detail') : '';
   const candGenTitle = poolCount ? '候选池还有未处理的候选'
-      : `让会话给出若干候选${KIND.support}，挑完再写入卡片`;
+      : `让会话给出若干候选${KIND.capability}，挑完再写入卡片`;
   const candBtn = detailContainer
     ? `<button class="tbtn primary" data-cand-gen="1" data-nid="${n.id}" data-proj="${p.id}" ${poolCount ? 'disabled' : ''}
          title="${esc(candGenTitle)}">生成候选</button>`
@@ -3861,7 +3898,7 @@ function detailMarkup(p, n){
       <div class="detail-row"><dt>状态</dt>
         <dd><span class="st" style="--st-tone:${st.tone}">${st.label}</span>
           ${hasIssues(n) && !n.closed ? '<span class="mnote" style="margin-left:8px;color:var(--red)">· 有未处置问题</span>' : ''}
-          <span class="mnote" style="margin-left:8px">自动流转：有内容→规划中，有子节点→进行中，子节点全关闭→${n.kind === "milestone" ? "待确认达成" : (n.kind === "support" ? "自动完成 / 无记录时手动完成" : "已关闭")}</span></dd>
+          <span class="mnote" style="margin-left:8px">自动流转：有内容→规划中，有子节点→进行中，子节点全关闭→${n.kind === "milestone" ? "待确认达成" : (n.kind === "capability" ? "自动完成 / 无记录时手动完成" : "已关闭")}</span></dd>
       </div>
       ${editable}
       ${rows}
@@ -4079,7 +4116,7 @@ async function viewSession(sessionId){
 
 /** 「生成」：标题是唯一必需项，按标题一次补齐该节点所有空字段（host 侧结束后自动写卡片）
     执行记录没有可补的字段（记录只留只读信息），这里给空数组把入口关掉 */
-const GEN_FIELDS_CLIENT = { milestone: ['vision', 'supports'], support: ['metric', 'approach'], exec: ['verify'] };
+const GEN_FIELDS_CLIENT = { milestone: ['vision', 'capabilities'], capability: ['capability','necessity','causal','gap','module','module_mode','collaboration','metric','approach'], exec: ['verify'] };
 /** 缺项判据：与 generateMissing 共用同一份字段表，文案与高亮都从这一处派生 */
 function genStateOf(n){
   const rec = isRecord(n);
@@ -4209,7 +4246,7 @@ async function refreshPoolCount(p, n){
     document.querySelector(`.tnode[data-nid="${n.id}"]`));
 }
 
-/* ─────────── 支撑项动作：生成计划 / 执行计划（action-records/v1） ─────────── */
+/* ─────────── 能力闭环动作：生成计划 / 执行计划（action-records/v1） ─────────── */
 const SUPPORT_ACTIONS = {
   plan: { path:'/action/plan', busy:'生成计划中', ok:'计划已生成', fail:'生成计划失败' },
   exec: { path:'/action/exec', busy:'执行计划中', ok:'执行完成', fail:'执行失败' },
@@ -4224,7 +4261,7 @@ function stopActionPolls(){
   actionPolls.clear();
 }
 /** 发送预览确认后真正起会话：POST 建记录 + 起会话，然后轮询 /api/runs */
-async function startSupportAction(p0, n0, action, btn, override = {}){
+async function startCapabilityAction(p0, n0, action, btn, override = {}){
   if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
   if (!p0.file) return toast('该项目没有可写回的卡片文件');
   if (!API_BASE) return toast('未连接服务，无法发起会话');
@@ -4234,7 +4271,7 @@ async function startSupportAction(p0, n0, action, btn, override = {}){
   const up0 = activeAncestorOf(p0, n0);
   if (up0){ toast(`上游「${up0.title || up0.id}」正在生成，先等它结束`); return; }
   const pollKey = p0.file + '::' + n0.id;
-  if (actionPolls.has(pollKey)) return toast('这个支撑项已经有会话在跑，等它结束');
+  if (actionPolls.has(pollKey)) return toast('这个能力闭环已经有会话在跑，等它结束');
   const oldText = btn && btn.textContent;
   if (btn){ btn.disabled = true; btn.textContent = cfg.busy + '…'; }
   try {
@@ -4247,14 +4284,14 @@ async function startSupportAction(p0, n0, action, btn, override = {}){
     if (j.run && j.run.key) runMap.set(j.run.key, j.run);
     paintRunBadges();
     toast(`${cfg.busy}…会话跑完会自动刷新卡片`);
-    await pollSupportAction({ pollKey, p0, n0, run: j.run, cfg });
+    await pollCapabilityAction({ pollKey, p0, n0, run: j.run, cfg });
   } catch (error) {
     toast(cfg.fail + '：' + error.message);
     if (btn && document.body.contains(btn)){ btn.disabled = false; btn.textContent = oldText || ''; }
   }
 }
-/** 等这个支撑项的 run 终止（done / failed / cancelled）再 reloadProjects 换掉卡片 */
-async function pollSupportAction({ pollKey, p0, n0, run, cfg }){
+/** 等这个能力闭环的 run 终止（done / failed / cancelled）再 reloadProjects 换掉卡片 */
+async function pollCapabilityAction({ pollKey, p0, n0, run, cfg }){
   const token = { cancelled: false };
   actionPolls.set(pollKey, token);
   const key = (run && run.key) || pollKey;
@@ -4266,7 +4303,7 @@ async function pollSupportAction({ pollKey, p0, n0, run, cfg }){
       if (token.cancelled) return;
       const list = await fetchRunsSnapshot();
       if (!list) continue;
-      // run 的 nodeId 是支撑项 id、recordId 是记录 id：两个都认
+      // run 的 nodeId 是能力闭环 id、recordId 是记录 id：两个都认
       const hit = list.find(x => x.key === key)
         || (recordId ? list.find(x => x.recordId === recordId) : null)
         || list.find(x => x.nodeId === n0.id && (x.status === 'starting' || x.status === 'running'));
@@ -4300,11 +4337,14 @@ const candImpOf = (c) => {
   return Number.isFinite(n) && n > 0 ? Math.min(5, Math.max(1, Math.round(n))) : 0;
 };
 
-/** 候选行瘦身：序号 + 重要性徽标 + 标题 + 承接支撑项一行；其余字段都在悬浮卡里 */
+/** 候选行瘦身：序号 + 重要性 + 标题 + 承接条目 + 模块徽标；其余字段都在悬浮卡里 */
 const candRowHtml = (c, p0, n0, idx) => {
   const uid = candUid(c);
   const imp = candImpOf(c);
-  const sup = String((c && c.support) || '').trim();
+  const sup = String((c && c.capability) || '').trim();
+  const mode = MODULE_MODE_LABEL[(c && c.module_mode) || ''] || '';
+  const mod = String((c && c.module) || '').trim();
+  const modText = mod || mode || '模块未标注';
   return `
     <div class="cand-row" data-cand-row="${uid}" tabindex="0">
       <span class="cand-idx mono">${idx + 1}</span>
@@ -4312,7 +4352,8 @@ const candRowHtml = (c, p0, n0, idx) => {
         aria-label="${imp ? '重要性 ' + imp + ' / 5' : '重要性未生成'}">${imp || '–'}</span>
       <div class="cand-main">
         <div class="cand-title">${esc(c.title || '（未命名）')}</div>
-        <div class="cand-sup" title="${esc(sup || '承接支撑项未生成')}">${esc(sup || '承接支撑项未生成')}</div>
+        <div class="cand-sup" title="${esc(sup || '承接能力闭环未生成')}">${esc(sup || '承接能力闭环未生成')}</div>
+        <div class="cand-mod" title="${esc((mode ? mode + ' · ' : '') + (mod || '未标注模块'))}">${esc((mode ? mode + ' · ' : '') + modText)}</div>
       </div>
       <button class="tbtn primary" data-cand-adopt="${uid}" data-nid="${n0.id}" data-proj="${p0.id}">添加</button>
       <button class="tbtn" data-cand-del="${uid}" data-nid="${n0.id}" data-proj="${p0.id}">删除</button>
@@ -4329,9 +4370,12 @@ function candTipHtml(c){
       <span class="ct-imp">重要性 ${imp ? esc(String(imp) + ' / 5') : '（未生成）'}</span>
     </div>
     <dl class="ct-list">
-      ${row('承接支撑项', norm(c && c.support))}
+      ${row('承接能力闭环', norm(c && c.capability))}
       ${row('必要性', norm(c && c.necessity))}
-      ${row('因果', norm(c && c.causal))}
+      ${row('与闭环的关系', norm(c && c.causal))}
+      ${row('缺失影响', norm(c && c.gap))}
+      ${row('功能模块', `${MODULE_MODE_LABEL[(c && c.module_mode) || ''] || '未标注改造/新增'} · ${norm(c && c.module) || '（未标注模块）'}`)}
+      ${row('协同面', norm(c && c.collaboration))}
       ${row('证据', norm(c && c.evidence))}
     </dl>`;
 }
@@ -4396,12 +4440,12 @@ function bindCandTip(){
 }
 
 const candEmptyHtml = (added) => `<div class="cand-empty">${added
-  ? `本次已加入 ${added} 条支撑项`
+  ? `本次已加入 ${added} 条能力闭环`
   : '候选池是空的：先点「生成候选」'}</div>`;
 
 const candNoteText = () => {
   if (!CAND_META.list.length) return '';
-  return '点「添加」写入为支撑项子节点；悬停候选行或 Tab 聚焦可看必要性 / 因果 / 证据。';
+  return '点「添加」写入为能力闭环子节点；悬停候选行或 Tab 聚焦可看模块归属 / 缺失影响 / 协同面。';
 };
 
 const candPoolBody = () => CAND_META.list.length
@@ -4492,7 +4536,7 @@ async function adoptCandidate(uid, btn){
     CAND_META.list.splice(idx, 1);
     CAND_META.added += 1;
     paintCandChrome();
-    toast(`已加入支撑项：${(j.child && j.child.title) || ''}`);
+    toast(`已加入能力闭环：${(j.child && j.child.title) || ''}`);
     reloadProjects();   // 卡片上的「候选池 n」与新子节点一起刷新，不挡退场动画
     setTimeout(() => {
       row.dataset.leaving = '1';
@@ -4542,11 +4586,11 @@ async function deleteCandidate(uid, btn){
 async function manualAddChild(pid, nid){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
-  const childKind = { milestone: 'support', support: 'exec' }[n0.kind] || null;
+  const childKind = { milestone: 'capability', capability: 'exec' }[n0.kind] || null;
   if (!childKind) return toast('执行记录不能再往下加');
   askConfirm(`手动添加${KIND[childKind]}`,
     `<div class="detail-row"><dt>标题</dt><dd><input class="dfield" id="mc-title" style="width:100%" placeholder="8–16 字，说清做到什么"></dd></div>
-     <div class="mnote">加完会在详情卡里继续填字段；支撑项的承接支撑项 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
+     <div class="mnote">加完会在详情卡里继续填字段；能力闭环的承接能力闭环 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
     '添加', async () => {
       const title = ($('#mc-title') || {}).value || '';
       if (!title.trim()) return toast('标题不能为空');
@@ -5057,11 +5101,11 @@ async function openActionPreview(projId, nid, action){
   const item = (data.list || [])[0] || {};
   if (action === 'exec'){
     launchCtx = { mode: 'exec', p, n, action, objective: data.objective || '', fallback: data.fallback || item.prompt || '' };
-    $('#launch-title').textContent = `发送预览 · 执行计划 · 支撑项「${n.title}」`;
+    $('#launch-title').textContent = `发送预览 · 执行计划 · 能力闭环「${n.title}」`;
     paintExecLaunch({ objective: data.objective || '', fallback: data.fallback || item.prompt || '', workdir: launchWorkdir(p) });
   } else {
     launchCtx = { mode: 'plan', p, n, action, text: item.prompt || '' };
-    $('#launch-title').textContent = `发送预览 · 生成计划 · 支撑项「${n.title}」`;
+    $('#launch-title').textContent = `发送预览 · 生成计划 · 能力闭环「${n.title}」`;
     paintTextLaunch({
       text: item.prompt || '',
       commandLines: data.command && data.command.length ? [data.command[0].split('\n')[0] + ' …（整段作为正文）'] : [],
@@ -5093,12 +5137,12 @@ async function doLaunch(){
     const objective = String(($('#launch-objective') || {}).value || ctx.objective || '').trim();
     if (!objective) return toast('目标不能为空');
     closeLaunch();
-    return startSupportAction(p, n, 'exec', null, { objective });
+    return startCapabilityAction(p, n, 'exec', null, { objective });
   }
   const text = String(($('#launch-prompt') || {}).value || ctx.text || '').trim();
   if (!text) return toast('prompt 是空的');
   closeLaunch();
-  if (mode === 'plan') return startSupportAction(p, n, 'plan', null, { prompt: text });
+  if (mode === 'plan') return startCapabilityAction(p, n, 'plan', null, { prompt: text });
   toast('会话启动中…');
   try {
     const res = await fetch(api('/run'), {
@@ -5152,9 +5196,9 @@ function openConfirm(id){
   const pr = progressOf(n), parent = findParent(p.root, id);
   pendingClose = id;
   const isMilestone = n.kind === 'milestone';
-  const isSupport = n.kind === 'support';
-  // 里程碑「确认达成」、支撑项「完成」是正式动作；执行记录仍叫「确认关闭」
-  $('#modal-title').textContent = `${(isMilestone || isSupport) ? closeLabelOf(n) : '确认关闭'}「${n.title}」？`;
+  const isCapability = n.kind === 'capability';
+  // 里程碑「确认达成」、能力闭环「完成」是正式动作；执行记录仍叫「确认关闭」
+  $('#modal-title').textContent = `${(isMilestone || isCapability) ? closeLabelOf(n) : '确认关闭'}「${n.title}」？`;
   const rows = [`<div class="mrow"><span>类型</span><b>${KIND[n.kind] || n.kind} · ${n.id}</b></div>`];
   if ((n.children||[]).length) rows.push(`<div class="mrow"><span>子项</span><b>${pr.closed}/${pr.kids} 已关闭</b></div>`);
   if (parent) rows.push(`<div class="mrow"><span>上级</span><b>${KIND[parent.kind] || parent.kind} · ${parent.title}</b></div>`);
@@ -5165,11 +5209,11 @@ function openConfirm(id){
   if ((n.issues||[]).length) rows.push(`<div class="mrow warn"><span>未处置</span><b>${n.issues.length} 条问题反馈</b></div>`);
   rows.push(`<div class="mnote">${isMilestone
     ? '确认后里程碑进入「已达成」，项目仍留在主泳道；可从项目菜单查看「里程碑历史」、开新里程碑或重开。'
-    : isSupport
-      ? '支撑项有执行记录时，记录全闭环会自动完成；没有记录时可在这里手动完成。确认后折叠进里程碑卡片的「已闭环 N」，不会消失；关错了可点「重开」恢复。'
-      : '执行记录随会话结束自动闭环；支撑项 / 里程碑要人确认，不会自动关。关错了可点「重开」恢复。'}</div>`);
+    : isCapability
+      ? '能力闭环有执行记录时，记录全闭环会自动完成；没有记录时可在这里手动完成。确认后折叠进里程碑卡片的「已闭环 N」，不会消失；关错了可点「重开」恢复。'
+      : '执行记录随会话结束自动闭环；能力闭环 / 里程碑要人确认，不会自动关。关错了可点「重开」恢复。'}</div>`);
   $('#modal-body').innerHTML = rows.join('');
-  $('#modal-ok').textContent = (isMilestone || isSupport) ? closeLabelOf(n) : '确认关闭';
+  $('#modal-ok').textContent = (isMilestone || isCapability) ? closeLabelOf(n) : '确认关闭';
   const m = $('#modal');
   showModal(m);
   $('#modal-ok').focus();
@@ -5697,7 +5741,7 @@ $('#file-input').addEventListener('change', (e) => {
       if (i >= 0) PROJECTS[i] = proj; else PROJECTS.push(proj);
       state.focusId = proj.id;
       render();
-      toast(`已载入 ${proj.name}（${proj.root.children.length} 个支撑项）`);
+      toast(`已载入 ${proj.name}（${proj.root.children.length} 个能力闭环）`);
     } catch (err) { toast(`载入失败：${err.message}`); }
   };
   rd.readAsText(f);
@@ -5710,7 +5754,7 @@ $('#density').addEventListener('click', (e)=>{
   savePrefs({ density: on ? 'compact' : 'comfort' });   // 显示风格跨刷新保留
   render();
 });
-// 「隐藏已闭环」：画布上不留已闭环的支撑项 / 执行记录；已达成里程碑仍留主管，数量上提到卡片 chips
+// 「隐藏已闭环」：画布上不留已闭环的能力闭环 / 执行记录；已达成里程碑仍留主管，数量上提到卡片 chips
 $('#hide-closed').addEventListener('click', (e)=>{
   state.hideClosed = !state.hideClosed;
   e.currentTarget.setAttribute('aria-pressed', state.hideClosed ? 'true' : 'false');
@@ -5831,9 +5875,9 @@ document.addEventListener('click', (e)=>{
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const candGen = e.target.closest('[data-cand-gen]');
   if (candGen){ generateCandidates(candGen.dataset.proj, candGen.dataset.nid, candGen); return; }
-  const supportAct = e.target.closest('[data-support-act]');
-  if (supportAct){
-    if (!supportAct.disabled) openActionPreview(supportAct.dataset.proj, supportAct.dataset.nid, supportAct.dataset.supportAct);
+  const capabilityAct = e.target.closest('[data-capability-act]');
+  if (capabilityAct){
+    if (!capabilityAct.disabled) openActionPreview(capabilityAct.dataset.proj, capabilityAct.dataset.nid, capabilityAct.dataset.capabilityAct);
     return;
   }
   const planDoc = e.target.closest('[data-plan-doc]');
