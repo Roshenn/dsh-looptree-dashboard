@@ -1,12 +1,12 @@
 <div align="center">
-  <img src="assets/hero.png" alt="Looptree Dashboard — swimlanes of milestones, supports and execution records" width="100%">
+  <img src="assets/hero.png" alt="Looptree Dashboard — swimlanes of milestones, capabilities and execution records" width="100%">
 </div>
 
 <h1 align="center">Looptree Dashboard</h1>
 
 <p align="center">
   <b>Every project gets one milestone tree that can actually be closed.</b><br>
-  A DSH plugin that puts <code>project vision → milestone → support → execution</code> on one screen,
+  A DSH plugin that puts <code>project vision → milestone → capability → execution</code> on one screen,
   gives every node a structured prompt, launches DSH sessions from the node that needs them,
   and reports the live status of the dev services behind it.
 </p>
@@ -42,30 +42,30 @@ nobody can trace back to a vision, and the next session starts by guessing what 
 
 Looptree Dashboard keeps that intent on disk, next to the code. Each project starts with a **project
 vision** and a `rotation/v1` card file: a milestone (milestone vision + core metrics + important
-supports), the **support items** that turn those supports into executable work (each with its own core
-metric and approach), the plans those supports generate, and the execution records of the sessions that
+capabilities), the **capability items** that turn those capabilities into executable work (each with its own core
+metric and approach), the plans those capabilities generate, and the execution records of the sessions that
 did the work. The panel is the view; DSH is the engine.
 
 ## Features
 
-- **One swimlane per project.** Milestone, support and execution-record columns at a glance. Closed
-  supports fold into a `▸ closed N` chip instead of taking up space, and the **Hide closed** display-style
+- **One swimlane per project.** Milestone, capability and execution-record columns at a glance. Closed
+  capabilities fold into a `▸ closed N` chip instead of taking up space, and the **Hide closed** display-style
   toggle removes even that chip (the count moves onto the card's chips); execution records never fold, so
   you always see what just ran.
-- **Vision first, supports second.** A milestone starts with a 3–6 sentence vision (≤ 1000 chars) of what
-  the project should *become*, then 3–5 **important supports**: what must exist for that vision to hold,
-  ordered by importance and derived from first principles. The **确认达成** gate is **at least one support
-  child + every child closed** — it no longer depends on whether the supports list is filled.
-- **One core metric, on the support.** Each support's own `metric` states what it must reach for that
-  support to hold the milestone up — there is no milestone-level metric any more. The project vision
+- **Vision first, capabilities second.** A milestone starts with a 3–6 sentence vision (≤ 1000 chars) of what
+  the project should *become*, then 3–5 **important capabilities**: what must exist for that vision to hold,
+  ordered by importance and derived from first principles. The **确认达成** gate is **at least one capability
+  child + every child closed** — it no longer depends on whether the capabilities list is filled.
+- **One core metric, on the capability.** Each capability's own `metric` states what it must reach for that
+  capability to hold the milestone up — there is no milestone-level metric any more. The project vision
   sits above everything: `project.vision` (≤ 1000 chars) is edited from the project name's
   `⋯ → Project info` dialog.
-- **Candidate pool with reasoning, sorted by importance.** A milestone generates candidate supports that
-  carry support / necessity / causal / evidence / importance (1–5); they are stored in descending
-  importance order and each row reveals a hover card. Adopting writes only the **read-only trio**
-  (support / necessity / causal); the core metric and approach stay empty and are filled with
-  **Generate 2 items**.
-- **Plan, execute, reflect from the support.** Fill the core metric and approach to enable **Generate
+- **Candidate pool with reasoning and a landing spot, sorted by importance.** A milestone generates
+  candidate capabilities that carry capability / necessity / causal / **gap impact** / **module
+  (brownfield or greenfield)** / **integration surface** / evidence / importance (1–5); they are stored in
+  descending importance order, each row shows a module badge and reveals a hover card. Adopting keeps
+  those fields read-only; the core metric and approach stay empty and are filled with **Generate 2 items**.
+- **Plan, execute, reflect from the capability.** Fill the core metric and approach to enable **Generate
   plan** (`409 FILL_REQUIRED`); when a plan exists, **Execute plan** (`409 PLAN_MISSING`). Generate plan
   sends `/plan`; execute runs `/plan off` then `/goal <objective>` in the *same* session. When the record
   finishes, reflection runs once more and stores lessons on the milestone.
@@ -81,7 +81,7 @@ did the work. The panel is the view; DSH is the engine.
   panel lists the collision (fail closed); services already up are skipped. **Stop all** kills whatever
   is listening on the configured loopback ports, including services you started in a terminal, and
   reports per-port failures instead of stopping the batch.
-- **Item fields are lists you edit in place.** Important-support and core-metric editors add and remove
+- **Item fields are lists you edit in place.** Important-capability and core-metric editors add and remove
   one item at a time (`+ Add one` / `×`), and renumber on save. There is no drag ordering: the order you
   type is the order that is written back.
 - **The arithmetic is on screen.** Convergence health, close span, close rate, in-flight ages, overdue
@@ -92,7 +92,7 @@ did the work. The panel is the view; DSH is the engine.
   a `ready` tag plus a teal rail on the card, `running N · ready N` in the lane head, and a clickable
   **idle branch →** footer that scrolls to it. A lone branch that is running lights nothing up; a lone
   idle branch gets a quiet emphasis. A parent whose children are running stays dark, so you never see
-  "milestone ready" next to three running supports. Single-versus-multiple is counted per project, and no
+  "milestone ready" next to three running capabilities. Single-versus-multiple is counted per project, and no
   new field is written to the card.
 
 ## See it work
@@ -100,7 +100,7 @@ did the work. The panel is the view; DSH is the engine.
 | Swimlane matrix | Node detail |
 |---|---|
 | ![Swimlane matrix](assets/hero.png) | ![Node detail card](assets/detail.png) |
-| Every project in one matrix: milestone → support → execution record. | Click any node for fields, issues, plan, execution records and prompts. |
+| Every project in one matrix: milestone → capability → execution record. | Click any node for fields, issues, plan, execution records and prompts. |
 
 | Prompt structure before sending |
 |---|
@@ -156,13 +156,13 @@ If `health` 404s the host half is not mounted — see [INSTALL.md](INSTALL.md).
 
 Three steps, once per day:
 
-1. **Read the lanes.** A milestone expands into its supports; execution records show running / done /
+1. **Read the lanes.** A milestone expands into its capabilities; execution records show running / done /
    failed with the session result. Milestones waiting for review are amber, and execution records never fold.
 2. **Close what is closed.** Support records close themselves once every record is done; the milestone
    enters **待确认达成** and only a click on **确认达成** writes `closed_at`, snapshots it into the milestone
-   history and keeps the project in the main lane. The gate is **at least one support child + every child
-   closed**; a milestone that never spawned a support keeps its button greyed out.
-3. **Push the next step.** Fill a support's **core metric + approach** (or press **Generate 2 items**),
+   history and keeps the project in the main lane. The gate is **at least one capability child + every child
+   closed**; a milestone that never spawned a capability keeps its button greyed out.
+3. **Push the next step.** Fill a capability's **core metric + approach** (or press **Generate 2 items**),
    then **Generate plan**; only after the plan is written can you **Execute plan**. Every node has a prompt
    template; **发起** previews the prompt, then starts a real DSH session in that project's `workspace`.
 
@@ -181,19 +181,19 @@ project (the card's `project` block)
 milestone (one per card)
 ├── vision            3–6 sentences, ≤ 1000 chars
 ├── metrics[]         2–5 milestone core metrics: the observable result that proves the vision
-├── supports[]        3–5 important supports: what must exist for the vision to hold (importance order)
-├── children[]        support items (kind: support, depth 2)
-│   ├── support       the support entry it carries — copied verbatim (read-only, ≤ 80 chars)
+├── capabilities[]        3–5 important capabilities: what must exist for the vision to hold (importance order)
+├── children[]        capability items (kind: capability, depth 2)
+│   ├── capability       the capability entry it carries — copied verbatim (read-only, ≤ 80 chars)
 │   ├── necessity     why it helps the milestone (read-only, ≤ 200 chars)
 │   ├── causal        doing X → which step of the milestone becomes true (read-only, ≤ 200 chars)
-│   ├── metric        this support's core metric: how far it must go to hold the milestone up
+│   ├── metric        this capability's core metric: how far it must go to hold the milestone up
 │   ├── approach      the implementation approach
 │   ├── plan          plan book, written by Generate plan
 │   └── children[]    execution records (kind: exec, depth 3+): one DSH session each
 └── closed_milestones[]    ≤ 10 snapshots, written on 确认达成
 ```
 
-A candidate row reveals a hover card (support / necessity / causal / evidence / importance); adopting
+A candidate row reveals a hover card (capability / necessity / causal / evidence / importance); adopting
 writes only the read-only trio into the card, and the core metric + approach are filled with
 **Generate 2 items**.
 
@@ -285,7 +285,7 @@ Nothing leaves the machine except the model calls that DSH already routes.
 - UI copy is Chinese-only for now; the data model and API are language-neutral.
 - Markdown in prompts is plain text on purpose — DSH chat bubbles do not render it.
 - Candidate pools are runtime data under `~/.dsh/rotation/candidates/` and are not synced through the
-  project's git: candidates do not follow you to another machine, only adopted support items do.
+  project's git: candidates do not follow you to another machine, only adopted capability items do.
 - Stop all locates listeners by port: on Windows it uses `Get-NetTCPConnection` then `netstat` /
   `taskkill`, on macOS it needs `lsof` (bundled with the OS), on Linux it falls back to `ss` /
   `netstat`. Services whose URL is not a loopback address (`localhost`, `127.0.0.0/8`, `::1`) are
@@ -302,9 +302,9 @@ npm run check          # against a running DSH: health / panel / registry
 
 Individual suites: `npm run lint:plugin`, `mock:client`, `mock:session`, `mock:action`, `mock:prompt`,
 `mock:candidates`, `mock:genbtn`, `mock:closure`, `mock:registry`, `mock:services`, `mock:services-batch`,
-`mock:stale-run`, `validate:samples`. Migration for older cards: `npm run migrate:supports` — folds goals
-and ideas into support items and renames blockers to important supports; dry-run by default, `--write`
-persists and writes `<card>.supports-backup.json`. Cards older than 0.13 need `migrate`, `migrate:single-idea`,
+`mock:stale-run`, `validate:samples`. Migration for older cards: `npm run migrate:capabilities` — folds goals
+and ideas into capability items and renames blockers to important capabilities; dry-run by default, `--write`
+persists and writes `<card>.capabilities-backup.json`. Cards older than 0.13 need `migrate`, `migrate:single-idea`,
 `migrate:blockers`, `migrate:milestone` first (also dry-run by default).
 
 Architecture, event flow and directory map: [docs/architecture.md](docs/architecture.md).

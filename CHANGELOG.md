@@ -1,60 +1,92 @@
 # CHANGELOG
 
-## 0.15.1 — 核心指标从里程碑下移到支撑项
+## 0.16.0 — 重要支撑升级成「主要能力闭环 / 能力闭环」，带功能模块归属
 
-- **要求**（2026-10-31，用户指出）：里程碑里不该有核心指标，核心指标应该是支撑项的。
-  里程碑只回答「把项目带到哪」和「要什么才成立」（重要支撑）；「做到什么程度算撑住」是每条支撑项自己的事。
+- **要求**（2026-10-31，用户指出）：`重要支撑` 说的是「要什么」，但接不住「落在哪个功能模块、
+  改造还是新增、跟谁协同」。改成 **主要能力闭环（第一列属性）→ 能力闭环（第二列）**：
+  里程碑先划出「要让愿景成立，必须形成哪几段能自己跑通的能力」，候选池挑中后落到第二列，
+  每条能力闭环都是一次可独立验证的里程碑落地。
+- **破坏性变更**：
+  - **kind**：`support` → `capability`；`milestone.supports` → `milestone.capabilities`；
+    承接字段 `support` → `capability`。旧卡读入即折叠，`npm run migrate:capabilities --write` 写盘
+    （先备份 `<卡片>.capabilities-backup.json`，幂等）。
+  - **能力≠功能点**：`capabilities` 条目允许 UI 展示 / UX 动画 / 布局审美 / 内容管线这类非代码能力域，
+    不再逼着写「缺哪个模块」。
+- **新增字段（能力闭环，只读，候选阶段产出）**：
+  - `gap`：缺失影响——缺了这块能力，闭环断在哪、谁受影响；
+  - `module`：功能模块或能力域（代码模块名/路径，或「UX 动画」这类能力域）；
+  - `module_mode`：`existing`（改造现有）/ `new`（新增）；
+  - `collaboration`：协同面——和哪些组件、通过什么接口 / 事件 / 数据协同。
+- **prompt**：
+  - 里程碑「生成主要能力闭环」：第一性原理问「要让愿景成立，必须形成哪几段能自己跑通、能单独验证的能力」，
+    一条一行写成「<能力闭环> → 它让愿景哪一步成立」，不写模块路径与实现手段；
+  - 候选生成：每条候选回答 承接条目 / 必要性 / 与闭环的关系 / 缺失影响 / 功能模块 / 改造还是新增 / 协同面，
+    先读项目结构再判断 `existing` 还是 `new`；缺 `necessity` / `causal` / `gap` / `module` 的候选丢弃；
+  - 能力闭环补全：迁移过来的老节点一次补齐模块信息 + 核心指标 + 实现思路；
+  - 计划 / 执行：背景注入模块归属与协同面，计划里的「改哪些文件」要与 `module` 对齐。
+- **面板**：第二列改名「能力闭环」；能力闭环卡显示模块徽标（`改造现有 · src/plot` / `新增 · UX 动画层`）；
+  详情卡只读六行（承接条目 / 必要性 / 与闭环的关系 / 缺失影响 / 功能模块 / 协同面）+ 可写两项；
+  候选行加模块徽标，悬浮卡同步展示这六项。
+- **迁移**：`npm run migrate:capabilities`（默认 dry-run；读磁盘原卡，不读归一后的对象）；
+  迁移只改名与搬运，新字段留空，交给「生成 N 项」补。
+- **验证**：`npm run preflight` 全绿；4 张真卡迁移后 `validate-rotation` 全通过、二次干跑 0 张待迁移；
+  面板实测三列 / 模块徽标 / 悬浮卡六项 / 能力闭环详情。
+
+## 0.15.1 — 核心指标从里程碑下移到能力闭环
+
+- **要求**（2026-10-31，用户指出）：里程碑里不该有核心指标，核心指标应该是能力闭环的。
+  里程碑只回答「把项目带到哪」和「要什么才成立」（主要能力闭环）；「做到什么程度算撑住」是每条能力闭环自己的事。
 - **破坏性变更**：
   - `milestone.metrics` 退役：允许留在 JSON（旧卡、旧快照原样保留），校验器只警告，
     面板不显示、不校验、不进 prompt。
-  - 里程碑「生成 N 项」只剩 `vision` + `supports`；补全 prompt 不再产出指标（`FILLABLE_BY_KIND`、
+  - 里程碑「生成 N 项」只剩 `vision` + `capabilities`；补全 prompt 不再产出指标（`FILLABLE_BY_KIND`、
     `GEN_FIELDS_CLIENT`、`EDIT_FIELDS` 三处同步）。
   - 里程碑卡片的「核心指标 N 项」chip、详情卡「核心指标」可编辑行移除；`hasInfo` 判据同步。
-- **不变**：`support.metric`（支撑项核心指标）语义与位置不变——仍是「这条支撑做到什么程度算撑住里程碑」，
+- **不变**：`capability.metric`（能力闭环核心指标）语义与位置不变——仍是「这条支撑做到什么程度算撑住里程碑」，
   仍是「生成计划」的前置条件之一（`409 FILL_REQUIRED`）。
-- **迁移**：不做数据迁移。旧卡里的 `milestone.metrics` 留在原处作为历史文本，需要时人工搬到某条支撑项的
-  `metric` 里；`migrate:supports` 的输出也会提示这一点。
+- **迁移**：不做数据迁移。旧卡里的 `milestone.metrics` 留在原处作为历史文本，需要时人工搬到某条能力闭环的
+  `metric` 里；`migrate:capabilities` 的输出也会提示这一点。
 - **验证**：`npm run preflight` 全绿（`mock:prompt` / `mock:genbtn` / `mock:list-fields` 收紧到新字段表）；
-  面板实测里程碑详情只剩「重要支撑」，支撑项仍显示核心指标 + 实现思路。
+  面板实测里程碑详情只剩「主要能力闭环」，能力闭环仍显示核心指标 + 实现思路。
 
-## 0.15.0 — 目标 / 构思两列合并成「支撑项」，闭环改成愿景驱动
+## 0.15.0 — 目标 / 构思两列合并成「能力闭环」，闭环改成愿景驱动
 
 - **要求**（2026-10-31，用户拍板）：闭环太冗长——里程碑 → 目标 → 构思 → 执行四层，每层都要单独补字段、
-  单独确认，真正干活的只有最后一列。改成 **项目愿景 → 里程碑愿景 → 核心指标 → 重要支撑 → 支撑项
-  （核心指标 + 实现思路）→ 计划 / 执行 / 反馈**：里程碑只说「把项目带到哪」，重要支撑从第一性原理回答
-  「要什么才能让愿景成立」，支撑项承接一条支撑、自己带核心指标与实现思路，然后直接开计划与执行。
+  单独确认，真正干活的只有最后一列。改成 **项目愿景 → 里程碑愿景 → 核心指标 → 主要能力闭环 → 能力闭环
+  （核心指标 + 实现思路）→ 计划 / 执行 / 反馈**：里程碑只说「把项目带到哪」，主要能力闭环从第一性原理回答
+  「要什么才能让愿景成立」，能力闭环承接一条支撑、自己带核心指标与实现思路，然后直接开计划与执行。
 - **破坏性变更**：
-  - **kind 阶梯**：`milestone → goal → idea → exec` 四层收敛为 `milestone → support → exec` 三层；
-    `goal` / `idea` 两种 kind 退役，旧卡读入即折叠成 `support`（`lib/core.mjs` 的 `normalizeLegacyCard`：
-    `goal.blocker → support.support`，`idea.approach/plan` 空时继承，`idea.children` 上提为支撑项子节点）。
-  - **`milestone.blockers` → `milestone.supports`**（阻碍项 → 重要支撑）：语义从「现在还差什么」改成
+  - **kind 阶梯**：`milestone → goal → idea → exec` 四层收敛为 `milestone → capability → exec` 三层；
+    `goal` / `idea` 两种 kind 退役，旧卡读入即折叠成 `capability`（`lib/core.mjs` 的 `normalizeLegacyCard`：
+    `goal.blocker → capability.capability`，`idea.approach/plan` 空时继承，`idea.children` 上提为能力闭环子节点）。
+  - **`milestone.blockers` → `milestone.capabilities`**（阻碍项 → 主要能力闭环）：语义从「现在还差什么」改成
     「要什么才能让愿景成立」，3–5 条、按重要性排序、一条一行；读入即改名，校验器只给警告、不阻断保存。
   - **字段退役**：`scenario` / `constraints` / `acceptance` 不再使用——允许留在 JSON，只警告、
-    不显示、不校验、不进 prompt；业务语义改用里程碑核心指标 + 支撑项 `metric` / `approach` 表达。
+    不显示、不校验、不进 prompt；业务语义改用里程碑核心指标 + 能力闭环 `metric` / `approach` 表达。
     `milestone.acceptance`（更早退役）同样只留警告。
-  - **面板三列**：里程碑 / 支撑项 / 执行验证反馈；里程碑「确认达成」闸门改为「至少 1 个支撑项子节点 +
-    子项全部闭环」，不再看 `supports` 是否非空；删除阻碍项闸门（`blockerGate`）。
+  - **面板三列**：里程碑 / 能力闭环 / 执行验证反馈；里程碑「确认达成」闸门改为「至少 1 个能力闭环子节点 +
+    子项全部闭环」，不再看 `capabilities` 是否非空；删除阻碍项闸门（`blockerGate`）。
 - **新增**：
-  - 候选池只剩「里程碑 → 支撑项」一种：候选带 `{ title, support, necessity, causal, importance(1–5), evidence }`，
-    host 解析后按 importance 降序稳定排序落盘；无 `supports` 时返回 `409 SUPPORTS_REQUIRED`，
+  - 候选池只剩「里程碑 → 能力闭环」一种：候选带 `{ title, capability, necessity, causal, importance(1–5), evidence }`，
+    host 解析后按 importance 降序稳定排序落盘；无 `capabilities` 时返回 `409 CAPABILITIES_REQUIRED`，
     缺 `necessity` / `causal` 的候选丢弃。
-  - 候选行**悬浮详情卡**：展示承接支撑项 / 必要性 / 因果 / 证据 / 重要性；滚动与窗口缩放时收起。
-  - 采纳只写**只读三件套**（`support` / `necessity` / `causal`），核心指标与实现思路留空，
+  - 候选行**悬浮详情卡**：展示承接能力闭环 / 必要性 / 因果 / 证据 / 重要性；滚动与窗口缩放时收起。
+  - 采纳只写**只读三件套**（`capability` / `necessity` / `causal`），核心指标与实现思路留空，
     用「生成 2 项」补（缺项 > 0 时按钮高亮）。
-  - 里程碑「AI 拆出重要支撑」：输出 `{"supports":[...]}`，预览勾选后写入 `milestone.supports`。
-  - 支撑项「生成计划」前置核心指标 + 实现思路（`409 FILL_REQUIRED`），「执行计划」前置计划
+  - 里程碑「AI 拆出主要能力闭环」：输出 `{"capabilities":[...]}`，预览勾选后写入 `milestone.capabilities`。
+  - 能力闭环「生成计划」前置核心指标 + 实现思路（`409 FILL_REQUIRED`），「执行计划」前置计划
     （`409 PLAN_MISSING`）；执行完自动反馈提炼写 `milestone.lessons`。
-  - `npm run migrate:supports`：默认 dry-run；`--write` 先备份 `<卡片>.supports-backup.json` 再原子写回，
+  - `npm run migrate:capabilities`：默认 dry-run；`--write` 先备份 `<卡片>.capabilities-backup.json` 再原子写回，
     幂等，逐卡报告不中断。
 - **配套实现**：`lib/core.mjs`（字段 / 不变量 / 旧卡折叠）、`lib/prompt.mjs`（候选 / 补全 / 拆解 / 计划四份契约）、
   `lib/index.js`（候选池与动作链路）、`web/index.html`（三列 + 悬浮卡）、`samples/` 与 `templates/`、mock 套件。
 - **验证方式**：
   - `npm run preflight`（新增 `mock:candidates` / `mock:candtip`，`mock:prompt` / `mock:genbtn` / `mock:closure`
     收紧到新契约）；
-  - `npm run migrate:supports` 干跑看每张卡的迁移计划，`--write` 后用 `node validate-rotation.mjs <卡片>` 复查；
+  - `npm run migrate:capabilities` 干跑看每张卡的迁移计划，`--write` 后用 `node validate-rotation.mjs <卡片>` 复查；
   - 面板实测：三列布局、候选行悬浮卡、采纳后「生成 2 项」补齐、里程碑闸门、生成计划 → 执行计划 → 反馈提炼。
 - **文档**：`rotation-card-spec.md`、`docs/prompts.md`、`docs/architecture.md`、`docs/execution-records.md`
-  与两个 README 改成支撑项口径。
+  与两个 README 改成能力闭环口径。
 
 ## 0.14.6 — 列表字段改 JSON 数组，阻碍项不再揉成一块
 
