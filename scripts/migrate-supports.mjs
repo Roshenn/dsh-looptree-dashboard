@@ -223,8 +223,10 @@ for (const t of targets) {
   let card;
   let original;
   try {
-    const raw = t.entry ? null : await readFile(t.path, 'utf8');
-    card = t.entry ? await readCard(t.entry) : JSON.parse(raw);
+    // 必须读磁盘上的原卡：store.readCard 会把 goal/idea 归一成 support，
+    // 拿归一后的对象做计划会永远判「已是最新」，--write 就什么都不写（2026-10-31 踩过）
+    const raw = await readFile(t.path, 'utf8');
+    card = JSON.parse(raw);
     original = JSON.parse(JSON.stringify(card));
   } catch (error) {
     failed += 1;
