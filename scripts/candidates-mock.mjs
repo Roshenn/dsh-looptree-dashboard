@@ -156,9 +156,9 @@ try {
   server.listen(PORT, '127.0.0.1', async () => {
     try {
       /* 1. 生成候选：假 agent 吐 5 条，2 条缺必要字段被丢，其余按 importance 降序 */
-      const gen = await post('/candidates/generate', { file: project.file, nodeId: NODE_ID, count: 3 });
+      const gen = await post('/candidates/generate', { file: project.file, nodeId: NODE_ID, count: 9 });
       check('生成候选 → 200', gen.status === 200 && gen.body?.ok === true, JSON.stringify(gen.body));
-      check('生成条数不超过主要能力闭环条数', gen.body?.want === 3, String(gen.body?.want));
+      check('候选数 = 主要能力闭环条数（count 参数被忽略，1:1）', gen.body?.want === 3, String(gen.body?.want));
       const pool = await waitPool();
       check('候选池落盘 3 条（缺必要字段的 3 条各丢 1 条）', pool.length === 3, JSON.stringify(pool.map((c) => c.title)));
       check('按 importance 降序', pool.map((c) => c.importance).join(',') === '5,3,2', pool.map((c) => c.importance).join(','));

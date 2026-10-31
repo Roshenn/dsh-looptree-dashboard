@@ -146,11 +146,12 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 
 ### 4.1 候选生成（里程碑 → 能力闭环）
 
-入口：`POST /rotation/api/candidates/generate` `{file, nodeId, count}`。
+入口：`POST /rotation/api/candidates/generate` `{file, nodeId}`（2026-10-31 起不再接受 `count`：条数由能力闭环决定）。
 
 - **前置**：`milestone.capabilities` 非空；为空时 `409 CAPABILITIES_REQUIRED`，不退化成「按愿景缺口编抽象支撑」。
   候选池里还有未处理候选时也拒绝（先处理掉）。
-- **条数**：`count` 夹在 1–6；每条候选承接一条**不同**的主要能力闭环，条数不超过 `capabilities` 条数。
+- **条数**：严格 **1:1**——每条主要能力闭环各出 1 条候选，能力闭环有几条就出几条。
+  不再有默认 3 条、6 条硬上限、按能力条数夹取这三道限制；也不允许同一条能力闭环出多条替代（顺序与比较复杂化）。
 - **证据**：先读 README / 目录 / 现有模块（读代码 / 跑命令 / 看产物），再判断「改造现有还是新增」；
   `evidence` 指到文件 / 命令 / 输出，不写「已确认」这类空话。
 
@@ -173,7 +174,7 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 ]
 ```
 
-- `importance` 1–5（5 = 最该先做）；host 解析时**按 importance 降序稳定排序**后落盘，cap 6。
+- `importance` 1–5（5 = 最该先做）；host 解析时**按 importance 降序稳定排序**后落盘，条数不再截断。
 - `module_mode` 只能是 `existing`（改造现有）/ `new`（新增）；`existing` 必须能在项目里指到模块。
 - 缺 `necessity` / `causal` / `gap` / `module` 的候选在解析时丢弃——这四项答不出「缺了会怎样、落在哪」。
 - 采纳（`POST /candidates/adopt`）把 `title` / `capability` / `necessity` / `causal` / `gap` /

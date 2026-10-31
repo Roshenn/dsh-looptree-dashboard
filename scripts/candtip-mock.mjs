@@ -151,7 +151,8 @@ check('只传空对象也不崩', api.candTipHtml(null).includes('（未生成�
 
 /* ── 4. 候选行：瘦身 + 不再含退役字段 ── */
 const row = api.candRowHtml(full, { id: 'p1' }, { id: 'n1' }, 0);
-check('候选行含序号 / 重要性 / 标题 / 承接条目 / 模块徽标', row.includes('cand-idx') && row.includes('data-imp="4"') && row.includes('统一索引层') && row.includes('章节→情节两层索引') && row.includes('cand-mod'), row.slice(0, 260));
+check('候选行含重要度 / 标题 / 承接条目 / 模块徽标', row.includes('重要度 4') && !row.includes('cand-idx') && row.includes('统一索引层') && row.includes('章节→情节两层索引') && row.includes('cand-mod'), row.slice(0, 260));
+check('候选行不再显示名次（避免两个数字叠在一起）', !/cand-idx|>1<\/span>\s*<span class="cand-imp"/.test(row), row.slice(0, 200));
 check('候选行含添加 / 删除操作', row.includes('data-cand-adopt') && row.includes('data-cand-del'), '');
 check('候选行不再含退役的 acceptance / strength', !row.includes('acceptance') && !row.includes('strength'), row);
 check('候选行标题同样过 esc', !api.candRowHtml(nasty, { id: 'p' }, { id: 'n' }, 0).includes('<script>'), '');

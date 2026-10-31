@@ -72,6 +72,8 @@
 - **候选池**：`~/.dsh/rotation/candidates/<卡片文件>__<节点 id>.json`（运行时数据，不进项目 git）。
   形状 `[{ title, capability, necessity, causal, gap, module, module_mode, collaboration, importance, evidence }]`，
   落盘按 `importance`（1–5）降序稳定排序；缺 `necessity` / `causal` / `gap` / `module` 的条目直接丢弃。
+  **条数严格 1:1**：每条主要能力闭环各出 1 条候选，能力闭环几条就有几条候选；不设数字上限，
+  也不允许同一条能力闭环出多条替代（2026-10-31）。
   只有里程碑能生成「候选能力闭环」；采纳把全部只读项写进新节点，`metric` / `approach` 留空用「生成 2 项」补。
   候选池每行 = 序号 + 重要性 + 标题 + 承接条目 + **模块徽标**；悬浮出详情卡，展示
   承接能力闭环 / 必要性 / 与闭环的关系 / 缺失影响 / 功能模块（含改造/新增）/ 协同面 / 证据。
