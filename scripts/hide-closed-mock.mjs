@@ -117,6 +117,17 @@ check('隐藏态：数量上提到卡片 chips', cardChips(v).includes('已闭�
 check('隐藏态：chips 保留原有条目', cardChips(v).includes('6 目标'));
 check('隐藏态：已达成里程碑的根仍返回（泳道主管不消失）', visibleRoot({ ...mkTree(), closed: true }).id === 'ms');
 
+/* 2.5 隐藏态点「已闭环 N」→ 展开这一颗（复用 foldedClosed，等价于开关关闭时的折叠行） */
+state.hideClosed = true;
+foldedClosed.clear();
+revealedClosed.clear();
+foldedClosed.add('ms');
+v = visibleRoot(mkTree());
+check('隐藏态手动展开：已闭环目标回来', ids(v).includes('g1'), JSON.stringify(ids(v)));
+check('隐藏态手动展开：仍不出折叠行（计数留在 chips）', v.hiddenClosed === 0, String(v.hiddenClosed));
+check('隐藏态展开后 chips 仍带计数（渲染成收起按钮）', cardChips(v).includes('已闭环 1'), JSON.stringify(cardChips(v)));
+foldedClosed.clear();
+
 /* 3. 跳转到已闭环节点：临时放行那一颗 */
 state.hideClosed = true;
 foldedClosed.clear();
@@ -138,8 +149,14 @@ check('紧凑也进同一份偏好', /savePrefs\(\{ density: on \? 'compact' : '
 check('启动时从偏好恢复', /state\.hideClosed = !!PREFS\.hideClosed/.test(script) && /dataset\.density = PREFS\.density === 'comfort'/.test(script), '');
 check('点击开关后重绘', /#hide-closed'\)\.addEventListener\('click'[\s\S]{0,400}render\(\)/.test(script), '');
 check('关掉开关清掉临时放行', /revealedClosed\.clear\(\)/.test(script), '');
+/* 5. 已闭环 chip 是按钮：点它展开 / 收起 */
+check('已闭环 chip 渲染成按钮（data-reveal）', /data-reveal="\$\{n\.id\}"/.test(script), '');
+check('按钮带 aria-expanded 状态', /aria-expanded="\$\{chipsExpanded/.test(script), '');
+check('点它切换 foldedClosed 并重绘', /closest\('\[data-reveal\]'\)/.test(script) && /foldedClosed\.add\(nid\)/.test(script) && /foldedClosed\.delete\(nid\)/.test(script), '');
+check('可点 chip 有 cursor/hover 样式', /button\.tchip\{font:inherit/.test(html), '');
 check('关闭动作的提示区分隐藏态', /已按「隐藏已闭环」收进卡片 chips/.test(script), '');
-check('可见树按开关分叉', /if \(!forced && state\.hideClosed\)/.test(script), '');
+check('可见树按开关分叉（隐藏态也认 foldedClosed 手动展开）',
+  /if \(!forced && !foldedClosed\.has\(n\.id\)\)/.test(script) && !/state\.hideClosed\)\{ hidden\+\+; continue; \}/.test(script), '');
 
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} 通过`);

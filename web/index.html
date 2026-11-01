@@ -251,6 +251,11 @@
   .tbtn.danger{color:color-mix(in srgb,var(--red) 82%,var(--tx1));border-color:color-mix(in srgb,var(--red) 35%,var(--b2))}
   .tbtn.danger:hover{background:color-mix(in srgb,var(--red) 12%,transparent)}
   .tchip{font-size:9.5px;line-height:1;padding:3px 5px;border-radius:4px;color:var(--tx4);background:color-mix(in srgb,var(--b2) 55%,transparent);border:1px solid color-mix(in srgb,var(--b2) 70%,transparent);white-space:nowrap}
+  /* 可展开的 chip：与只读 chip 同尺寸，只多一点手形与 hover 反馈（不抢视觉焦点） */
+  button.tchip{font:inherit;font-size:9.5px;line-height:1;cursor:pointer}
+  button.tchip:hover{color:var(--tx1);border-color:var(--b3);
+    background:color-mix(in srgb,var(--brand) 10%,transparent)}
+  button.tchip[aria-expanded="true"]{color:var(--brand-2,var(--brand))}
   .bars{display:inline-flex;gap:2px}
   .bars i{width:10px;height:3px;border-radius:2px;background:var(--b3)}
   .bars i.on{background:var(--green)}
@@ -2174,6 +2179,15 @@ function cardChips(n){
 function nodeMarkup(n, p){
   const st = stateOf(n), tone = nodeTone(n), pr = progressOf(n);
   const chips = cardChips(n);   // 隐藏已闭环时，被藏掉的数量作为一条 chip 上提
+  const chipsExpanded = foldedClosed.has(n.id);
+  const chipHtml = chips.map((c) => {
+    const m = /^已闭环 (\d+)$/.exec(String(c));
+    if (!m) return `<span class="tchip">${esc(c)}</span>`;
+    // 隐藏态：这条 chip 就是「展开已闭环节点」的入口；展开后同一颗按钮变成收起
+    const label = chipsExpanded ? `▾ 收起已闭环 ${m[1]}` : `已闭环 ${m[1]} ▸`;
+    return `<button type="button" class="tchip chipbtn" data-reveal="${n.id}" aria-expanded="${chipsExpanded ? 'true' : 'false'}"
+      title="${chipsExpanded ? '收起已闭环节点' : '展开已闭环节点（它们只是被隐藏，不会消失）'}">${esc(label)}</button>`;
+  }).join('');
   const kids = workKids(n);          // 记录不算工作子节点：不参与「完成」与进度条
   const kidsExist = kids.length>0;
   const isContainer = n.kind === 'milestone';
@@ -2234,7 +2248,7 @@ function nodeMarkup(n, p){
     </div>
     <div class="tnode-title" title="${n.title}">${n.title}</div>
     ${n.meta ? `<div class="tnode-meta one" title="${esc(n.metaFull || n.meta)}">${esc(n.meta)}</div>` : ''}
-    ${chips.length ? `<div class="tnode-chips">${chips.map(c => `<span class="tchip">${esc(c)}</span>`).join('')}</div>` : ''}
+    ${chips.length ? `<div class="tnode-chips">${chipHtml}</div>` : ''}
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
     ${lateBadge(n)}
     ${p ? runBadge(p, n) : ''}
@@ -2265,7 +2279,7 @@ function visibleRoot(root){
     for (const k of (n.children || [])){
       if (k.closed && !isRecord(k)){
         const forced = revealedClosed.has(k.id);   // 跳转目标：即使在隐藏态也让这一颗露出来
-        if (!forced && state.hideClosed){ hidden++; continue; }
+        // 手动展开（点「已闭环 N」chip）在两种显示风格下都认；隐藏态只是默认不展开
         if (!forced && !foldedClosed.has(n.id)){ hidden++; continue; }
         shown++;
       }
@@ -6183,6 +6197,16 @@ document.addEventListener('click', (e)=>{
     const p0 = PROJECTS.find(x => x.id === abandonBtn.dataset.proj);
     const n0 = p0 && findNode(p0.root, abandonBtn.dataset.abandon);
     if (p0 && n0) abandonRecord(p0, n0);
+    return;
+  }
+  const revealBtn = e.target.closest('[data-reveal]');
+  if (revealBtn){
+    const nid = revealBtn.dataset.reveal;
+    if (foldedClosed.has(nid)) foldedClosed.delete(nid);
+    else foldedClosed.add(nid);
+    render();
+    const after = document.querySelector(`.tnode[data-nid="${nid}"] [data-reveal]`);
+    if (after && after.getAttribute('aria-expanded') === 'true') toast('已展开已闭环节点；再点一次可收起');
     return;
   }
   const candGen = e.target.closest('[data-cand-gen]');
