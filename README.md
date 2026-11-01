@@ -68,6 +68,11 @@ did the work. The panel is the view; DSH is the engine.
 - **Live updates without tab-hopping.** Finishing a session refreshes the board in place within ~2 s and the
   touched nodes get a **新** badge that stays until you open them; idle polling compares card mtimes so edits
   from another window or machine land too, without stealing focus.
+- **Crash-recoverable.** After a DSH crash or forced restart, cards no longer deadlock on
+  `session … already exists`: a persisted session is resumed first, and if that fails a fresh
+  session takes over (the new id is written back). Orphaned `running` records started by this
+  machine are failed and closed on boot, and each failed record offers **retry in place** or
+  **abandon with a reason**; failures never auto-close a capability.
 - **Plan, execute, reflect from the capability.** Fill the core metric and approach to enable **Generate
   plan** (`409 FILL_REQUIRED`); when a plan exists, **Execute plan** (`409 PLAN_MISSING`). Generate plan
   sends `/plan`; execute runs `/plan off` then `/goal <objective>` in the *same* session. When the record

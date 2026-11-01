@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 0.17.0 — 崩溃可恢复：重接会话 / 换新会话继续 / 失败可原地重跑
+
+- **要求**（2026-11-01，用户截图）：DSH 崩溃或强制重启后，卡片停在
+  `执行失败：创建会话失败：session "…" already exists`，任务卡死在这里动不了。
+- **根因**：`exec` / `reflect` 复用 `capability.plan.session`；宿主重启后进程内 agent 缓存已空，
+  但会话仍落盘在 DSH 里，于是再 `create` 同一个 id 必然抛 `SessionAlreadyExistsError`；
+  而失败记录按原设计保持打开 → 能力闭环的「子记录全关」永远不满足，手动「完成」也被 recordOpen 挡住。
+- **修复**：
+  - `lib/runner.mjs` 新增 `acquireAgent` 四步取会话：进程内缓存 → `ctx.agents.get` →
+    `ctx.agents.resume({ resumeSessionId })`（重接已落盘会话）→ `ctx.agents.create`；
+    create 撞 `already exists` 时换 `session-<uuid>` 重试（rebound），并记录 `sessionSource`。
+  - 换过会话会把新 id 回写 `capability.plan.session` 与 `record.session.id`（`session.rebound_from` 留原 id）。
+  - `session.host` 记发起机器；`reconcileOrphans()` 在插件 apply 与 `GET /api/cards` 前（5s 节流）
+    只收拾本机发起、且进程内已无 run 的非终态记录：标 stale + `outcome=failed` + 关闭 + 写 proof。
+  - 新增 `POST /api/action/retry`（原地重跑，复用同一条 record id、换新会话）与
+    `POST /api/action/abandon`（放弃并关闭，`outcome=abandoned`、`proof="放弃：…"`）。
+  - `exec.outcome`（success / failed / cancelled / abandoned）进校验；能力闭环自动收口要求在
+    无 open 记录之外**不存在失败类记录**——失败必须人工处理（重跑成功或放弃后人工「完成」）。
+  - 面板：失败/陈旧记录卡显示 ⚠ 原因 + 「重跑 / 放弃」，记录上标「已重接会话 / 已换新会话」。
+- **验证**：`npm run mock:crash`（新增，13 组断言：resume / rebound / 失败保持打开 / 原地重跑 /
+  放弃 / 对账只动本机）；`mock:closure` 补「失败记录不自动收口」；`npm run preflight` 全绿。
+- **已知取舍**：重接失败换新会话会丢对话上下文（计划全文在卡片里，执行仍能继续）；无人值守时
+  失败记录会停在「待处理」，这是「失败必须人工处理」的刻意选择。
+
 ## 0.16.3 — 「生成 N 项」挂到节点卡左下角
 
 - **要求**（2026-10-31，用户在截图上指出）：`生成 2 项` 只出现在详情卡动作行，应该在节点卡片的左下角。

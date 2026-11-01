@@ -1,6 +1,6 @@
 {
   "name": "dsh-looptree-dashboard",
-  "version": "0.16.3",
+  "version": "0.17.0",
   "description": "Looptree Dashboard for DSH: one swimlane per project (project vision → milestone → capability loop → execution records) with node sessions, structured prompts and one-click service control",
   "license": "MIT",
   "author": "jrri",
@@ -84,6 +84,7 @@
     "verify:package": "node scripts/verify-package.mjs",
     "migrate:capabilities": "node scripts/migrate-capabilities.mjs",
     "mock:refresh": "node scripts/refresh-mock.mjs",
-    "mock:stamp": "node scripts/stamp-mock.mjs"
+    "mock:stamp": "node scripts/stamp-mock.mjs",
+    "mock:crash": "node scripts/crash-recovery-mock.mjs"
   }
 }

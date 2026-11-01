@@ -18,7 +18,8 @@
   旧卡读入即折叠成 `capability`，见「旧卡兼容与迁移」。）
 - **关闭状态**：`closed_at`（ISO 时间或 `null`）——**只有它代表关闭**，`status` 不代表。
   面板显示里程碑「已达成」、能力闭环「已闭环」= `closed_at` 非空。
-  **里程碑必须人工点「确认达成」才写 `closed_at`**；能力闭环在已有执行记录时随记录全闭环自动收口，
+  **里程碑必须人工点「确认达成」才写 `closed_at`**；能力闭环在已有执行记录时随记录全闭环自动收口
+  （但存在 failed / cancelled / abandoned 记录时不自动收口——失败必须人工处理），
   还没有执行记录时显示「完成」由人手动收口。
   里程碑「确认达成」的闸门 = **至少 1 个能力闭环子节点 + 子项全部闭环**——
   不再看 `capabilities` 是否非空：主要能力闭环是规划输入，不是关闭条件（2026-10-31 改）。
@@ -162,6 +163,12 @@
 | `proof` | exec | 关闭时必填 | 证据字符串（命令输出摘要 / 路径 / commit） |
 | `issues[]` | exec | ➖ | `{ "text", "at", "resolved_at?" }`，未 resolved 即阻塞 |
 | `action` | exec | ➖ | `plan` / `exec` / `reflect`，一次动作会话一条记录 |
+| `outcome` | exec | ➖ | 结局：`success` / `failed` / `cancelled` / `abandoned`（成功收尾写 success；失败与放弃要人工处理后才收口） |
+| `error` | exec | ➖ | 失败原因摘要，面板红色显示（记录保持打开时也有值） |
+| `failed_at` | exec | ➖ | 最近一次失败的时间 |
+| `session.host` | exec | ➖ | 发起机器名：崩溃对账只收本机遗留的会话，别的机器一律不动 |
+| `session.source` | exec | ➖ | `live` / `resumed` / `created` / `rebound`：这条记录最后是怎么拿到会话的 |
+| `session.rebound_from` | exec | ➖ | 换过会话时记原 sessionId（面板显示「已换新会话」） |
 | `session` | 全部 | ➖ | 节点对应的 DSH 会话（见「节点会话」） |
 | `children[]` | milestone / capability | ➖ | 顺序即展示顺序；milestone 下只能放 capability，capability 下只能放 exec |
 | `scenario` / `constraints` / `acceptance` | 已退役 | ➖ | 允许留在 JSON；只警告、不显示、不校验、不进 prompt，业务语义改用核心指标 + 实现思路 |
@@ -237,6 +244,25 @@
 - **复制地址**：复制 `url`，方便贴到别处验证。
 - **项目菜单（`⋯`）**：**服务信息收集**（AI 会话读项目 → 预览探活 → 确认后写回 `services`；草稿在 `~/.dsh/rotation/services/`）
   与**移除项目**（只取消注册表登记，保留 `rotation.json`）。
+
+## 崩溃恢复（2026-11-01）
+
+DSH 崩溃或强制重启后，卡片不会再卡在 `session "…" already exists` 上。三层兜底：
+
+1. **取会话四步**（`lib/runner.mjs` 的 `acquireAgent`）：
+   进程内缓存 → `ctx.agents.get(sessionId)`（宿主里还活着）→
+   `ctx.agents.resume({ resumeSessionId })`（**重接已落盘会话，上下文不丢**）→
+   `ctx.agents.create({ sessionId })`；create 撞 `already exists` 时换 `session-<uuid>` 重试一次（**rebound**）。
+   换过会话会把新 id 回写 `capability.plan.session` 与 `record.session.id`，下次续跑指向活会话。
+2. **启动对账**（`reconcileOrphans`）：插件 apply 时一次、`GET /api/cards` 前 5s 节流一次。
+   只处理 `session.host === 本机` 且进程内没有对应 run 的非终态记录：
+   标 `stale`、判 `outcome=failed`、关闭记录并写 `proof`；**别机器发起的记录一个字段都不动**。
+3. **人工出口**：
+   - `POST /api/action/retry` `{file, recordId}`：原地重跑，复用同一条记录 id，换新会话；
+   - `POST /api/action/abandon` `{file, recordId, reason}`：放弃并关闭，`outcome=abandoned`、`proof="放弃：…"`。
+
+失败记录保持打开时不阻塞面板其它操作，但能力闭环不会自动收口；要么重跑成功（`outcome=success`），
+要么放弃后人工点「完成」。
 
 ## 节点会话（可选，面板写入）
 
@@ -371,7 +397,8 @@
 | `exec` / `issues` | 第 3 列记录卡；`issues` 渲染成卡片内红色条目 |
 | 深度 ≥ 4 | 第 3 列卡片内的缩进折叠行 |
 | `closed_at` 非空 | 卡片变灰 + 「重开」按钮；同级的已闭环能力闭环默认折叠成「▸ 已闭环 N」；显示风格打开「隐藏已闭环」后**整颗不渲染、折叠行也不再出现**，被藏掉的数量上提成卡片 chips「已闭环 N」（已达成里程碑仍留主管）。跳转过去的那一颗临时放行（`revealedClosed`） |
-| 可关闭 | 能力闭环：记录全闭环自动收口；没有记录时卡上有「完成」。里程碑：「确认达成」固定在卡片 footer **左端**，与右侧「生成候选 / 候选池」同屏但分开；**都不会自动关闭** |
+| 可关闭 | 能力闭环：记录全闭环**且没有失败/取消/放弃记录**才自动收口；没有记录、或失败已处理完时卡上有「完成」。里程碑：「确认达成」固定在卡片 footer **左端**，与右侧「生成候选 / 候选池」同屏但分开；**都不会自动关闭** |
+| 失败 / 陈旧记录 | 卡上显示 ⚠ 原因 + 两颗按钮：「重跑」（原地复用同一条记录换新会话）/「放弃」（关闭并写原因，`outcome=abandoned`）；两者都走人工，不会自动放行 |
 | 缺描述字段（`vision` / `capabilities`；能力闭环 `capability` / `necessity` / `causal` / `gap` / `module` / `module_mode` / `collaboration` / `metric` / `approach`） | 「生成 N 项」挂在**节点卡 footer 左下角**（`lead` 组最左；里程碑跟「确认达成」同一组，能力闭环没有收敛按钮，它就是左下角那一颗）：**缺项 > 0 就高亮**（描边强调，不是实底橙——别和「生成候选」抢焦点），补完变灰「无缺项」。里程碑缺 2 项、能力闭环最多缺 9 项；标题是唯一必需项，占位名（待命名）时按钮灰、只能先写标题；执行记录没有可补字段，整颗按钮不出现。详情卡底部动作行保留同一按钮（两处都能点） |
 | 从没衍生过子节点（`children` 为空） | 里程碑「确认达成」**置灰不可点**（点一下只弹 toast 说明原因）：没有能力闭环就没有可收口的分支；想结束里程碑请先进详情页删子节点。能力闭环没有执行记录时显示「完成」，允许人直接结束 |
 | 里程碑子项全关闭但自身未确认 | 状态「待确认达成」+ 泳道头 CTA；**闸门 = 至少 1 个能力闭环子节点 + 子项全部闭环**，与 `capabilities` 是否非空无关 |

@@ -56,7 +56,20 @@ DSH 进程
 4. **写入永远先校验**：`validateCard` → 422 拒绝 → tmp+rename 原子替换；不另留 `.bak`，历史版本由 git 负责。
 5. **折叠/状态都是渲染层**：收敛进度、健康度、节点统计用完整树计算，不受折叠影响。
 
-## 五、事件与状态机
+## 五、会话生命周期与崩溃恢复
+
+```
+起动作（plan / exec / reflect / retry）
+  └─ acquireAgent：进程内缓存 → ctx.agents.get → ctx.agents.resume → ctx.agents.create
+       └─ create 撞 session "<id>" already exists → 换 session-<uuid> 重试（rebound）
+            └─ 新 id 回写 capability.plan.session 与 record.session.id
+卡片记录：session = { id, host, status, source?, rebound_from? }；结束时写 status / error / outcome
+崩溃重启后：reconcileOrphans（插件 apply + GET /api/cards 前 5s 节流）
+  └─ 只收 session.host === 本机 且无进程内 run 的非终态记录 → stale + outcome=failed + 关闭
+人工出口：POST /api/action/retry（原地重跑，复用 record id）/ POST /api/action/abandon（放弃并写原因）
+```
+
+## 六、事件与状态机
 
 ```
 POST /api/run
@@ -72,7 +85,7 @@ POST /api/run
   结束 → persistSession → 卡片 node.session
 ```
 
-## 六、目录
+## 七、目录
 
 ```
 lib/index.js      宿主插件入口（路由 + 装配）
@@ -87,7 +100,7 @@ scripts/          dev-host / mock / lint / migrate（含 migrate-capabilities）
 samples/          5 张样例卡（也是校验样例）
 ```
 
-## 七、本地验证手段
+## 八、本地验证手段
 
 | 想验什么 | 命令 |
 |---|---|
