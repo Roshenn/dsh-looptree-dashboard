@@ -98,6 +98,7 @@ const SOURCE = [
   grabFunction('isFilled'),
   grabFunction('hasInfo'),
   grabConst('STATE_DEF'),
+  grabConst('BAD_OUTCOMES'),
   grabFunction('capabilityRecordsDone'),
   grabFunction('deriveState'),
   grabFunction('stateOf'),
@@ -121,11 +122,14 @@ const N = (id, kind, opts = {}) => ({
   raw: { id, kind, title: opts.title || id, ...(opts.action ? { action: opts.action } : {}), ...(opts.raw || {}) },
   children: opts.children || [],
 });
-const record = (id, action, closed = true) => N(id, 'exec', {
+const record = (id, action, closed = true, outcome) => N(id, 'exec', {
   action, closed,
-  raw: action === 'plan'
-    ? { plan_steps: 3 }
-    : (action === 'exec' ? { verify: 'pnpm test' } : { lessons: ['x'] }),
+  raw: {
+    ...(action === 'plan'
+      ? { plan_steps: 3 }
+      : (action === 'exec' ? { verify: 'pnpm test' } : { lessons: ['x'] })),
+    ...(outcome ? { outcome } : {}),
+  },
 });
 const capabilityWith = (id, records, raw = {}) => N(id, 'capability', {
   title: `能力闭环 ${id}`, raw: { metric: '指标', approach: '思路', ...raw }, children: records,
@@ -155,6 +159,14 @@ const autoTree = N('ms-auto', 'milestone', { title: '里程碑', raw: { vision: 
 api.autoCloseTree(autoTree);
 check('autoCloseTree：能力闭环自动闭环', freshDone.closed === true);
 check('autoCloseTree：里程碑保持待确认', autoTree.closed === false);
+// 契约：失败记录必须人工处理——即使全部记录都关闭，也不自动收口
+const failedDone = capabilityWith('s-failed', [
+  record('p1', 'plan'), record('e1', 'exec', true, 'failed'), record('r1', 'reflect'),
+]);
+const failedTree = N('ms-failed', 'milestone', { title: '里程碑', raw: { vision: '愿景' }, children: [failedDone] });
+api.autoCloseTree(failedTree);
+check('autoCloseTree：有失败记录时不自动收口', failedDone.closed === false, JSON.stringify(failedDone.closed));
+check('capabilityRecordsDone：失败记录 → false', api.capabilityRecordsDone(failedDone) === false, '');
 // 契约：能力闭环无执行记录时给「完成」按钮手动收口，autoCloseTree 不关它
 const noRecTree = N('ms-no-rec', 'milestone', { title: '里程碑', raw: { vision: '愿景' }, children: [noRecord] });
 api.autoCloseTree(noRecTree);

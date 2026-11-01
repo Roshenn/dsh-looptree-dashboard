@@ -32,6 +32,8 @@ try {
   await run(npm, ['run', 'mock:client']);
   console.log('── mock:session ──');
   await run('node', ['scripts/dev-session-mock.mjs'], { ROTATION_HOME: home, MOCK_WS: ws, PORT: port });
+  console.log('── mock:crash ──');
+  await run(npm, ['run', 'mock:crash'], { PORT: String(Number(port) + 5) });
   console.log('── mock:action ──');
   await run(npm, ['run', 'mock:action'], { PORT: String(Number(port) + 1) });
   console.log('── mock:candidates ──');

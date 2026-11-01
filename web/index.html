@@ -1737,10 +1737,13 @@ function convergeBtnMarkup(n, tone){
  * 子记录全部关闭，且至少出现过一条 exec 与一条 reflect。
  * 只生成过计划、没执行过 → 仍算规划中；没有子记录 → false，交给「完成」按钮手动收口。
  */
+const BAD_OUTCOMES = new Set(['failed', 'cancelled', 'abandoned']);
 function capabilityRecordsDone(n){
   if (!n || n.kind !== 'capability') return false;
   const kids = n.children || [];
   if (!kids.length || !kids.every(k => k.closed)) return false;
+  // 失败 / 取消 / 人工放弃的记录不允许自动收口：必须人点「完成」或先重跑成功
+  if (kids.some(k => BAD_OUTCOMES.has(k.raw && k.raw.outcome))) return false;
   const actions = kids.map(k => recordActionOf(k));
   return actions.includes('exec') && actions.includes('reflect');
 }
@@ -2210,11 +2213,13 @@ function nodeMarkup(n, p){
   const idleModel = p && p.idle;
   const idleMode = idleModel && idleModel.idleIds.has(n.id)
     ? (idleModel.mode === 'strong' ? 'strong' : 'modest') : '';
+  const recovery = recordRecoveryBtns(p, n);
+  const srcNote = recordSourceNote(n);
   const foot = [
     kidsExist ? `<span class="mono" style="font-size:10.5px;color:var(--tx4)">${pr.closed}/${pr.kids} 关闭</span>` : '',
     leafCloseBtn,
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
-    candGen, candPool, planActs, viewSess,
+    srcNote, recovery, candGen, candPool, planActs, viewSess,
   ].filter(Boolean).join('');
   // 收敛 / 达成落在 footer 左端；「生成 N 项」紧跟其右侧（同一组 lead），右侧留给「继续生成」那组动作
   const leadKids = [closeBtn, genBtn].filter(Boolean).join('');
@@ -3743,13 +3748,42 @@ function capabilityActionButtons(p, n, where){
   return `${planBtn}${execBtn}${chip}`;
 }
 
+/** 记录是否处于「需要人工处理」的失败态（失败 / 取消 / 人工放弃 / 进程已不在） */
+function recordFailed(n){
+  if (!isRecord(n)) return false;
+  const raw = n.raw || {};
+  const sess = raw.session || {};
+  if (BAD_OUTCOMES.has(raw.outcome)) return true;
+  if (BAD_OUTCOMES.has(sess.status)) return true;
+  return !!raw.error && !n.closed;
+}
+
+/** 失败/陈旧记录的两条出口：重跑（原地复用记录）、放弃（关闭并写原因） */
+function recordRecoveryBtns(p, n){
+  if (!p || !recordFailed(n)) return '';
+  const rid = n.id;
+  const retry = `<button class="tbtn primary" data-retry="${rid}" data-proj="${p.id}" title="原地重跑：复用这条记录，换一个新会话">重跑</button>`;
+  const abandon = n.closed
+    ? ''
+    : `<button class="tbtn" data-abandon="${rid}" data-proj="${p.id}" title="放弃这次执行，关闭记录并写原因">放弃</button>`;
+  return retry + abandon;
+}
+
+/** 会话来源：重接过 / 换过新会话时给一颗 chip，让「为什么还能跑」有据可查 */
+function recordSourceNote(n){
+  if (!isRecord(n)) return '';
+  const sess = (n.raw && n.raw.session) || {};
+  if (sess.rebound_from) return `<span class="tchip" title="原会话 ${esc(sess.rebound_from)} 已失效，已换新会话">已换新会话</span>`;
+  if (sess.source === 'resumed') return `<span class="tchip" title="重接了已落盘的会话">已重接会话</span>`;
+  return '';
+}
+
 /** 记录卡：失败的会话把错误摘要摆在卡片上（完成记录折叠进「已关闭」） */
 function recordErrorLine(n){
   if (!isRecord(n)) return '';
   const sess = n.raw.session || {};
-  const err = sess.error || n.raw.error || '';
-  const failed = ['failed', 'cancelled'].includes(sess.status) || ['failed', 'cancelled'].includes(n.raw.status);
-  if (!err || !failed) return '';
+  const err = n.raw.error || sess.error || '';
+  if (!err || !recordFailed(n)) return '';
   return `<div class="issue">⚠ ${esc(err.length > 140 ? err.slice(0, 140) + '…' : err)}</div>`;
 }
 
@@ -3903,7 +3937,7 @@ function detailMarkup(p, n){
     detailContainer
       ? convergeBtnMarkup(n, 'primary')
       : (canClose ? `<button class="tbtn primary" data-close="${n.id}">${closeLabelOf(n)}</button>` : ''),
-    genBtn,
+    genBtn, recordRecoveryBtns(p, n), recordSourceNote(n),
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     planActs, candBtn, poolBtn, addBtn,
     `<button class="tbtn" data-copy="${n.id}">复制 JSON</button>`,
@@ -4280,6 +4314,61 @@ function stopActionPolls(){
   for (const t of actionPolls.values()) t.cancelled = true;
   actionPolls.clear();
 }
+/**
+ * 原地重跑一条失败/陈旧记录：复用同一条 record id，只换新会话。
+ * 失败记录必须人工处理——重跑成功后会把它改回 success，能力闭环才可能自动收口。
+ */
+async function retryRecord(p0, n0, btn){
+  if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
+  if (!p0.file) return toast('该项目没有可写回的卡片文件');
+  if (!API_BASE) return toast('未连接服务，无法重跑');
+  const action = n0.raw && n0.raw.action;
+  const cfg = SUPPORT_ACTIONS[action] || { busy:'重跑中', ok:'重跑完成', fail:'重跑失败' };
+  const pollKey = p0.file + '::' + n0.id;
+  if (actionPolls.has(pollKey)) return toast('这条记录已经有会话在跑，等它结束');
+  const oldText = btn && btn.textContent;
+  if (btn){ btn.disabled = true; btn.textContent = '重跑中…'; }
+  try {
+    const res = await fetch(api('/action/retry'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: p0.file, recordId: n0.id }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    if (j.run && j.run.key) runMap.set(j.run.key, j.run);
+    paintRunBadges();
+    toast('已重跑，会话结束后自动刷新卡片');
+    await pollCapabilityAction({ pollKey, p0, n0, run: j.run, cfg });
+  } catch (error) {
+    toast('重跑失败：' + error.message);
+    if (btn && document.body.contains(btn)){ btn.disabled = false; btn.textContent = oldText || '重跑'; }
+  }
+}
+
+/** 人工放弃一条记录：关闭它并写原因（不重跑的那条出口） */
+async function abandonRecord(p0, n0){
+  if (!p0 || !p0.file || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
+  if (!API_BASE) return toast('未连接服务，无法放弃');
+  askConfirm('放弃这条记录',
+    `<div class="mnote">放弃会关闭这条记录并写失败原因；能力闭环要收口还得你点「完成」（失败必须人工处理）。</div>
+     <div class="detail-row"><dt>原因</dt><dd><input class="dfield" id="ab-reason" style="width:100%" placeholder="例如：会话已失效，不打算再跑"></dd></div>`,
+    '放弃', async () => {
+      const reason = (($('#ab-reason') || {}).value || '').trim();
+      try {
+        const res = await fetch(api('/action/abandon'), {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ file: p0.file, recordId: n0.id, reason }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+        toast('已放弃这条记录');
+        await reloadProjects();
+      } catch (error) {
+        toast('放弃失败：' + error.message);
+      }
+    });
+}
+
 /** 发送预览确认后真正起会话：POST 建记录 + 起会话，然后轮询 /api/runs */
 async function startCapabilityAction(p0, n0, action, btn, override = {}){
   if (!p0 || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
@@ -6081,6 +6170,20 @@ document.addEventListener('click', (e)=>{
   if (openSess){ openInDsh(openSess.dataset.openSession); return; }
   const viewSess = e.target.closest('[data-view-session]');
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
+  const retryBtn = e.target.closest('[data-retry]');
+  if (retryBtn){
+    const p0 = PROJECTS.find(x => x.id === retryBtn.dataset.proj);
+    const n0 = p0 && findNode(p0.root, retryBtn.dataset.retry);
+    if (p0 && n0) retryRecord(p0, n0, retryBtn);
+    return;
+  }
+  const abandonBtn = e.target.closest('[data-abandon]');
+  if (abandonBtn){
+    const p0 = PROJECTS.find(x => x.id === abandonBtn.dataset.proj);
+    const n0 = p0 && findNode(p0.root, abandonBtn.dataset.abandon);
+    if (p0 && n0) abandonRecord(p0, n0);
+    return;
+  }
   const candGen = e.target.closest('[data-cand-gen]');
   if (candGen){ generateCandidates(candGen.dataset.proj, candGen.dataset.nid, candGen); return; }
   const capabilityAct = e.target.closest('[data-capability-act]');
