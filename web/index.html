@@ -957,6 +957,8 @@ const STAGES = [
 const KIND = { milestone:'里程碑', capability:'能力闭环', exec:'执行' };
 /** module_mode：改造还是新增（与 host / prompt 的 MODULE_MODE_LABEL 同口径） */
 const MODULE_MODE_LABEL = { existing:'改造现有', new:'新增' };
+/** 失败类结局：出现这些结局的记录不允许能力闭环自动收口（失败必须人工处理） */
+const BAD_OUTCOMES = new Set(['failed', 'cancelled', 'abandoned']);
 /** 执行记录按 action 区分显示（计划 / 执行 / 反馈）；老记录没有 action 仍显示「执行」 */
 const ACTION_LABEL = { plan:'计划', exec:'执行', reflect:'反馈' };
 const isRecord = (n) => !!(n && n.kind === 'exec' && n.raw && n.raw.action);
@@ -1737,7 +1739,6 @@ function convergeBtnMarkup(n, tone){
  * 子记录全部关闭，且至少出现过一条 exec 与一条 reflect。
  * 只生成过计划、没执行过 → 仍算规划中；没有子记录 → false，交给「完成」按钮手动收口。
  */
-const BAD_OUTCOMES = new Set(['failed', 'cancelled', 'abandoned']);
 function capabilityRecordsDone(n){
   if (!n || n.kind !== 'capability') return false;
   const kids = n.children || [];

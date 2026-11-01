@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.17.1 — 修复面板启动白屏（BAD_OUTCOMES 的 TDZ）
+
+- **症状**：0.17.0 的面板打开后只有顶栏、没有泳道（`#matrix` 为空）。
+- **根因**：`const BAD_OUTCOMES` 声明在 `capabilityRecordsDone` 之前，但 `let PROJECTS` 的初始化
+  （`CARDS.map(cardToProject)` → `autoCloseTree` → `capabilityRecordsDone`）在这条声明**之前**执行，
+  于是抛 `ReferenceError: Cannot access 'BAD_OUTCOMES' before initialization`，boot 中断。
+- **修复**：把 `BAD_OUTCOMES` 提到顶部常量区（`MODULE_MODE_LABEL` 之后）；`mock:candtip` 增加两条
+  静态断言：顶部常量必须声明在 `let PROJECTS` 与 `capabilityRecordsDone` 之前。
+- **教训**：单测只覆盖纯函数，渲染链路没有真正跑过 boot；这次用真浏览器 + 页面 error 监听才抓到。
+
 ## 0.17.0 — 崩溃可恢复：重接会话 / 换新会话继续 / 失败可原地重跑
 
 - **要求**（2026-11-01，用户截图）：DSH 崩溃或强制重启后，卡片停在

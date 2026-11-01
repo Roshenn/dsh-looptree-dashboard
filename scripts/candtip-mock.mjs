@@ -165,6 +165,12 @@ check('页面有 #cand-tip 单例', /id="cand-tip"/.test(html), '');
 check('#cand-tip 是 fixed + z-index 51（不被弹窗裁掉）', /#cand-tip\{[^}]*position:fixed[^}]*z-index:51/.test(html), '');
 check('悬停 / 聚焦有委托', script.includes("addEventListener('mouseover'") && script.includes("addEventListener('focusin'") && script.includes('hideCandTip'), '');
 check('悬浮卡显隐走 data-show 过渡', html.includes('#cand-tip[data-show="true"]'), '');
+// 面板启动顺序：PROJECTS 的初始化会调 cardToProject → autoCloseTree，凡在这条链上被引用的
+// 顶部 const 必须声明在它之前，否则会踩 TDZ（2026-11-01 实际踩过一次：BAD_OUTCOMES 声明在后）
+check('顶部常量声明在 PROJECTS 初始化之前（防 TDZ）',
+  html.indexOf("const BAD_OUTCOMES") > 0 && html.indexOf("const BAD_OUTCOMES") < html.indexOf("let PROJECTS ="), '');
+check('BAD_OUTCOMES 声明在 capabilityRecordsDone 之前',
+  html.indexOf("const BAD_OUTCOMES") < html.indexOf("function capabilityRecordsDone"), '');
 
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} 通过`);
