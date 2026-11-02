@@ -679,7 +679,8 @@
   .ptitle:hover{color:var(--tx1)}
   .pbtn{height:22px;padding:0 7px;border-radius:5px;corner-shape:var(--corner);border:1px solid var(--b2);
     background:var(--l3);color:var(--tx3);font-size:10.5px;flex:0 0 auto;
-    transition:color 140ms var(--ease-out),border-color 140ms var(--ease-out),background-color 140ms var(--ease-out)}
+    transition:color 140ms var(--ease-out),border-color 140ms var(--ease-out),
+      background-color 140ms var(--ease-out),transform 140ms var(--ease-out)}
   .pbtn:hover{color:var(--tx1);border-color:var(--b3)}
   .pbtn.run{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent);
     background:color-mix(in srgb,var(--green) 12%,transparent)}
@@ -692,6 +693,42 @@
     border:1.5px solid currentColor;border-top-color:transparent;display:inline-block;vertical-align:-1px;
     animation:svc-spin 640ms linear infinite}
   @keyframes svc-spin{to{transform:rotate(360deg)}}
+
+  /* ───────── 一键拉起：图标四态（play → 转圈 → 对勾 + 高光 / 红叉 + 抖） ─────────
+     只动 opacity / transform / stroke-dashoffset，不碰宽高；文字不换，按钮宽度恒定。 */
+  .svc-ico{position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:11px;height:11px;margin-right:4px;vertical-align:-1px}
+  .svc-ico svg{width:11px;height:11px;overflow:visible;display:block}
+  .svc-ico path,.svc-ico circle{fill:none;stroke:currentColor;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round;transition:opacity 120ms var(--ease-out)}
+  .svc-ico .ico-play{opacity:0;fill:currentColor;stroke:none}
+  .svc-ico .ico-ring{opacity:0}
+  .svc-ico .ico-check{opacity:0}
+  .svc-ico .ico-x{opacity:0}
+  .pbtn[data-phase="idle"] .ico-play{opacity:.85}
+  .pbtn[data-phase="loading"]{cursor:progress}
+  .pbtn[data-phase="loading"] .ico-ring{opacity:1;stroke-dasharray:2.3 2.3}
+  .pbtn[data-phase="loading"] .svc-ico svg{animation:svc-spin 760ms linear infinite}
+  .pbtn[data-phase="check"] .ico-check{opacity:1}
+  .pbtn[data-phase="check"] .svc-ico{transform:scale(1)}
+  .pbtn[data-phase="error"] .ico-x{opacity:1}
+  .pbtn[data-phase="error"]{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent);
+    background:color-mix(in srgb,var(--red) 10%,transparent)}
+  /* 一次性动画只在相位刚翻过来的那一刻播（data-anim=1）；5s 轮询重画不会重播 */
+  .pbtn[data-phase="check"][data-anim="1"] .ico-check{animation:svc-draw 220ms var(--ease-out) both}
+  .pbtn[data-phase="error"][data-anim="1"] .ico-x{animation:svc-shake 260ms var(--ease-out) both}
+  .pbtn[data-phase="check"][data-anim="1"] .svc-ico{animation:svc-pop 240ms var(--ease-out) both}
+  /* 对勾那一格：一圈绿光闪过去（只在图标上，不铺满按钮） */
+  .pbtn[data-phase="check"][data-anim="1"] .svc-ico::after{content:"";position:absolute;inset:-5px;border-radius:50%;
+    background:radial-gradient(circle,color-mix(in srgb,var(--green) 78%,transparent),transparent 68%);
+    animation:svc-glow 520ms var(--ease-out) both;pointer-events:none}
+  @keyframes svc-draw{from{stroke-dasharray:9;stroke-dashoffset:9;opacity:0}
+    55%{opacity:1}to{stroke-dasharray:9;stroke-dashoffset:0;opacity:1}}
+  @keyframes svc-pop{0%{transform:scale(.72)}62%{transform:scale(1.16)}100%{transform:scale(1)}}
+  @keyframes svc-glow{0%{opacity:0;transform:scale(.5)}38%{opacity:.95}100%{opacity:0;transform:scale(1.5)}}
+  @keyframes svc-shake{0%,100%{transform:translateX(0)}22%{transform:translateX(-1.6px)}
+    58%{transform:translateX(1.4px)}82%{transform:translateX(-.8px)}}
+  .pbtn:active{transform:scale(.97)}
   #launch-prompt{width:100%;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx1);
     background:var(--l1);border:1px solid var(--b2);border-radius:7px;padding:8px 9px;resize:vertical;min-height:180px}
   #launch-prompt:focus{outline:2px solid var(--brand);outline-offset:1px}
@@ -1514,6 +1551,37 @@ const serviceMap = new Map();      // file -> [{ id, name, url, status, latencyM
 let servicePlatform = { id: '', label: '当前平台' };   // 当前宿主平台（host 用 process.platform 解析 start）
 const SVC_LABEL = { up:'运行中', down:'未启动', starting:'启动中', failed:'启动失败' };
 const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)', failed:'var(--red)' };
+
+/* 「一键拉起」按钮的瞬时状态机：idle → loading → check / error → idle。
+   存在 Map 里而不是 DOM 上：服务块每 5s 会被整体重画一次，DOM 上的状态会被抹掉。 */
+const SVC_LOAD_MIN_MS = 700;      // 接口 ~40ms 就回；不等一下，转圈根本看不见
+const SVC_PHASE_HOLD_MS = 1400;   // 对勾 / 红叉停多久再复位
+const SVC_ANIM_FRESH_MS = 320;    // 相位刚翻过来的这一小段才放动画，重画时不重播
+const svcPhases = new Map();      // `${file}::${id}` → { phase, at, timer }
+/** 当前相位 + 这一相位是否还「新鲜」（新鲜才播一次性动画，5s 轮询重画不会重播） */
+function svcPhaseOf(file, id){
+  const rec = svcPhases.get(`${file}::${id}`);
+  if (!rec) return { phase: 'idle', fresh: false };
+  return { phase: rec.phase, fresh: rec.at ? Date.now() - rec.at < SVC_ANIM_FRESH_MS : false };
+}
+function setSvcPhase(file, id, phase, holdMs){
+  const key = `${file}::${id}`;
+  const prev = svcPhases.get(key);
+  if (prev && prev.timer) clearTimeout(prev.timer);
+  const rec = { phase, at: Date.now() };
+  if (holdMs > 0){
+    rec.timer = setTimeout(() => { svcPhases.delete(key); paintServiceBlocks(); }, holdMs);
+  }
+  svcPhases.set(key, rec);
+  paintServiceBlocks();
+}
+/** 四态共用一个小图标槽：play / ring / check / x 叠在同一 11px 画布上，靠 data-phase 显示 */
+const SVC_RUN_ICON = '<span class="svc-ico" aria-hidden="true"><svg viewBox="0 0 12 12">'
+  + '<path class="ico-play" d="M4.4 3.1 L9.1 6 L4.4 8.9 Z"/>'
+  + '<circle class="ico-ring" cx="6" cy="6" r="4.1"/>'
+  + '<path class="ico-check" d="M3.2 6.4 L5.1 8.2 L8.9 4.05"/>'
+  + '<path class="ico-x" d="M4.2 4.2 L7.8 7.8 M7.8 4.2 L4.2 7.8"/>'
+  + '</svg></span>';
 const promptEdits = new Map();      // `${nodeId}::<taskId>` -> 手改后的 prompt
 let pgenOpen = null;                // 展开中的内联编辑：{ nid, task }
 const promptKey = (nid, tid) => `${nid}::${tid}`;
@@ -1950,7 +2018,11 @@ function svcRows(p){
       ? `<div class="svc-warn">启动失败：${esc(svcStartFail.why)}${svcStartFail.command ? `<span class="mono"> · ${esc(svcStartFail.command)}</span>` : ''}</div>` : '';
     // 平台化 start：只有当前平台那条才算「能拉起」；旧宿主只给字符串 start 时按字符串兜底
     const startCommand = svc.startCommand || (typeof svc.start === 'string' ? svc.start : '');
-    const canStart = startCommand && svc.status !== 'up' && svc.status !== 'starting';
+    // 动画进行中按钮必须留在原位：复核会把状态先改成「启动中」，
+    // 那一帧若按 canStart 判定，按钮会被「停止」顶掉，对勾与高光就没地方演了
+    const ph = svcPhaseOf(p.file, svc.id);
+    const canStart = startCommand
+      && (ph.phase !== 'idle' || (svc.status !== 'up' && svc.status !== 'starting'));
     const canStop = (svc.status === 'up' || svc.status === 'starting') && svc.pid;
     const platform = svc.startPlatform || '当前平台';
     const cmdLine = startCommand
@@ -1961,6 +2033,7 @@ function svcRows(p){
     const buildLine = buildCommand
       ? `<div class="svc-cmd mono" title="${esc(buildCommand)}"><b>编译（${esc(platform)}）</b> ${esc(buildCommand)}</div>`
       : (svc.build ? `<div class="svc-warn mono">没有 ${esc(platform)} 的编译命令${(svc.buildPlatforms || []).length ? `（只有 ${esc((svc.buildPlatforms || []).join(' / '))}）` : ''}</div>` : '');
+    // 拉起按钮的四态图标：play（可点）→ 转圈（等接口）→ 对勾 + 高光 / 红叉 + 抖
     return `<div class="svc">
       <div class="svc-top">
         <i class="svc-dot" style="--tone:${tone}"></i>
@@ -1974,7 +2047,7 @@ function svcRows(p){
       ${buildLine}
       <div class="svc-acts">
         <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
-        ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}">一键拉起</button>` : ''}
+        ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}" data-phase="${ph.phase}" data-anim="${ph.fresh ? 1 : 0}" aria-label="一键拉起 ${esc(svc.name)}">${SVC_RUN_ICON}一键拉起</button>` : ''}
         ${buildCommand ? `<button class="pbtn build" data-svc-build="${svc.id}" data-file="${esc(p.file)}" title="在 ${esc(svc.cwd || '项目目录')} 执行 ${esc(buildCommand)}">一键编译</button>` : ''}
         ${canStop ? `<button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}">停止</button>` : ''}
         <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
@@ -1983,47 +2056,79 @@ function svcRows(p){
     </div>`;
   }).join('');
 }
-/** 一键拉起：不做二次确认，点下去就 spawn；失败原因写回服务块常驻显示 */
-async function startService(p0, svc, btn){
+/** 一键拉起：不做二次确认，点下去就 spawn；按钮走 idle→loading→check/error→idle 四态 */
+async function startService(p0, svc){
+  // 动画进行中（loading / check / error）再点不重复起进程
+  if (svcPhaseOf(p0.file, svc.id).phase !== 'idle') return;
   const command = svc.startCommand || (typeof svc.start === 'string' ? svc.start : '');
-  if (btn) btn.setAttribute('aria-busy', 'true');
+  setSvcPhase(p0.file, svc.id, 'loading');
+  const t0 = Date.now();
+  let ok = false;
+  let why = '';
+  let pid = '';
   try {
     const res = await fetch(api('/service/start'), { method:'POST',
       headers: { 'content-type':'application/json', 'x-rotation-token': RUN_CFG.token },
       body: JSON.stringify({ file: p0.file, id: svc.id }) });
     const j = await res.json().catch(() => ({}));
-    if (j.ok){
-      svcStartFail = null;
-      toast(`已启动 ${svc.name}（pid ${(j.service && j.service.pid) || '?'}）`);
-      // shell 里「命令不存在」不会让 spawn 失败，只会让进程秒退（退出码 127）：
-      // 过一会儿再探一次，把「起了但立刻挂了」也落到服务块里，不留下一条骗人的 toast
-      setTimeout(() => verifyStarted(p0, svc, command), 1200);
-    } else {
-      svcStartFail = { file: p0.file, id: svc.id, why: j.error || '启动失败', command };
-      toast('启动失败：' + (j.error || '未知原因'));
-    }
+    ok = !!j.ok;
+    pid = (j.service && j.service.pid) || '';
+    if (!ok) why = j.error || `启动失败（HTTP ${res.status}）`;
   } catch (error){
-    svcStartFail = { file: p0.file, id: svc.id, why: error.message || '请求异常', command };
-    toast('启动失败：' + error.message);
-  } finally {
-    if (btn) btn.removeAttribute('aria-busy');
-    paintServiceBlocks();
-    setTimeout(refreshServices, 800);
-    setTimeout(refreshServices, 2500);
+    why = error.message || '请求异常';
   }
+  // 保底时长：接口 40ms 就回，不等一下，转圈与高光都会一闪而过
+  const rest = SVC_LOAD_MIN_MS - (Date.now() - t0);
+  if (rest > 0) await new Promise(resolve => setTimeout(resolve, rest));
+
+  if (!ok){
+    svcStartFail = { file: p0.file, id: svc.id, why, command };
+    setSvcPhase(p0.file, svc.id, 'error', SVC_PHASE_HOLD_MS);
+    toast('启动失败：' + why);
+    return;
+  }
+  // 先静默复核一次再给对勾：命令秒退（127）时不该先演一个假成功
+  const probe = await probeSvcQuiet(p0, svc);
+  if (probe.failed){
+    svcStartFail = { file: p0.file, id: svc.id, why: probeWhy(probe), command };
+    setSvcPhase(p0.file, svc.id, 'error', SVC_PHASE_HOLD_MS);
+    toast('启动失败：' + probeWhy(probe));
+    return;
+  }
+  svcStartFail = null;
+  setSvcPhase(p0.file, svc.id, 'check', SVC_PHASE_HOLD_MS);
+  toast(`已启动 ${svc.name}（pid ${pid || '?'}）`);
+  // 再兜一次更慢的失败（起来 1 秒后才挂）
+  setTimeout(() => verifyStarted(p0, svc, command), 900);
 }
+
+/** 静默探一次：只更新 serviceMap 不重画（重画会重造按钮、剪断动画） */
+async function probeSvcQuiet(p0, svc){
+  try {
+    const res = await fetch(api('/services?file=') + encodeURIComponent(p0.file));
+    if (res.ok){
+      const j = await res.json();
+      if (j.ok) serviceMap.set(p0.file, j.services || []);
+    }
+  } catch { /* 查不到就交给下一轮 5s 轮询 */ }
+  const hit = (serviceMap.get(p0.file) || []).find(s => s.id === svc.id);
+  if (!hit || hit.status !== 'failed') return { failed: false, tail: '' };
+  return {
+    failed: true,
+    tail: String(hit.output || '').trim().split('\n').slice(-3).join(' ').trim().slice(0, 160),
+  };
+}
+const probeWhy = (probe) => (probe && probe.tail
+  ? `进程已退出：${probe.tail}`
+  : '进程已退出（退出码非 0），点「日志」看输出');
 
 /** 拉起后复核：进程若已经非 0 退出，把退出输出挂到服务块上（下次成功启动 / 探到在线才清） */
 async function verifyStarted(p0, svc, command){
-  await refreshServices();
-  const hit = (serviceMap.get(p0.file) || []).find(s => s.id === svc.id);
-  if (!hit || hit.status !== 'failed') return;
-  const tail = String(hit.output || '').trim().split('\n').slice(-3).join(' ').trim().slice(0, 160);
-  svcStartFail = {
-    file: p0.file, id: svc.id, command,
-    why: tail ? `进程已退出：${tail}` : '进程已退出（退出码非 0），点「日志」看输出',
-  };
-  paintServiceBlocks();
+  const probe = await probeSvcQuiet(p0, svc);
+  if (!probe.failed) return;
+  svcStartFail = { file: p0.file, id: svc.id, why: probeWhy(probe), command };
+  // 对勾改成红叉：同一次点击里两种结果，动画会反向改口，但比留着假对勾诚实
+  setSvcPhase(p0.file, svc.id, 'error', SVC_PHASE_HOLD_MS);
 }
 
 /** 编译结果弹窗：退出码 + 时长 + 输出尾巴；失败先看错误再看输出 */
@@ -6637,7 +6742,7 @@ document.addEventListener('click', (e)=>{
   if (svcStart){
     const { p0, svc } = svcFor(svcStart);
     // 拉起不做二次确认：点下去就跑，失败原因写回服务块（toast 只是辅助）
-    if (p0 && svc && RUN_CFG) startService(p0, svc, svcStart);
+    if (p0 && svc && RUN_CFG) startService(p0, svc);
     return;
   }
   const svcBuild = e.target.closest('[data-svc-build]');
