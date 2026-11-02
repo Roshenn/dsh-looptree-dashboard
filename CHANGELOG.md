@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 0.19.1 — 还是开系统浏览器：拆掉 `sidebarRightTabs` 前置闸，失败原因留在服务块里
+
+- **症状**（2026-11-02，用户截图）：重启 DSH 后点「打开」，页面仍落在系统 Chrome，面板没有任何提示。
+- **根因（两层，缺一不可）**：
+  1. client 半拿 `ctx.get('sidebarRightTabs')?.get('browser')` 当**前置闸**——这个注册表在插件 ctx 上拿不到
+     （或 browser kind 没注册）就直接判死、回 `ok:false`；而 `ui-sidebar-browser` 自己的启用条件是
+     `ctx.get('profileContext')?.name !== 'desktop'` → 禁用（见 `dsh-web-app` 的 bundle patch），
+     一旦禁用就没有 `browser` 这个 kind，前置闸必然误杀。
+  2. 面板 1.5s 收不到回执 → 只弹一条 2.4s 的 toast 就回退系统浏览器；原因随 toast 消失，
+     用户视野里只剩「怎么又开 Chrome」。
+- **修**：
+  - client 半不再预判：解析 `ctx.get('sidebarRight')`（兼容 `ctx.sidebarRight` 属性访问）→ 直接
+    `openTab('browser', { params: { url } })`；失败时把 DSH 原文（`no tab type is registered as "browser"` 等）
+    原样回给面板，不再用我们的猜测替换真实原因。
+  - 面板把失败原因写进**对应那条服务的服务块**（`svcOpenFail`，随渲染常驻），成功打开后自动清掉；toast 只作辅助。
+  - 本机 profile `~/.dsh/profiles/desktop/cordis.patch.yml` 显式 `disabled: false` 打开 `ui-sidebar-browser`，
+    把「有没有内嵌浏览器」从隐含条件变成确定项。
+- **验证**：`mock:client` 10 项全绿（新增 openTab 抛错原文回传、`sidebarRightTabs` 缺失不再提前拒绝）；
+  Playwright 桩宿主 8 项 + 失败提示 2 项全绿（失败原因常驻服务块、成功时不出现）；`npm run preflight` 全绿。
+
 ## 0.19.0 — 服务「打开」改走 DSH 内嵌浏览器，宿主不支持才退回系统浏览器
 
 - **要求**（2026-11-02，用户截图）：服务块的「打开」现在调系统默认浏览器，希望直接开在 DSH 里那个内嵌浏览器。

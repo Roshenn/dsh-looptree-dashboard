@@ -1719,6 +1719,9 @@ state.stamp = (CARDS[0] && CARDS[0].updated)
   ? new Date(CARDS[0].updated).toLocaleString('sv-SE').slice(0,16)
   : '2026-10-26 23:20';
 const collapsed = new Set();
+/** 内嵌浏览器打不开时留下的原因（{ file, id, why }），渲染在对应服务块里；
+ *  只弹 toast 会随 2.4s 消失，用户回头根本看不到为什么退回了系统浏览器。 */
+let svcOpenFail = null;
 const $ = (s,r=document)=>r.querySelector(s);
 
 /* ─────────── 显示风格偏好（跨刷新保留） ───────────
@@ -1930,6 +1933,8 @@ function svcRows(p){
     const tone = SVC_TONE[svc.status] || 'var(--tx4)';
     const st = SVC_LABEL[svc.status] || svc.status;
     const lat = svc.status === 'up' && svc.latencyMs != null ? ` · ${svc.latencyMs}ms` : '';
+    const openFail = svcOpenFail && svcOpenFail.file === p.file && svcOpenFail.id === svc.id
+      ? `<div class="svc-warn">内嵌浏览器没开成：${esc(svcOpenFail.why)}（已改用系统浏览器）</div>` : '';
     // 平台化 start：只有当前平台那条才算「能拉起」；旧宿主只给字符串 start 时按字符串兜底
     const startCommand = svc.startCommand || (typeof svc.start === 'string' ? svc.start : '');
     const canStart = startCommand && svc.status !== 'up' && svc.status !== 'starting';
@@ -1945,6 +1950,7 @@ function svcRows(p){
         <span class="svc-st" style="color:${tone}">${st}${lat}</span>
       </div>
       <button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>
+      ${openFail}
       ${cmdLine}
       <div class="svc-acts">
         <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
@@ -4244,7 +4250,7 @@ function openInDsh(sessionId){
 /** 请宿主在内嵌浏览器打开服务地址：面板在 iframe 里建不了 sidebar tab，只能让 client 半转发；
  *  独立打开 / 宿主没启用 ui-sidebar-browser 时，退化为系统默认浏览器。 */
 let dshUrlSeq = 0;
-const dshUrlPending = new Map();   // reqId → { timer, fallback }
+const dshUrlPending = new Map();   // reqId → { timer, fallback, at }
 
 window.addEventListener('message', (e) => {
   const d = e && e.data;
@@ -4253,7 +4259,12 @@ window.addEventListener('message', (e) => {
   if (!pending) return;
   dshUrlPending.delete(d.reqId);
   clearTimeout(pending.timer);
-  if (!d.ok) pending.fallback(d.error || 'DSH 没有打开内嵌浏览器');
+  if (!d.ok) return pending.fallback(d.error || 'DSH 没有打开内嵌浏览器');
+  // 这次开成了：把同一条服务上的失败提示收掉
+  if (svcOpenFail && pending.at && svcOpenFail.file === pending.at.file && svcOpenFail.id === pending.at.id){
+    svcOpenFail = null;
+    render();
+  }
 });
 
 /** 系统默认浏览器兜底：window.open 带 noopener 时恒返回 null，没法据此判断是否被拦，
@@ -4266,13 +4277,15 @@ function openInSystemBrowser(url){
   }
 }
 
-function openInDshBrowser(url){
+function openInDshBrowser(url, at){
   if (!url) return;
   let embedded = false;
   try { embedded = !!(window.parent && window.parent !== window); } catch { embedded = false; }
   if (!embedded) return openInSystemBrowser(url);
   const reqId = 'rotation-url-' + (++dshUrlSeq);
   const fallback = (why) => {
+    // 失败原因留在服务块里：toast 只活 2.4s，用户回头看时只剩「怎么又开 Chrome」
+    if (at && at.file){ svcOpenFail = { file: at.file, id: at.id, why }; render(); }
     toast(`内嵌浏览器不可用（${why}），已改用默认浏览器`);
     openInSystemBrowser(url);
   };
@@ -4281,7 +4294,7 @@ function openInDshBrowser(url){
     dshUrlPending.delete(reqId);
     fallback('宿主没有响应');
   }, 1500);
-  dshUrlPending.set(reqId, { timer, fallback });
+  dshUrlPending.set(reqId, { timer, fallback, at });
   try {
     window.parent.postMessage({ type: 'rotation-open-url', url: String(url), reqId }, '*');
   } catch (error) {
@@ -6540,13 +6553,14 @@ document.addEventListener('click', (e)=>{
   }
   const svcOpen = e.target.closest('[data-svc-open]');
   if (svcOpen){
-    const { svc } = svcFor(svcOpen);
+    const { p0, svc } = svcFor(svcOpen);
+    const at = p0 && svc ? { file: p0.file, id: svc.id } : null;
     if (svc && RUN_CFG){
       const u = svc.health
         ? new URL(String(svc.health).replace(/^\//, ''), svc.url.endsWith('/') ? svc.url : svc.url + '/').toString()
         : svc.url;
-      openInDshBrowser(u);
-    } else if (svc){ openInDshBrowser(svc.url); }
+      openInDshBrowser(u, at);
+    } else if (svc){ openInDshBrowser(svc.url, at); }
     return;
   }
   const svcCopy = e.target.closest('[data-svc-copy]');

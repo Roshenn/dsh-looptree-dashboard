@@ -101,11 +101,21 @@ ok('带原地址与 params', openCalls[0]?.[1]?.params?.url === 'http://127.0.0.
 ok('成功回执 ok=true', replies.length === 1 && replies[0].ok === true, JSON.stringify(replies[0]));
 
 openCalls.length = 0;
-services = { sidebarRightTabs: { get: () => undefined } };
+services = {};
 replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40150/', reqId: 'u2' });
-ok('没启用内嵌浏览器时回失败', replies[0]?.ok === false && /内嵌浏览器/.test(replies[0].error || ''),
+ok('拿不到 sidebar 服务时回失败', replies[0]?.ok === false && /sidebarRight\.openTab/.test(replies[0].error || ''),
   JSON.stringify(replies[0]));
-ok('没启用时不调用 openTab', openCalls.length === 0);
+ok('拿不到 sidebar 时不调用 openTab', openCalls.length === 0);
+
+// 关键回归：不再用 sidebarRightTabs 做前置判断，而是把 DSH 自己的报错原样带回面板
+openCalls.length = 0;
+services = {
+  sidebarRight: { openTab: () => { throw new Error('sidebarRight: no tab type is registered as "browser"'); } },
+};
+replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2b' });
+ok('openTab 抛错时把 DSH 原文带回面板', replies[0]?.ok === false
+  && /no tab type is registered as "browser"/.test(replies[0].error || ''), JSON.stringify(replies[0]));
+ok('不因 sidebarRightTabs 缺失就提前拒绝', openCalls.length === 0);
 
 openCalls.length = 0;
 services = browserServices();
