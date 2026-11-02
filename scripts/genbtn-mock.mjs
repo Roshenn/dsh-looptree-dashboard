@@ -135,7 +135,8 @@ check('字段表：里程碑 2 项 / 能力闭环 9 项 / 执行记录 1 项',
 check('字段表不再有 support / goal / idea', !('goal' in GEN_FIELDS_CLIENT) && !('idea' in GEN_FIELDS_CLIENT), JSON.stringify(GEN_FIELDS_CLIENT));
 
 /* 4. 源码结构：卡片 footer 里「确认收敛 → 生成 N 项」的顺序、详情标题行不再挂它 */
-const leadAt = script.indexOf('const leadKids = [closeBtn, genBtn]');
+// lead 组现在的形状：[closeBtn, genBtn, manualAdd]——生成项仍紧跟确认收敛，「手动新增」排在它右边
+const leadAt = script.indexOf('const leadKids = [closeBtn, genBtn');
 check('节点卡 footer：生成项紧跟确认收敛右侧', leadAt > 0, String(leadAt));
 const detailHead = script.slice(script.indexOf('<div class="detail-path-row">'), script.indexOf('</div>', script.indexOf('<div class="detail-path-row">')) + 6);
 check('详情卡标题行不再挂「生成」按钮', !detailHead.includes('genBtn'), detailHead.slice(0, 120));
@@ -145,7 +146,7 @@ check('详情卡动作行保留「生成」按钮（紧跟确认）',
   actsBlock.includes('convergeBtnMarkup') && actsBlock.includes('genBtn,')
   && actsBlock.indexOf('convergeBtnMarkup') < actsBlock.indexOf('genBtn,'), actsBlock.slice(0, 140));
 check('节点卡把生成按钮挂到 footer 左下角（里程碑 + 能力闭环都要）',
-  script.includes('const genBtn = p ? genBtnMarkup(p, n)') && script.includes('const leadKids = [closeBtn, genBtn]'), '');
+  script.includes('const genBtn = p ? genBtnMarkup(p, n)') && script.includes('const leadKids = [closeBtn, genBtn'), '');
 check('高亮样式 .genbtn.is-hot 已定义', /\.genbtn\.is-hot\{/.test(html), '');
 
 /* 5. 生成完成后按钮换挡：generateMissing 写卡片后会整页 render()，按钮按新字段重算 */

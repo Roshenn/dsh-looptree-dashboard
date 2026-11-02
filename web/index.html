@@ -997,7 +997,6 @@
   </div>
 </div>
 
-<div class="addmenu" id="addmenu" hidden role="menu" aria-label="添加子节点"></div>
 <div class="addmenu" id="prjmenu" hidden role="menu" aria-label="项目菜单"></div>
 <!-- 候选池悬浮详情卡：body 级单例，绝不放进 #ask / 行内（见 CSS 注释） -->
 <div id="cand-tip" role="tooltip" aria-hidden="true" hidden></div>
@@ -2326,6 +2325,11 @@ function nodeMarkup(n, p){
          title="${poolCount ? '候选池：' + poolCount + ' 条待选' : '候选池为空'}">${candPoolLabel(poolCount)}</button>`
     : '';
   const planActs = n.kind === 'capability' && p ? capabilityActionButtons(p, n, 'card') : '';
+  // 卡片上直接新增子级（只有里程碑卡）：点进去只问标题，写完留在树上，不弹详情页
+  const manualAdd = (n.kind === 'milestone' && p)
+    ? `<button class="tbtn" data-manual-add="1" data-stay="1" data-nid="${n.id}" data-proj="${p.id}"
+         title="直接新增一条主要能力闭环：只问标题，不用点进详情页">手动新增</button>`
+    : '';
   // 「查看会话」放卡片下缘：点它直接切到 DSH 里这条会话的对话页（独立打开时退化为看全文）
   // 会话正等你选择时它变主色 + 呼吸：这是唯一能进去答话的入口
   const sessId = p ? sessionIdOf(p, n) : '';
@@ -2347,8 +2351,9 @@ function nodeMarkup(n, p){
     n.closed ? `<button class="tbtn" data-reopen="${n.id}">重开</button>` : '',
     srcNote, recovery, candGen, candPool, planActs, viewSess,
   ].filter(Boolean).join('');
-  // 收敛 / 达成落在 footer 左端；「生成 N 项」紧跟其右侧（同一组 lead），右侧留给「继续生成」那组动作
-  const leadKids = [closeBtn, genBtn].filter(Boolean).join('');
+  // 收敛 / 达成落在 footer 左端；「生成 N 项」与「手动新增」紧跟其右侧（同一组 lead），
+  // 右侧留给「继续生成」那组动作（生成候选 / 候选池 / 查看会话）
+  const leadKids = [closeBtn, genBtn, manualAdd].filter(Boolean).join('');
   const lead = leadKids ? `<span class="lead">${leadKids}</span>` : '';
   return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${idleMode ? ` data-idle="${idleMode}"` : ''}${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
@@ -2988,84 +2993,10 @@ function reopenNode(id){
   render();
   persist(p);
 }
-let seq = 0;
-function addChild(id){
-  const p = findProjectByNode(id); if (!p) return;
-  const n = findNode(p.root, id);
-  const wasRootClosed = !!p.root.closed;
-  const kind = n.kind==='milestone' ? 'capability' : n.kind==='capability' ? 'exec' : null;
-  if (!kind) return toast('执行记录不能再往下加');
-  const title = kind==='capability' ? '新能力闭环（待命名）' : '新执行记录（待命名）';
-  const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null };
-  if (kind === 'capability'){ rawChild.capability = ''; rawChild.necessity = ''; rawChild.causal = ''; rawChild.metric = ''; rawChild.approach = ''; }
-  if (kind === 'exec'){ rawChild.issues = []; rawChild.verify = '（待补）验证命令'; }
-  n.raw.children = n.raw.children || [];
-  n.raw.children.push(rawChild);
-  // 手工拼派生节点会漏字段（chip / meta 都由 cardToProject 算），统一重建更稳
-  const rebuilt = rebuildProject(p);
-  reopenChain(rebuilt.root, n.id);   // 给已闭环的节点加子节点 → 它和祖先都回到进行中
-  if (wasRootClosed && !rebuilt.root.closed){
-    removeClosedMilestone(rebuilt, currentMilestoneHistoryId(rebuilt));   // 重新开工的里程碑不再是历史
-    delete rebuilt.root.convergedAt;
-  }
-  toast(`已为「${n.title}」新增${KIND[kind]}`);
-  render();
-  persist(rebuilt);
-}
 
-/* ─────────── 加法菜单 + AI 拆主要能力闭环 ─────────── */
+
+/* ─────────── AI 拆主要能力闭环 ─────────── */
 const SPLIT_TASK = 'split-goals';   // 沿用 host 已注册的拆分任务 id（契约未改 taskId）
-let addMenuCtx = null;              // { pid, nid, btn }
-
-function openAddMenu(btn){
-  const id = btn.dataset.addmenu;
-  const p = findProjectByNode(id), n = p && findNode(p.root, id);
-  if (!p || !n || n.kind === 'exec') return;
-  const menu = $('#addmenu');
-  const isMilestone = n.kind === 'milestone';
-  // 里程碑：AI 拆出主要能力闭环（写进 milestone.capabilities）/ 手动添加能力闭环
-  // 能力闭环：执行记录由「生成计划 / 执行计划」产生，这里只留手动添加
-  menu.innerHTML = isMilestone
-    ? `<button type="button" class="am-ai" data-aim="ai" role="menuitem">
-        <span>AI 拆出主要能力闭环</span><span class="am-sub">生成 3 条，勾选后写进「主要能力闭环」</span>
-      </button>
-      <div class="am-sep"></div>
-      <button type="button" data-aim="manual" role="menuitem"><span>手动添加能力闭环</span></button>`
-    : `<button type="button" data-aim="manual" role="menuitem"><span>手动添加执行记录</span></button>`;
-  addMenuCtx = { pid: p.id, nid: n.id, btn };
-  btn.setAttribute('aria-expanded', 'true');
-  menu.hidden = false;
-  // 贴按钮定位：默认在下方右对齐；下方放不下就翻到上方
-  const r = btn.getBoundingClientRect();
-  const mw = menu.offsetWidth || 200, mh = menu.offsetHeight || 74;
-  const left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
-  const below = r.bottom + 6;
-  const flip = below + mh > window.innerHeight - 8;
-  menu.style.left = left + 'px';
-  menu.style.top = (flip ? Math.max(8, r.top - mh - 6) : below) + 'px';
-  menu.dataset.flip = flip ? '1' : '0';
-  requestAnimationFrame(() => { menu.dataset.show = 'true'; });
-}
-
-function closeAddMenu(){
-  const menu = $('#addmenu');
-  if (!menu || menu.hidden) return;
-  if (addMenuCtx && addMenuCtx.btn) addMenuCtx.btn.setAttribute('aria-expanded', 'false');
-  addMenuCtx = null;
-  menu.dataset.show = 'false';
-  setTimeout(() => { if (menu.dataset.show !== 'true') menu.hidden = true; }, 150);
-}
-
-function chooseAddMenu(which){
-  const ctx = addMenuCtx;
-  closeAddMenu();
-  if (!ctx) return;
-  if (which === 'manual') return addChild(ctx.nid);
-  if (which === 'ai'){
-    const p = PROJECTS.find(x => x.id === ctx.pid), n = p && findNode(p.root, ctx.nid);
-    return (n && n.kind === 'milestone') ? aiSplitCapabilities(ctx.pid, ctx.nid) : toast('只有里程碑能拆主要能力闭环');
-  }
-}
 
 /* ─────────── 项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 移除项目 ─────────── */
 let projMenuCtx = null;                   // { pid, btn }
@@ -4060,7 +3991,8 @@ function detailMarkup(p, n){
   const childKind = { milestone: 'capability', capability: 'exec' }[n.kind] || null;
   const poolCount = detailContainer ? candidateCount(p, n) : 0;
   const addBtn = childKind
-    ? `<button class="tbtn ghost" data-manual-add="1" data-nid="${n.id}" data-proj="${p.id}">手动添加${KIND[childKind]}</button>`
+    ? `<button class="tbtn ghost" data-manual-add="1" data-nid="${n.id}" data-proj="${p.id}"
+         title="新增${KIND[childKind]}：只问标题，其余字段进详情再填">手动新增</button>`
     : '';
   // 能力闭环：生成计划 / 执行计划；里程碑：候选池（候选 = 主要能力闭环）
   const planActs = n.kind === 'capability' ? capabilityActionButtons(p, n, 'detail') : '';
@@ -4871,15 +4803,18 @@ async function deleteCandidate(uid, btn){
   }
 }
 
-/** 手动添加子节点：只问标题，其余字段进详情再填 */
-async function manualAddChild(pid, nid){
+/**
+ * 手动新增子节点：只问标题，其余字段进详情再填。
+ * stayInTree=true 时（卡片上那颗按钮）不加完就弹详情页，留在树上只 flash + 滚过去。
+ */
+async function manualAddChild(pid, nid, { stayInTree = false } = {}){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
   const childKind = { milestone: 'capability', capability: 'exec' }[n0.kind] || null;
   if (!childKind) return toast('执行记录不能再往下加');
-  askConfirm(`手动添加${KIND[childKind]}`,
+  askConfirm(`手动新增${KIND[childKind]}`,
     `<div class="detail-row"><dt>标题</dt><dd><input class="dfield" id="mc-title" style="width:100%" placeholder="8–16 字，说清做到什么"></dd></div>
-     <div class="mnote">加完新节点会闪一下、滚进可视区；点它进详情继续填字段。能力闭环的承接能力闭环 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
+     <div class="mnote">加完新节点会闪一下、滚进可视区${stayInTree ? '，你留在卡片上就能接着加下一个' : '；点它进详情继续填字段'}。能力闭环的承接能力闭环 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
     '添加', async () => {
       const title = ($('#mc-title') || {}).value || '';
       if (!title.trim()) return toast('标题不能为空');
@@ -4894,16 +4829,16 @@ async function manualAddChild(pid, nid){
       rebuildProject(p0);   // 只写 raw 树的话派生视图还是旧的，新节点要等整页刷新才出现
       ensureVisible(id);    // 父节点被折叠过就先展开，父节点下缘才看得到新节点
       render();
-      openDetail(n0.id);    // 详情留在父节点，继续填它的其余字段
+      if (!stayInTree) openDetail(n0.id);    // 详情留在父节点，继续填它的其余字段
       requestAnimationFrame(() => {
         const el = document.querySelector(`.tnode[data-nid="${id}"]`);
         if (!el) return;
         el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         flashNode(el);
-        // flashNode 会清掉父节点的选中环（详情卡还挂在父节点上），补回来
-        document.querySelectorAll(`.tnode[data-nid="${n0.id}"]`).forEach((x) => x.classList.add('is-active'));
+        // flashNode 会清掉父节点的选中环（详情卡还挂在父节点上），补回来；卡片入口没有详情卡
+        if (!stayInTree) document.querySelectorAll(`.tnode[data-nid="${n0.id}"]`).forEach((x) => x.classList.add('is-active'));
       });
-      toast(`已添加${KIND[childKind]}`);
+      toast(`已新增${KIND[childKind]}`);
     });
 }
 
@@ -5553,7 +5488,6 @@ $('#projinfo-close').addEventListener('click', closeProjInfo);
 $('#projinfo').addEventListener('click', (e) => { if (e.target.id === 'projinfo') closeProjInfo(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (!$('#addmenu').hidden) { closeAddMenu(); return; }
   if (!$('#prjmenu').hidden) { closeProjMenu(); return; }
   if (!$('#projinfo').hidden) closeProjInfo();
   else if (!$('#history').hidden) closeHistory();
@@ -6533,7 +6467,10 @@ document.addEventListener('click', (e)=>{
   const candDel = e.target.closest('[data-cand-del]');
   if (candDel){ deleteCandidate(candDel.dataset.candDel, candDel); return; }
   const manualAdd = e.target.closest('[data-manual-add]');
-  if (manualAdd){ manualAddChild(manualAdd.dataset.proj, manualAdd.dataset.nid); return; }
+  if (manualAdd){
+    manualAddChild(manualAdd.dataset.proj, manualAdd.dataset.nid, { stayInTree: manualAdd.dataset.stay === '1' });
+    return;
+  }
   const delNode = e.target.closest('[data-del-node]');
   if (delNode){
     const p0 = PROJECTS.find(x => x.id === delNode.dataset.proj);
@@ -6807,19 +6744,12 @@ document.addEventListener('click', (e)=>{
   }
   const reopenBtn = e.target.closest('[data-reopen]');
   if (reopenBtn){ e.stopPropagation(); reopenNode(reopenBtn.dataset.reopen); return; }
-  const addMenuBtn = e.target.closest('[data-addmenu]');
-  if (addMenuBtn){ e.stopPropagation(); openAddMenu(addMenuBtn); return; }
   const projMenuBtn = e.target.closest('[data-projmenu]');
   if (projMenuBtn){ e.stopPropagation(); openProjMenu(projMenuBtn); return; }
   const prjAct = e.target.closest('[data-prj-act]');
   if (prjAct){ e.stopPropagation(); chooseProjMenu(prjAct.dataset.prjAct); return; }
   if (!$('#prjmenu').hidden && !e.target.closest('#prjmenu')) closeProjMenu();
   if (e.target.closest('#split-regen')){ e.stopPropagation(); regenSplit(); return; }
-  const aim = e.target.closest('[data-aim]');
-  if (aim){ e.stopPropagation(); chooseAddMenu(aim.dataset.aim); return; }
-  if (!$('#addmenu').hidden && !e.target.closest('#addmenu')) closeAddMenu();
-  const addBtn = e.target.closest('[data-add]');
-  if (addBtn){ e.stopPropagation(); addChild(addBtn.dataset.add); return; }
   const exp = e.target.closest('[data-export]');
   if (exp){ const p0 = PROJECTS.find(x=>x.id===exp.dataset.export); if (p0) exportCard(p0); return; }
   const sess = e.target.closest('[data-sess]');
@@ -6859,7 +6789,7 @@ document.addEventListener('click', (e)=>{
   }
 });
 window.addEventListener('resize', ()=>{ hideCandTip(); render(); });
-window.addEventListener('scroll', ()=>{ closeAddMenu(); hideCandTip(); }, true);
+window.addEventListener('scroll', ()=>{ hideCandTip(); }, true);
 
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
