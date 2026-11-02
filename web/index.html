@@ -420,7 +420,19 @@
   .svc-st{margin-left:auto;font-size:10px;flex:0 0 auto}
   .svc-url{display:block;text-align:left;font-size:10.5px;color:var(--tx3);padding:1px 0 3px;word-break:break-all}
   .svc-url:hover{color:var(--link,var(--brand-2));text-decoration:underline}
-  .svc-acts{display:flex;gap:4px;flex-wrap:wrap}
+  /* 按钮区两态叠在同一套三列网格上：列宽/行高恒定，只有透明度与 0.98→1 的缩放变化 */
+  /* 外层只做「叠放容器」：单列 + 两个 grid-area:1/1 的层，层自己才是三列网格 */
+  .svc-acts{display:grid;grid-template-columns:minmax(0,1fr)}
+  .svc-acts-layer{grid-area:1/1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;
+    transition:opacity 160ms var(--ease-out),transform 160ms var(--ease-out)}
+  .svc-acts-layer[data-on="1"]{opacity:1;transform:scale(1);pointer-events:auto}
+  .svc-acts-layer[data-on="0"]{opacity:0;transform:scale(.98);pointer-events:none}
+  .svc-cell{display:block}
+  .svc-acts .pbtn{min-width:0;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    justify-content:center;text-align:center}
+  .svc-loglink{display:inline-block;margin-top:3px;padding:0;border:none;background:none;
+    font-size:10px;color:var(--tx4);cursor:pointer;text-align:left}
+  .svc-loglink:hover{color:var(--tx2);text-decoration:underline}
 
   /* ───────── 嵌入 DSH 主区时的紧凑模式 ───────── */
   html[data-embed="1"] .topbar{padding:6px 10px;gap:8px}
@@ -2016,24 +2028,25 @@ function svcRows(p){
     // 拉起没有二次确认：失败原因留在这里，不靠 2.4s 就消失的 toast
     const startFail = svcStartFail && svcStartFail.file === p.file && svcStartFail.id === svc.id
       ? `<div class="svc-warn">启动失败：${esc(svcStartFail.why)}${svcStartFail.command ? `<span class="mono"> · ${esc(svcStartFail.command)}</span>` : ''}</div>` : '';
-    // 平台化 start：只有当前平台那条才算「能拉起」；旧宿主只给字符串 start 时按字符串兜底
+    // 平台化 start / build：只看当前平台那条；旧宿主只给字符串 start 时按字符串兜底
     const startCommand = svc.startCommand || (typeof svc.start === 'string' ? svc.start : '');
-    // 动画进行中按钮必须留在原位：复核会把状态先改成「启动中」，
-    // 那一帧若按 canStart 判定，按钮会被「停止」顶掉，对勾与高光就没地方演了
-    const ph = svcPhaseOf(p.file, svc.id);
-    const canStart = startCommand
-      && (ph.phase !== 'idle' || (svc.status !== 'up' && svc.status !== 'starting'));
-    const canStop = (svc.status === 'up' || svc.status === 'starting') && svc.pid;
+    const buildCommand = svc.buildCommand || (typeof svc.build === 'string' ? svc.build : '');
     const platform = svc.startPlatform || '当前平台';
     const cmdLine = startCommand
       ? `<div class="svc-cmd mono" title="${esc(startCommand)}"><b>启动（${esc(platform)}）</b> ${esc(startCommand)}</div>`
       : (svc.start ? `<div class="svc-warn mono">没有 ${esc(platform)} 的启动命令${(svc.startPlatforms || []).length ? `（只有 ${esc((svc.startPlatforms || []).join(' / '))}）` : ''}</div>` : '');
-    // build 与 start 同构：只看当前平台那条；没有 build 就完全不出现编译按钮
-    const buildCommand = svc.buildCommand || (typeof svc.build === 'string' ? svc.build : '');
     const buildLine = buildCommand
       ? `<div class="svc-cmd mono" title="${esc(buildCommand)}"><b>编译（${esc(platform)}）</b> ${esc(buildCommand)}</div>`
       : (svc.build ? `<div class="svc-warn mono">没有 ${esc(platform)} 的编译命令${(svc.buildPlatforms || []).length ? `（只有 ${esc((svc.buildPlatforms || []).join(' / '))}）` : ''}</div>` : '');
-    // 拉起按钮的四态图标：play（可点）→ 转圈（等接口）→ 对勾 + 高光 / 红叉 + 抖
+    // 两态共用一套三列网格：停态 [启动][复制命令][编译]，运行态 [打开][停止][复制地址]。
+    // 两层用 grid-area 叠在同一个格子里（不是绝对定位）：容器高度由按钮自己撑开，
+    // lane（19px）与详情（22px）两种尺寸都不用在这里写死。切换只翻 data-on，列宽与行高不变。
+    // 动画进行中不切到运行态：复核会先把状态改成「启动中」，那一帧切层会把对勾与高光剪断。
+    const ph = svcPhaseOf(p.file, svc.id);
+    const isRunning = svc.status === 'up' || svc.status === 'starting';
+    const showRunning = isRunning && ph.phase === 'idle';
+    const copyCommand = startCommand ? `cd "${svc.cwd || ''}" && ${startCommand}` : '';
+    const actCell = (html) => html || '<span class="svc-cell"></span>';
     return `<div class="svc">
       <div class="svc-top">
         <i class="svc-dot" style="--tone:${tone}"></i>
@@ -2046,13 +2059,18 @@ function svcRows(p){
       ${cmdLine}
       ${buildLine}
       <div class="svc-acts">
-        <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
-        ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}" data-phase="${ph.phase}" data-anim="${ph.fresh ? 1 : 0}" aria-label="一键拉起 ${esc(svc.name)}">${SVC_RUN_ICON}一键拉起</button>` : ''}
-        ${buildCommand ? `<button class="pbtn build" data-svc-build="${svc.id}" data-file="${esc(p.file)}" title="在 ${esc(svc.cwd || '项目目录')} 执行 ${esc(buildCommand)}">一键编译</button>` : ''}
-        ${canStop ? `<button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}">停止</button>` : ''}
-        <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
-        ${svc.output ? `<button class="pbtn" data-svc-log="${svc.id}" data-file="${esc(p.file)}">日志</button>` : ''}
+        <div class="svc-acts-layer" data-on="${showRunning ? 0 : 1}" data-kind="stopped">
+          ${actCell(startCommand ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}" data-phase="${ph.phase}" data-anim="${ph.fresh ? 1 : 0}" aria-label="启动 ${esc(svc.name)}">${SVC_RUN_ICON}启动</button>` : '')}
+          ${actCell(copyCommand ? `<button class="pbtn" data-svc-copycmd="${svc.id}" data-file="${esc(p.file)}" title="复制：${esc(copyCommand)}">复制命令</button>` : '')}
+          ${actCell(buildCommand ? `<button class="pbtn build" data-svc-build="${svc.id}" data-file="${esc(p.file)}" title="在 ${esc(svc.cwd || '项目目录')} 执行 ${esc(buildCommand)}">编译</button>` : '')}
+        </div>
+        <div class="svc-acts-layer" data-on="${showRunning ? 1 : 0}" data-kind="running">
+          <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
+          <button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}"${svc.pid ? '' : ' title="这个服务不是面板拉起的；结束不了就用「关闭全部服务」按端口关"'}>停止</button>
+          <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
+        </div>
       </div>
+      ${svc.output ? `<button class="svc-loglink" data-svc-log="${svc.id}" data-file="${esc(p.file)}">查看日志</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -5808,7 +5826,8 @@ function paintServiceBlocks(){
 function svcFor(btn){
   const p0 = PROJECTS.find(x => x.file === btn.dataset.file);
   const list = p0 && (serviceMap.get(p0.file) || []);
-  const svc = list && list.find(x => x.id === (btn.dataset.svcOpen || btn.dataset.svcStart || btn.dataset.svcStop || btn.dataset.svcCopy || btn.dataset.svcBuild));
+  const svc = list && list.find(x => x.id === (btn.dataset.svcOpen || btn.dataset.svcStart || btn.dataset.svcStop
+    || btn.dataset.svcCopy || btn.dataset.svcBuild || btn.dataset.svcCopycmd));
   return { p0, svc };
 }
 
@@ -6715,6 +6734,18 @@ document.addEventListener('click', (e)=>{
   if (svcCopy){
     const { svc } = svcFor(svcCopy);
     if (svc) copyText(svc.url).then(ok => toast(ok ? '已复制服务地址' : '复制失败'));
+    return;
+  }
+  // 复制命令：带 cd 的完整一行，粘到任何终端都能跑
+  const svcCopyCmd = e.target.closest('[data-svc-copycmd]');
+  if (svcCopyCmd){
+    const { svc } = svcFor(svcCopyCmd);
+    if (svc){
+      const command = svc.startCommand || (typeof svc.start === 'string' ? svc.start : '');
+      const line = command ? `cd "${svc.cwd || ''}" && ${command}` : '';
+      if (!line) toast('这条服务没有当前平台的启动命令');
+      else copyText(line).then(ok => toast(ok ? '已复制启动命令（含 cd）' : '复制失败'));
+    }
     return;
   }
   const svcStop = e.target.closest('[data-svc-stop]');
