@@ -241,10 +241,12 @@
 面板侧的语义（服务块与统计都在**第一列项目列**）：
 
 - **状态**：每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒。
-- **打开**：在 **DSH 右侧内嵌浏览器**打开 `url`（有 `health` 时打开 `url + health`）。
-  面板在 iframe 里建不了 sidebar tab，只能 `postMessage` 给 client 半、由宿主 `sidebarRight.openTab('browser')` 打开；
-  宿主没装 / 没启用 `ui-sidebar-browser`（Web profile 默认禁用）、面板被独立打开、或 1.5s 内没收到宿主回执时，
-  退回系统默认浏览器并提示退回原因。
+- **打开**：在 **DSH 内嵌浏览器**打开 `url`（有 `health` 时打开 `url + health`）。两级落点：
+  1. 右栏 browser tab：`postMessage` 给 client 半 → `sidebarRight.openTab('browser')`；
+     它要求右栏**已为当前会话挂载过 surface**，右栏一直收起时会抛 `no session surface is mounted`。
+  2. 主区内嵌页 `rotation-service`：上面那条抛错时 `layout.selectPanel('rotation-service')` 切过去，
+     页面仍在 DSH 里，顶部有「← 里程碑树」「系统浏览器」两条出口。
+  只有连主区页都开不了（面板被独立打开 / 宿主缺服务）才退回系统默认浏览器，并把原因写进服务块里。
 - **一键拉起**：弹窗确认**平台、命令与工作目录**后 `spawn(shell)`，进程组独立，可「停止」。
 - **一键编译**：服务块里 `build` 有当前平台的命令时出现；弹窗确认后用 `spawn(shell)` 跑一次，等退出再看
   结果（退出码 + 时长 + 输出尾巴，最多 8000 字符）。同一服务编译中再点返回 409，超时整组杀掉并报超时。

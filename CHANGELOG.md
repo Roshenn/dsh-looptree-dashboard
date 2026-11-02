@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.20.2 — 右栏没挂载时，服务页改在主区打开（不再落系统浏览器）
+
+- **症状**（2026-11-02，用户贴回面板里的原文）：服务块显示
+  `内嵌浏览器没开成：sidebarRight: no session surface is mounted`，页面又落到系统 Chrome。
+- **根因**：`sidebarRight.openTab` 的 `require()` 读 `this.mounted`（`sessions.onScreen`）与该会话的
+  adopted store——两者只在**右栏为这个会话渲染过**之后才有值。右栏一直收起时无 surface，`openTab` 必抛；
+  面板拿不到任何内嵌落点，只能回退系统浏览器。
+- **修**：client 半新增一个主区页 `rotation-service`（iframe 承载服务页，顶部「← 里程碑树」「系统浏览器」）。
+  `openTab` 抛错 → `layout.selectPanel('rotation-service')` 切过去，页面仍在 DSH 里；
+  回执多带 `mode`（`sidebar` / `panel`）。两条内嵌路径都不可用（面板独立打开、宿主缺 `sidebarRight`）才回退系统浏览器。
+- **验证**：`mock:client` 12 项全绿（新增 `mode=panel`、切到 `rotation-service` 两项）；`npm run preflight` 全绿。
+- **未验**：真机主区切页的观感（需要重启 DSH 后点一次「打开」）。
+
 ## 0.20.1 — 「手动新增」拉到里程碑卡上，顺手删掉没人调用的加法菜单
 
 - **要求**（2026-11-02，用户截图）：把「手动添加能力闭环」改名为「手动新增」，并在节点卡上放一颗同样的按钮，
