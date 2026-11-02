@@ -1361,6 +1361,22 @@ function cardToProject(card, file){
   return proj;
 }
 
+/**
+ * 结构写入（增删子节点、换里程碑）之后重建派生视图。
+ * 只改 raw 树不会让 p.root 长出新的 children——卡片上就看不到新节点，
+ * 要等整页刷新（重新 cardToProject）才出现；所以写盘成功后统一走这里。
+ * 返回重建后的项目对象（p.root / p.card 引用都换了，后续操作要用返回值）。
+ */
+function rebuildProject(p){
+  if (!p) return p || null;
+  if (!p.card) return p;
+  const rebuilt = cardToProject(p.card, p.file);
+  const idx = PROJECTS.indexOf(p);
+  if (idx >= 0) PROJECTS[idx] = rebuilt;
+  else PROJECTS.push(rebuilt);
+  return rebuilt;
+}
+
 /* ─────────── 里程碑历史（card.closed_milestones，随项目 git） ─────────── */
 const CLOSED_MILESTONES_MAX = 10;
 const HISTORY_SOFT_BYTES = 400 * 1000;
@@ -2884,21 +2900,21 @@ function addChild(id){
   const kind = n.kind==='milestone' ? 'capability' : n.kind==='capability' ? 'exec' : null;
   if (!kind) return toast('执行记录不能再往下加');
   const title = kind==='capability' ? '新能力闭环（待命名）' : '新执行记录（待命名）';
-  n.children = n.children || [];
   const rawChild = { id:`${n.id}-n${++seq}`, kind, title, status:'plan', closed_at:null };
   if (kind === 'capability'){ rawChild.capability = ''; rawChild.necessity = ''; rawChild.causal = ''; rawChild.metric = ''; rawChild.approach = ''; }
   if (kind === 'exec'){ rawChild.issues = []; rawChild.verify = '（待补）验证命令'; }
-  n.children.push({ id: rawChild.id, kind, title, status:'plan', closed:false, raw: rawChild, children:[] });
   n.raw.children = n.raw.children || [];
   n.raw.children.push(rawChild);
-  reopenChain(p.root, n.id);   // 给已闭环的节点加子节点 → 它和祖先都回到进行中
-  if (wasRootClosed && !p.root.closed){
-    removeClosedMilestone(p, currentMilestoneHistoryId(p));   // 重新开工的里程碑不再是历史
-    delete p.root.convergedAt;
+  // 手工拼派生节点会漏字段（chip / meta 都由 cardToProject 算），统一重建更稳
+  const rebuilt = rebuildProject(p);
+  reopenChain(rebuilt.root, n.id);   // 给已闭环的节点加子节点 → 它和祖先都回到进行中
+  if (wasRootClosed && !rebuilt.root.closed){
+    removeClosedMilestone(rebuilt, currentMilestoneHistoryId(rebuilt));   // 重新开工的里程碑不再是历史
+    delete rebuilt.root.convergedAt;
   }
   toast(`已为「${n.title}」新增${KIND[kind]}`);
   render();
-  persist(p);
+  persist(rebuilt);
 }
 
 /* ─────────── 加法菜单 + AI 拆主要能力闭环 ─────────── */
@@ -3185,9 +3201,7 @@ function newLoopConfirm(p){
         children: [],
       };
       p.card.milestone = milestone;
-      const rebuilt = cardToProject(p.card, p.file);
-      const idx = PROJECTS.findIndex((x) => x.id === p.id);
-      if (idx >= 0) PROJECTS[idx] = rebuilt;
+      const rebuilt = rebuildProject(p);
       state.focusId = rebuilt.id;
       collapsed.delete(p.id);
       render();
@@ -4696,7 +4710,7 @@ async function manualAddChild(pid, nid){
   if (!childKind) return toast('执行记录不能再往下加');
   askConfirm(`手动添加${KIND[childKind]}`,
     `<div class="detail-row"><dt>标题</dt><dd><input class="dfield" id="mc-title" style="width:100%" placeholder="8–16 字，说清做到什么"></dd></div>
-     <div class="mnote">加完会在详情卡里继续填字段；能力闭环的承接能力闭环 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
+     <div class="mnote">加完新节点会闪一下、滚进可视区；点它进详情继续填字段。能力闭环的承接能力闭环 / 必要性 / 因果只读，由 AI 拆解写入。</div>`,
     '添加', async () => {
       const title = ($('#mc-title') || {}).value || '';
       if (!title.trim()) return toast('标题不能为空');
@@ -4708,8 +4722,18 @@ async function manualAddChild(pid, nid){
       n0.raw.children.push({ id, kind: childKind, title: title.trim(), status: 'plan', closed_at: null, children: [] });
       const res = await persist(p0);
       if (!res.ok) return toast('添加失败：' + res.error);
+      rebuildProject(p0);   // 只写 raw 树的话派生视图还是旧的，新节点要等整页刷新才出现
+      ensureVisible(id);    // 父节点被折叠过就先展开，父节点下缘才看得到新节点
       render();
-      openDetail(n0.id);
+      openDetail(n0.id);    // 详情留在父节点，继续填它的其余字段
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`.tnode[data-nid="${id}"]`);
+        if (!el) return;
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        flashNode(el);
+        // flashNode 会清掉父节点的选中环（详情卡还挂在父节点上），补回来
+        document.querySelectorAll(`.tnode[data-nid="${n0.id}"]`).forEach((x) => x.classList.add('is-active'));
+      });
       toast(`已添加${KIND[childKind]}`);
     });
 }
