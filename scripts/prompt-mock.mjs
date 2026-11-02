@@ -259,6 +259,14 @@ check('收集服务带已有 services 作为参考', collectText.includes('已�
 check('收集服务 lint 无警告', lintPrompt(collectText).warnings.length === 0, JSON.stringify(lintPrompt(collectText).warnings.slice(0, 2)));
 check('收集服务：无已有服务时写「无」',
   composeCollectServicesPrompt({ projectName: 'Y', workspace: '/w' }).includes('- 已有 services：无'));
+// 0.20.7：让模型「用命令读」而不是「凭印象猜」——之前没有工具，模型只会拒答
+check('收集服务给出 Makefile 的读取命令（grep 列 target + make -n 展开）',
+  collectText.includes('grep -n "^[A-Za-z0-9_.-]*:" Makefile') && collectText.includes('make -n <target>'));
+check('收集服务要求组合 target 顺依赖再看一层', collectText.includes('组合 target'));
+check('收集服务禁止真跑起服务', collectText.includes('不要执行 make dev'));
+check('收集服务要求端口三处取证', collectText.includes('Makefile 变量') && collectText.includes('vite.config'));
+check('收集服务带「没有工具就报 error」的逃生口', collectText.includes('{"error"'));
+check('收集服务要求小程序 watch 不算服务', collectText.includes('小程序 watch') && collectText.includes('不算服务'));
 
 /* ── 结果 ── */
 const failed = results.filter((r) => !r.pass);

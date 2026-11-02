@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 0.20.7 — 服务信息收集挂上 preset，Makefile 才真的读得到
+
+- **症状**（2026-11-02，用户截图）：重新收集 english-chunk 的服务，还是空的；会话原文是
+  「this session has no tool that can read file contents or run shell commands… I won't guess」。
+- **根因**：`runner.start` 的 `mountPreset` 只在 `mode === 'plan' || 'goal'` 时为真，而「服务信息收集」走
+  `mode=message` → 裸会话，profile 根上没有任何 `read` / `bash`。提示词再细也没用——它读不到文件，
+  只能拒答；拒答正文又被当成 JSON 解析，草稿自然是空。
+- **修**：`POST /api/services/collect` 显式传 `mountPreset: true`，与计划 / 执行会话同一套 agent preset。
+  模型若仍按契约报错（`{"error":"…"}`），`collectedErrorOf()` 把原话写进草稿 `error`，面板显示真原因。
+- **提示词按实际写法重写**（english-chunk 这类：组合 target + 变量端口 + 子目录 Makefile）：
+  - `ls Makefile makefile GNUmakefile` → `grep -n "^[A-Za-z0-9_.-]*:" Makefile` 列 target，`.PHONY:` 那行就是全部入口；
+  - `make -n <target>` 展开真实命令（dry run 不执行），组合 target 顺依赖再看一层；
+  - 子目录 `api/Makefile` 单独读；端口从 Makefile 变量 / README 端口行 / `vite.config.*` 三处取并写进 evidence；
+  - 明确「只跑只读命令、不要执行 make dev/pnpm dev」与「必须真读过文件，否则不要写这条」；
+  - 小程序 watch、纯构建、代码生成不算服务（最多当 build 候选）。
+- **验证**：mock:services 40 项全绿（新增「收集会话挂了 agent preset」「模型报错原话透传」两项）；
+  prompt-mock 新增 6 条断言（读取命令、组合 target、端口三处、error 逃生口、小程序判据）；
+  用真实 english-chunk 跑提示词里的命令，得到 `run-api`（8080）/ `run-web`（5173）/
+  `build-api`（`cd api && make generate && go build -o server ./cmd/server/main.go`）；`npm run preflight` 全绿。
+
 ## 0.20.6 — 服务按钮拆成停 / 跑两态：同一套三列网格，切换不跳动
 
 - **要求**（2026-11-02，用户截图 + 原话）：服务停止时不需要「打开」和「复制地址」（没起来时没东西可开），

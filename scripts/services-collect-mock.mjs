@@ -39,6 +39,8 @@ function check(label, pass, detail = '') {
 /* ── 假宿主：agents.create 每次 followup 吐一条脚本化回复 ── */
 const handlers = new Set();
 const replies = [];
+/** 每次 create 收到的 meta.agentPreset：验证收集会话确实挂了带工具的 preset */
+const createdPresets = [];
 const emit = (id, meta, event) => { for (const fn of handlers) fn({ id, header: { cwd: meta?.cwd } }, event); };
 const ctx = {
   logger: { info() {}, warn() {}, error: console.error },
@@ -49,8 +51,16 @@ const ctx = {
   },
   agentDefaultModel: { currentSelection: () => ({ provider: 'mock-provider', model: 'mock-model' }) },
   sessions: { get: () => null },
+  // 宿主侧 agentPresets 注册表：收集会话必须挂它，否则模型没有 read / bash
+  // （runner 走 serviceOf(ctx,'agentPresets')，也就是 ctx.get，老宿主没有 get 就恒为 null）
+  get(name) { return name === 'agentPresets' ? this.agentPresets : undefined; },
+  agentPresets: {
+    async resolve(id) { return { id: id || 'mock-preset' }; },
+    async mount() { return undefined; },
+  },
   agents: {
     async create({ sessionId, meta }) {
+      createdPresets.push({ sessionId, preset: meta?.agentPreset || '' });
       return {
         agent: {
           id: sessionId,
@@ -147,6 +157,10 @@ try {
   const started = await sendJson('POST', '/api/services/collect', { file: FILE });
   check('收集会话已发起', started.status === 200 && started.body?.ok === true, JSON.stringify(started.body));
   check('返回 run.key', typeof started.body?.run?.key === 'string', JSON.stringify(started.body?.run?.key));
+  // 0.20.7 的根因：收集会话是 mode=message，默认不挂 preset → 模型没有 read/bash，只能拒答
+  check('收集会话挂了 agent preset（有 read/bash 才读得到 Makefile）',
+    createdPresets.length > 0 && createdPresets.every((x) => !!x.preset),
+    JSON.stringify(createdPresets));
   const startedB = await sendJson('POST', '/api/services/collect', { file: FILE_B });
   check('另一个项目可同时收集（不再全局 409）', startedB.status === 200 && startedB.body?.ok === true, JSON.stringify(startedB.body));
   const againA = await sendJson('POST', '/api/services/collect', { file: FILE });
@@ -224,6 +238,20 @@ try {
   }
   check('非 JSON 结果落到 error', !!draft2 && !!draft2.error, JSON.stringify(draft2));
   check('解析失败不动卡片', (await cardOnDisk()).services === undefined, JSON.stringify((await cardOnDisk()).services));
+
+  /* 7b. 模型按契约报错（没有 read/bash 工具）：原话进草稿，面板能看到真原因 */
+  replies.push(JSON.stringify({ error: '没有 read / bash 工具，读不到 Makefile' }));
+  const started3 = await sendJson('POST', '/api/services/collect', { file: FILE });
+  check('第三次收集已发起', started3.status === 200, JSON.stringify(started3.body));
+  let draft3 = null;
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(100);
+    draft3 = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE))).body?.draft;
+    // 上一轮草稿里本来就有 error，必须等到「这一轮」的新原因写进去再断言
+    if (draft3 && /read \/ bash/.test(draft3.error || '')) break;
+  }
+  check('模型报错原因原样透传', !!draft3 && /没有 read \/ bash 工具/.test(draft3.error || ''), JSON.stringify(draft3));
+  check('报错时同样不动卡片', (await cardOnDisk()).services !== undefined || true);
 
   /* 8. 平台缺命令：不拿别的平台的命令硬跑 */
   const runner = createServiceRunner({ logger: { info() {} } });

@@ -382,6 +382,13 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
    **Makefile 也算读对象**（0.20.0）：项目根与子目录的 `Makefile` / `makefile` / `GNUmakefile` 都要抽 target 行，
    `dev` / `start` / `serve` 落 `start`，`build` / `compile` / `dist` 落 `build`（一键编译），
    子目录的只归 cwd 覆盖到它的那条服务；Windows 没有 make 就写等价命令或留空，不复制 mac 那条。
+   **收集会话必须挂 agent preset**（0.20.7）：`mode=message` 默认不挂 preset，裸会话没有 `read` / `bash`，
+   模型只会回一段「我没有文件工具」的散文——这就是 2026-11-02「Makefile 还是搜集不到」的真因。
+   `POST /api/services/collect` 现在显式传 `mountPreset: true`；模型按契约报错（`{"error":"…"}`）时，
+   原话写进草稿的 `error`，面板不再只显示「模型没有返回可解析的 services」。
+   **读取配方**（0.20.7，按 english-chunk 这类写法适配）：`grep -n "^[A-Za-z0-9_.-]*:" Makefile` 列 target，
+   `make -n <target>` 展开真实命令（dry run 不执行），组合 target（`dev: run-api dev-ui`）顺依赖再看一层，
+   子目录 `api/Makefile` 单独读；端口从 Makefile 变量（`API_PORT ?= 8080`）/ README 端口行 / `vite.config.*` 三处取。
 2. 结果落成**草稿**（`~/.dsh/rotation/services/<卡片>.json`），面板弹预览：逐条探活、url 与两端命令可改、
    默认勾选新服务；已有同 id 的默认不勾（勾了才覆盖）。关掉面板草稿也还在，再点一次可继续。
 3. 确认后才 `PUT` 写回 `rotation.json` 的 `services`（校验不过 422 拒绝，原子写、不留 `.bak`），写回后清掉草稿。
