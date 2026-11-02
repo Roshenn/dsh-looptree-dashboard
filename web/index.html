@@ -4241,6 +4241,56 @@ function openInDsh(sessionId){
   }
 }
 
+/** 请宿主在内嵌浏览器打开服务地址：面板在 iframe 里建不了 sidebar tab，只能让 client 半转发；
+ *  独立打开 / 宿主没启用 ui-sidebar-browser 时，退化为系统默认浏览器。 */
+let dshUrlSeq = 0;
+const dshUrlPending = new Map();   // reqId → { timer, fallback }
+
+window.addEventListener('message', (e) => {
+  const d = e && e.data;
+  if (!d || d.type !== 'rotation-open-url-result') return;
+  const pending = dshUrlPending.get(d.reqId);
+  if (!pending) return;
+  dshUrlPending.delete(d.reqId);
+  clearTimeout(pending.timer);
+  if (!d.ok) pending.fallback(d.error || 'DSH 没有打开内嵌浏览器');
+});
+
+/** 系统默认浏览器兜底：window.open 带 noopener 时恒返回 null，没法据此判断是否被拦，
+ *  只在它抛错（例如被策略禁掉）时把地址复制出来。 */
+function openInSystemBrowser(url){
+  try {
+    window.open(url, '_blank', 'noopener');
+  } catch {
+    copyText(url).then(ok => toast(ok ? `打开失败，地址已复制：${url}` : `打开失败，地址：${url}`));
+  }
+}
+
+function openInDshBrowser(url){
+  if (!url) return;
+  let embedded = false;
+  try { embedded = !!(window.parent && window.parent !== window); } catch { embedded = false; }
+  if (!embedded) return openInSystemBrowser(url);
+  const reqId = 'rotation-url-' + (++dshUrlSeq);
+  const fallback = (why) => {
+    toast(`内嵌浏览器不可用（${why}），已改用默认浏览器`);
+    openInSystemBrowser(url);
+  };
+  const timer = setTimeout(() => {
+    if (!dshUrlPending.has(reqId)) return;
+    dshUrlPending.delete(reqId);
+    fallback('宿主没有响应');
+  }, 1500);
+  dshUrlPending.set(reqId, { timer, fallback });
+  try {
+    window.parent.postMessage({ type: 'rotation-open-url', url: String(url), reqId }, '*');
+  } catch (error) {
+    clearTimeout(timer);
+    dshUrlPending.delete(reqId);
+    fallback(error.message || '无法给 DSH 发消息');
+  }
+}
+
 /** 查看会话全文：直接读 DSH 落盘的 session.v4.jsonl.zstd */
 async function viewSession(sessionId){
   askConfirm('会话 ' + String(sessionId).replace(/^session-/, '').slice(0, 12) + '…',
@@ -6495,8 +6545,8 @@ document.addEventListener('click', (e)=>{
       const u = svc.health
         ? new URL(String(svc.health).replace(/^\//, ''), svc.url.endsWith('/') ? svc.url : svc.url + '/').toString()
         : svc.url;
-      window.open(u, '_blank', 'noopener');
-    } else if (svc){ window.open(svc.url, '_blank', 'noopener'); }
+      openInDshBrowser(u);
+    } else if (svc){ openInDshBrowser(svc.url); }
     return;
   }
   const svcCopy = e.target.closest('[data-svc-copy]');

@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 0.19.0 — 服务「打开」改走 DSH 内嵌浏览器，宿主不支持才退回系统浏览器
+
+- **要求**（2026-11-02，用户截图）：服务块的「打开」现在调系统默认浏览器，希望直接开在 DSH 里那个内嵌浏览器。
+- **通道**：面板在 iframe 里建不了 sidebar tab，走和「查看会话」同一条路——`postMessage({type:'rotation-open-url'})`
+  → client 半 `ctx.get('sidebarRightTabs')?.get('browser')` 探到 `ui-sidebar-browser` 已注册后调
+  `sidebarRight.openTab('browser', { params: { url } })` → 回 `rotation-open-url-result`。
+- **安全**：只放行 `http(s)`（`file:` / `javascript:` 在 client 半就被拒），沿用同源校验；`health` 后缀口径不变。
+- **回退**：宿主没装 / 没启用内嵌浏览器（Web profile 默认禁用）、面板被独立打开、或 1.5s 内无回执 → 系统默认浏览器，
+  并 toast 出退回原因；`window.open` 带 `noopener` 恒返回 null，所以不拿返回值判断是否被拦，只在抛错时复制地址兜底。
+- **验证**：`mock:client` 新增 7 项断言（开 tab 的 kind 与 params、成功回执、未启用回失败且不调 openTab、
+  非 http(s) 被拒、跨源消息忽略）；Playwright 真浏览器（仓库副本 + `serve.mjs` + 父页 iframe 桩）8 项断言全绿：
+  点「打开」发出带 `health` 的地址、宿主回 ok 时不开系统浏览器、回 fail 与 1.5s 无响应两种情形都回退且提示原因；
+  独立打开面板时直接走系统浏览器（1 项）。
+
 ## 0.18.0 — 会话等你选择：节点呼吸高亮 + 右下角「待处理」托盘
 
 - **要求**（2026-11-02，用户截图）：会话卡在交互提问上时，面板要主动提示——节点高亮并闪烁、

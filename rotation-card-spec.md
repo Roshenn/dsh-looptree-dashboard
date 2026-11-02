@@ -239,7 +239,10 @@
 面板侧的语义（服务块与统计都在**第一列项目列**）：
 
 - **状态**：每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒。
-- **打开**：直接用浏览器打开 `url`（有 `health` 时打开 `url + health`）。
+- **打开**：在 **DSH 右侧内嵌浏览器**打开 `url`（有 `health` 时打开 `url + health`）。
+  面板在 iframe 里建不了 sidebar tab，只能 `postMessage` 给 client 半、由宿主 `sidebarRight.openTab('browser')` 打开；
+  宿主没装 / 没启用 `ui-sidebar-browser`（Web profile 默认禁用）、面板被独立打开、或 1.5s 内没收到宿主回执时，
+  退回系统默认浏览器并提示退回原因。
 - **一键拉起**：弹窗确认**平台、命令与工作目录**后 `spawn(shell)`，进程组独立，可「停止」。
 - **复制地址**：复制 `url`，方便贴到别处验证。
 - **项目菜单（`⋯`）**：**服务信息收集**（AI 会话读项目 → 预览探活 → 确认后写回 `services`；草稿在 `~/.dsh/rotation/services/`）
