@@ -113,9 +113,21 @@ services = {
   sidebarRight: { openTab: () => { throw new Error('sidebarRight: no tab type is registered as "browser"'); } },
 };
 replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2b' });
-ok('openTab 抛错时把 DSH 原文带回面板', replies[0]?.ok === false
+ok('没有主区兜底位时回失败', replies[0]?.ok === false
   && /no tab type is registered as "browser"/.test(replies[0].error || ''), JSON.stringify(replies[0]));
 ok('不因 sidebarRightTabs 缺失就提前拒绝', openCalls.length === 0);
+
+// 真机报错（2026-11-02）：右栏没挂载 surface → 落主区内嵌页，不再丢给系统浏览器
+openCalls.length = 0;
+const panelSelections = [];
+services = {
+  sidebarRight: { openTab: () => { throw new Error('sidebarRight: no session surface is mounted'); } },
+  layout: { selectPanel: (key) => panelSelections.push(key) },
+};
+replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2c' });
+ok('右栏没挂载时落主区内嵌页', replies[0]?.ok === true && replies[0]?.mode === 'panel', JSON.stringify(replies[0]));
+ok('切到 rotation-service 主区页', panelSelections.length === 1 && panelSelections[0] === 'rotation-service',
+  JSON.stringify(panelSelections));
 
 openCalls.length = 0;
 services = browserServices();
