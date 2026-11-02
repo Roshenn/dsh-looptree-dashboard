@@ -117,17 +117,41 @@ ok('没有主区兜底位时回失败', replies[0]?.ok === false
   && /no tab type is registered as "browser"/.test(replies[0].error || ''), JSON.stringify(replies[0]));
 ok('不因 sidebarRightTabs 缺失就提前拒绝', openCalls.length === 0);
 
-// 真机报错（2026-11-02）：右栏没挂载 surface → 落主区内嵌页，不再丢给系统浏览器
+// 真机报错（2026-11-02）：主区被面板占着 → sidebarRight 没有 on-screen 会话。
+// 先切回对话 + 拉起右栏，再重试开 tab（用户要的是「左对话 / 右页面」并排）
+openCalls.length = 0;
+const layoutCalls = [];
+let sidebarThrows = 1;
+services = {
+  sidebarRight: { openTab: () => {
+    if (sidebarThrows > 0) { sidebarThrows -= 1; throw new Error('sidebarRight: no session surface is mounted'); }
+    openCalls.push(['browser']);
+  } },
+  layout: {
+    selectPanel: (key) => layoutCalls.push(key),
+    openRightbar: (track, fullscreen) => layoutCalls.push(['rail', track, fullscreen]),
+  },
+};
+replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2c' });
+await new Promise((resolve) => setTimeout(resolve, 400));
+ok('失败后先切回对话并拉起右栏',
+  layoutCalls.includes(null) && layoutCalls.some((c) => Array.isArray(c) && c[0] === 'rail'), JSON.stringify(layoutCalls));
+ok('重试后开成右栏 tab', replies[0]?.ok === true && replies[0]?.mode === 'sidebar', JSON.stringify(replies[0]));
+
+// 一直抛：三次重试后落主区内嵌页，仍然不丢给系统浏览器
 openCalls.length = 0;
 const panelSelections = [];
 services = {
   sidebarRight: { openTab: () => { throw new Error('sidebarRight: no session surface is mounted'); } },
-  layout: { selectPanel: (key) => panelSelections.push(key) },
+  layout: {
+    selectPanel: (key) => panelSelections.push(key),
+    openRightbar: () => { /* noop */ },
+  },
 };
-replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2c' });
-ok('右栏没挂载时落主区内嵌页', replies[0]?.ok === true && replies[0]?.mode === 'panel', JSON.stringify(replies[0]));
-ok('切到 rotation-service 主区页', panelSelections.length === 1 && panelSelections[0] === 'rotation-service',
-  JSON.stringify(panelSelections));
+replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2d' });
+await new Promise((resolve) => setTimeout(resolve, 1600));
+ok('重试都失败时落主区内嵌页', replies[0]?.ok === true && replies[0]?.mode === 'panel', JSON.stringify(replies[0]));
+ok('切到 rotation-service 主区页', panelSelections.includes('rotation-service'), JSON.stringify(panelSelections));
 
 openCalls.length = 0;
 services = browserServices();

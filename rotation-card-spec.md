@@ -241,12 +241,14 @@
 面板侧的语义（服务块与统计都在**第一列项目列**）：
 
 - **状态**：每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒。
-- **打开**：在 **DSH 内嵌浏览器**打开 `url`（有 `health` 时打开 `url + health`）。两级落点：
-  1. 右栏 browser tab：`postMessage` 给 client 半 → `sidebarRight.openTab('browser')`；
-     它要求右栏**已为当前会话挂载过 surface**，右栏一直收起时会抛 `no session surface is mounted`。
-  2. 主区内嵌页 `rotation-service`：上面那条抛错时 `layout.selectPanel('rotation-service')` 切过去，
-     页面仍在 DSH 里，顶部有「← 里程碑树」「系统浏览器」两条出口。
-  只有连主区页都开不了（面板被独立打开 / 宿主缺服务）才退回系统默认浏览器，并把原因写进服务块里。
+- **打开**：在 **DSH 内嵌浏览器**打开 `url`（有 `health` 时打开 `url + health`），默认落点是
+  **右栏 browser tab —— 对话留在左、页面在右**。三级兜底：
+  1. `layout.openRightbar(true, false)` 先把右栏拉起来（非全屏），再 `sidebarRight.openTab('browser')`。
+  2. 若抛 `no session surface is mounted`（主区还被面板占着 / 右栏没 adopt 过 store）：
+     `layout.selectPanel(null)` 切回对话，按 120/260/500ms 重试三次。
+  3. 仍失败才用主区内嵌页 `rotation-service`（iframe + 「← 里程碑树」「系统浏览器」两条出口）；
+     连它都开不了才退回系统默认浏览器，原因写进服务块。
+  代价说明：切回对话意味着离开轮转面板，左栏「轮转闭环树」可再切回来。
 - **一键拉起**：不做二次确认，点下去就 `spawn(shell)`，进程组独立，可「停止」。失败原因（缺当前平台命令 /
   spawn 报错 / 端口被占）写进对应服务块常驻显示，下次成功启动或探到在线就清掉。
 - **一键编译**：服务块里 `build` 有当前平台的命令时出现；弹窗确认后用 `spawn(shell)` 跑一次，等退出再看
