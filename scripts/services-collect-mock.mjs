@@ -133,7 +133,8 @@ try {
   const GOOD = JSON.stringify({
     services: [
       { id: 'web', name: '本地预览 5273', url: 'http://127.0.0.1:5273', health: '/',
-        start: { mac: 'pnpm dev', windows: 'pnpm.cmd dev' }, evidence: 'vite.config.ts:12', confidence: 'high' },
+        start: { mac: 'pnpm dev', windows: 'pnpm.cmd dev' },
+        build: { mac: 'make build', windows: '' }, evidence: 'vite.config.ts:12', confidence: 'high' },
       { id: 'api', name: 'API 8786', url: 'http://127.0.0.1:8786', health: '/api/health',
         start: { mac: 'PORT=8786 pnpm --filter @echo/server dev', windows: 'set PORT=8786 && pnpm --filter @echo/server dev' } },
       { name: '没有 url 的服务' },
@@ -172,6 +173,9 @@ try {
     JSON.stringify(draft?.services?.[0]?.start));
   check('保留证据与置信度', draft?.services?.[0]?.evidence === 'vite.config.ts:12' && draft?.services?.[0]?.confidence === 'high',
     JSON.stringify(draft?.services?.[0]));
+  check('build 归一成平台映射（make build 来自 Makefile，空平台被丢掉）',
+    JSON.stringify(draft?.services?.[0]?.build) === JSON.stringify({ mac: 'make build' }),
+    JSON.stringify(draft?.services?.[0]?.build));
 
   /* 3. 探活：拿 mock 服务自己的 health 当目标 */
   const probed = await sendJson('POST', '/api/services/probe', { url: origin + '/api/health' });
@@ -228,6 +232,38 @@ try {
   check('linux 缺命令时拒绝启动', linuxStart.ok === false && /linux/.test(linuxStart.error || ''), JSON.stringify(linuxStart));
   check('平台解析：win32 拿 windows 命令',
     resolvePlatformValue({ mac: 'a', windows: 'b' }, 'win32') === 'b');
+
+  /* 9. 一键编译：有限任务，拿退出码与输出；重复点两次被挡；缺平台命令不硬跑 */
+  const mk = (build) => ({ services: [{ id: 'web', name: 'web', url: 'http://127.0.0.1:1', build }] });
+  const okBuild = await runner.build('p', mk('node -e "console.log(42)"'), 'web', ws);
+  check('编译成功带回退出码 0 与输出', okBuild.ok === true && okBuild.code === 0 && /42/.test(okBuild.output || ''),
+    JSON.stringify(okBuild));
+  const failBuild = await runner.build('p', mk('node -e "process.exit(3)"'), 'web', ws);
+  check('编译失败带回退出码 3', failBuild.ok === false && failBuild.code === 3, JSON.stringify(failBuild));
+  const noBuild = await runner.build('p', { services: [{ id: 'web', name: 'web', url: 'http://127.0.0.1:1' }] }, 'web', ws);
+  check('没有 build 字段时拒绝编译', noBuild.ok === false && noBuild.status === 400, JSON.stringify(noBuild));
+  const macOnly = await runner.build('p', mk({ mac: 'make build' }), 'web', ws, 'linux');
+  check('linux 缺编译命令时拒绝', macOnly.ok === false && /linux/.test(macOnly.error || ''), JSON.stringify(macOnly));
+  const slowCard = mk('node -e "setTimeout(()=>{},600)"');
+  const first = runner.build('busy', slowCard, 'web', ws);
+  await sleep(80);
+  const busy = await runner.build('busy', slowCard, 'web', ws);
+  check('同一服务编译中再点被 409 挡住', busy.ok === false && busy.status === 409, JSON.stringify(busy));
+  await first;
+  check('编译结束后可再次编译', runner.builds.size === 0);
+
+  /* 10. POST /api/service/build：面板「一键编译」走的就是这条 */
+  const BUILD_CMD = 'node -e "console.log(\'built\')"';
+  const putBuild = await sendJson('PUT', '/api/services', {
+    file: FILE,
+    services: [{ id: 'web', name: 'web', url: 'http://127.0.0.1:1', build: BUILD_CMD }],
+  });
+  check('写回 build 命令', putBuild.status === 200 && putBuild.body?.services?.[0]?.build === BUILD_CMD,
+    JSON.stringify(putBuild.body));
+  const built = await sendJson('POST', '/api/service/build', { file: FILE, id: 'web' });
+  check('编译接口跑通并带回输出',
+    built.status === 200 && built.body?.ok === true && /built/.test(built.body?.output || ''),
+    JSON.stringify(built.body));
 } catch (error) {
   check('mock 未抛异常', false, error.stack || error.message);
 } finally {

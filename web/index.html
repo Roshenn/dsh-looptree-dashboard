@@ -684,6 +684,14 @@
   .pbtn.run{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent);
     background:color-mix(in srgb,var(--green) 12%,transparent)}
   .pbtn.run:hover{color:var(--tx1);background:color-mix(in srgb,var(--green) 22%,transparent)}
+  .pbtn.build{color:var(--blue-300);border-color:color-mix(in srgb,var(--blue-300) 38%,transparent);
+    background:color-mix(in srgb,var(--blue-300) 10%,transparent)}
+  .pbtn.build:hover{color:var(--tx1);background:color-mix(in srgb,var(--blue-300) 20%,transparent)}
+  .pbtn[aria-busy="true"]{opacity:.55;pointer-events:none}
+  .pbtn[aria-busy="true"]::after{content:"";width:8px;height:8px;margin-left:4px;border-radius:50%;
+    border:1.5px solid currentColor;border-top-color:transparent;display:inline-block;vertical-align:-1px;
+    animation:svc-spin 640ms linear infinite}
+  @keyframes svc-spin{to{transform:rotate(360deg)}}
   #launch-prompt{width:100%;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tx1);
     background:var(--l1);border:1px solid var(--b2);border-radius:7px;padding:8px 9px;resize:vertical;min-height:180px}
   #launch-prompt:focus{outline:2px solid var(--brand);outline-offset:1px}
@@ -1943,6 +1951,11 @@ function svcRows(p){
     const cmdLine = startCommand
       ? `<div class="svc-cmd mono" title="${esc(startCommand)}"><b>启动（${esc(platform)}）</b> ${esc(startCommand)}</div>`
       : (svc.start ? `<div class="svc-warn mono">没有 ${esc(platform)} 的启动命令${(svc.startPlatforms || []).length ? `（只有 ${esc((svc.startPlatforms || []).join(' / '))}）` : ''}</div>` : '');
+    // build 与 start 同构：只看当前平台那条；没有 build 就完全不出现编译按钮
+    const buildCommand = svc.buildCommand || (typeof svc.build === 'string' ? svc.build : '');
+    const buildLine = buildCommand
+      ? `<div class="svc-cmd mono" title="${esc(buildCommand)}"><b>编译（${esc(platform)}）</b> ${esc(buildCommand)}</div>`
+      : (svc.build ? `<div class="svc-warn mono">没有 ${esc(platform)} 的编译命令${(svc.buildPlatforms || []).length ? `（只有 ${esc((svc.buildPlatforms || []).join(' / '))}）` : ''}</div>` : '');
     return `<div class="svc">
       <div class="svc-top">
         <i class="svc-dot" style="--tone:${tone}"></i>
@@ -1952,15 +1965,33 @@ function svcRows(p){
       <button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>
       ${openFail}
       ${cmdLine}
+      ${buildLine}
       <div class="svc-acts">
         <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
         ${canStart ? `<button class="pbtn run" data-svc-start="${svc.id}" data-file="${esc(p.file)}">一键拉起</button>` : ''}
+        ${buildCommand ? `<button class="pbtn build" data-svc-build="${svc.id}" data-file="${esc(p.file)}" title="在 ${esc(svc.cwd || '项目目录')} 执行 ${esc(buildCommand)}">一键编译</button>` : ''}
         ${canStop ? `<button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}">停止</button>` : ''}
         <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
         ${svc.output ? `<button class="pbtn" data-svc-log="${svc.id}" data-file="${esc(p.file)}">日志</button>` : ''}
       </div>
     </div>`;
   }).join('');
+}
+/** 编译结果弹窗：退出码 + 时长 + 输出尾巴；失败先看错误再看输出 */
+function showBuildResult(svc, j){
+  const ok = !!(j && j.ok);
+  const code = j && j.code;
+  const dur = j && j.durationMs != null ? ` · ${(j.durationMs / 1000).toFixed(1)}s` : '';
+  const head = ok
+    ? `<div class="detail-row"><dt>结果</dt><dd style="color:var(--green)">编译成功（退出码 ${code == null ? 0 : code}）${esc(dur)}</dd></div>`
+    : `<div class="detail-row"><dt>结果</dt><dd style="color:var(--red)">编译失败${code != null ? `（退出码 ${code}）` : ''}${esc(dur)}</dd></div>`;
+  const cmd = j && j.command ? `<div class="detail-row"><dt>命令</dt><dd class="mono">${esc(j.command)}</dd></div>` : '';
+  const cwd = j && j.cwd ? `<div class="detail-row"><dt>目录</dt><dd class="mono">${esc(j.cwd)}</dd></div>` : '';
+  const err = !ok && j && j.error ? `<div class="svc-warn">${esc(j.error)}</div>` : '';
+  const out = j && j.output
+    ? `<pre class="pgen" style="max-height:320px;white-space:pre-wrap">${esc(j.output)}</pre>`
+    : '<div class="mnote">编译没有任何输出。</div>';
+  askInfo(`编译结果 · ${svc.name}`, `${head}${cmd}${cwd}${err}${out}`);
 }
 function laneServices(p){
   if (!p.file) return '';
@@ -3361,11 +3392,13 @@ function openServicesPreview(p, services, draft){
   const existingIds = new Set(((p.card && Array.isArray(p.card.services)) ? p.card.services : []).map(s => s.id));
   const rows = services.map((s, i) => {
     const cmds = platformCommandsOf(s.start);
+    const bcmds = platformCommandsOf(s.build);
     const dup = existingIds.has(s.id);
     const meta = [
       s.evidence ? `证据：${s.evidence}` : '',
       s.confidence ? `置信度 ${s.confidence}` : '',
       s.health ? `health ${s.health}` : '',
+      s.cwd ? `cwd ${s.cwd}` : '',
       dup ? '已有同 id（默认不勾，勾了会覆盖）' : '',
     ].filter(Boolean).join(' · ');
     return `<label class="svc-cand" data-svc-cand="${i}" data-dup="${dup ? 1 : 0}">
@@ -3374,8 +3407,10 @@ function openServicesPreview(p, services, draft){
         <span class="svc-cand-head"><b>${esc(s.name || s.id)}</b><i class="svc-probe mono" data-svc-probe="${i}" data-ok="pending">探活中…</i></span>
         <input class="dfield mono" data-svc-url="${i}" value="${esc(s.url)}" spellcheck="false" aria-label="服务地址">
         <span class="svc-cand-cmds">
-          <input class="dfield mono" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(cmds.mac)}" placeholder="mac 启动命令" spellcheck="false" aria-label="mac 启动命令">
-          <input class="dfield mono" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(cmds.windows)}" placeholder="windows 启动命令" spellcheck="false" aria-label="windows 启动命令">
+          <input class="dfield mono" data-svc-kind="start" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(cmds.mac)}" placeholder="mac 启动命令" spellcheck="false" aria-label="mac 启动命令">
+          <input class="dfield mono" data-svc-kind="start" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(cmds.windows)}" placeholder="windows 启动命令" spellcheck="false" aria-label="windows 启动命令">
+          <input class="dfield mono" data-svc-kind="build" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(bcmds.mac)}" placeholder="mac 编译命令（Makefile 的 make build）" spellcheck="false" aria-label="mac 编译命令">
+          <input class="dfield mono" data-svc-kind="build" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(bcmds.windows)}" placeholder="windows 编译命令（没有就留空）" spellcheck="false" aria-label="windows 编译命令">
         </span>
         <span class="svc-cand-meta">${esc(meta || '没有证据说明（来自 AI 推断）')}</span>
       </span>
@@ -3387,27 +3422,39 @@ function openServicesPreview(p, services, draft){
   askConfirm('服务信息收集 · 确认后写回',
     `<div class="cand-list">${rows}</div>
      <div class="mnote">${esc(note)}<br>
-     start 按平台各存一条，当前机器（${esc(servicePlatform.label || '当前平台')}）点「一键拉起」会跑对应那条；确认后写入 <code>rotation.json</code> 的 <code>services</code>。</div>`,
+     start / build 都按平台各存一条：当前机器（${esc(servicePlatform.label || '当前平台')}）点「一键拉起」跑 start，「一键编译」跑 build（Makefile 的 <code>make build</code> 也走这条）；确认后写入 <code>rotation.json</code> 的 <code>services</code>。</div>`,
     '写回 services', () => {
       const p0 = PROJECTS.find(x => x.id === p.id);
       if (!p0) return toast('项目列表已变，刷新后重试');
+      // 某个字段的两条平台命令都空 → 不写这个字段（不生成空对象）
+      const cmdsOf = (i, kind) => {
+        const pick = (plat) => {
+          const el = document.querySelector(`#ask-body [data-svc-kind="${kind}"][data-svc-cmd-i="${i}"][data-svc-cmd="${plat}"]`);
+          return el ? el.value.trim() : '';
+        };
+        const out = {};
+        const mac = pick('mac');
+        const win = pick('windows');
+        if (mac) out.mac = mac;
+        if (win) out.windows = win;
+        return Object.keys(out).length ? out : null;
+      };
       const picked = [];
       services.forEach((s, i) => {
         const box = document.querySelector(`#ask-body [data-svc-pick="${i}"]`);
         if (!box || !box.checked) return;
         const urlEl = document.querySelector(`#ask-body [data-svc-url="${i}"]`);
-        const macEl = document.querySelector(`#ask-body [data-svc-cmd-i="${i}"][data-svc-cmd="mac"]`);
-        const winEl = document.querySelector(`#ask-body [data-svc-cmd-i="${i}"][data-svc-cmd="windows"]`);
         const url = urlEl ? urlEl.value.trim() : '';
         if (!url) return;
-        const start = {};
-        if (macEl && macEl.value.trim()) start.mac = macEl.value.trim();
-        if (winEl && winEl.value.trim()) start.windows = winEl.value.trim();
+        const start = cmdsOf(i, 'start');
+        const build = cmdsOf(i, 'build');
         const svc = { id: s.id, name: s.name || s.id, url };
         if (s.health) svc.health = s.health;
-        if (Object.keys(start).length) svc.start = start;
+        if (start) svc.start = start;
+        if (build) svc.build = build;
         if (s.cwd) svc.cwd = s.cwd;
         if (s.confidence) svc.confidence = s.confidence;
+        if (s.evidence) svc.evidence = s.evidence;
         picked.push(svc);
       });
       if (!picked.length) return toast('至少勾一条要写回的服务');
@@ -5416,6 +5463,9 @@ function launchCopyText(){
 }
 
 function showModal(m){
+  // 上一个弹窗的「150ms 后 hidden=true」还没落地就重开（确认 → 立刻弹结果）时，
+  // 那个超时会把刚打开的弹窗又关掉：重开前先撤掉待执行的关闭
+  clearTimeout(m._hideTimer);
   m.hidden = false;
   m.style.opacity = '';
   const card = m.querySelector('.modal-card');
@@ -5435,7 +5485,8 @@ function hideModal(m){
   m.style.opacity = '';
   const card = m.querySelector('.modal-card');
   if (card){ card.style.transition = ''; card.style.opacity = ''; card.style.transform = ''; }
-  setTimeout(() => { m.hidden = true; }, 150);
+  clearTimeout(m._hideTimer);
+  m._hideTimer = setTimeout(() => { m.hidden = true; }, 150);
 }
 
 function openConfirm(id){
@@ -5663,7 +5714,7 @@ function paintServiceBlocks(){
 function svcFor(btn){
   const p0 = PROJECTS.find(x => x.file === btn.dataset.file);
   const list = p0 && (serviceMap.get(p0.file) || []);
-  const svc = list && list.find(x => x.id === (btn.dataset.svcOpen || btn.dataset.svcStart || btn.dataset.svcStop || btn.dataset.svcCopy));
+  const svc = list && list.find(x => x.id === (btn.dataset.svcOpen || btn.dataset.svcStart || btn.dataset.svcStop || btn.dataset.svcCopy || btn.dataset.svcBuild));
   return { p0, svc };
 }
 
@@ -6610,6 +6661,35 @@ document.addEventListener('click', (e)=>{
             setTimeout(refreshServices, 800);
             setTimeout(refreshServices, 2500);
           } catch (e) { toast('启动失败：' + e.message); }
+        });
+    }
+    return;
+  }
+  const svcBuild = e.target.closest('[data-svc-build]');
+  if (svcBuild){
+    const { p0, svc } = svcFor(svcBuild);
+    if (p0 && svc && RUN_CFG){
+      const command = svc.buildCommand || (typeof svc.build === 'string' ? svc.build : '');
+      if (!command){ toast('没有当前平台的编译命令，先补 services 的 build'); return; }
+      askConfirm(`一键编译：${svc.name}`,
+        `<div class="detail-row"><dt>平台</dt><dd class="mono">${esc(svc.startPlatform || '当前平台')}</dd></div>
+         <div class="detail-row"><dt>命令</dt><dd class="mono">${esc(command)}</dd></div>
+         <div class="detail-row"><dt>工作目录</dt><dd class="mono">${esc(svc.cwd || (p0.card && p0.card.project && p0.card.project.workspace) || '项目目录')}</dd></div>
+         <div class="mnote">编译是一次性任务：跑完弹退出码与最后一段输出，最长等 10 分钟。编译不会启动服务。</div>`,
+        '开始编译', async () => {
+          svcBuild.setAttribute('aria-busy', 'true');
+          toast(`编译中：${command}`);
+          try {
+            const res = await fetch(api('/service/build'), { method:'POST',
+              headers: { 'content-type':'application/json', 'x-rotation-token': RUN_CFG.token },
+              body: JSON.stringify({ file: p0.file, id: svc.id }) });
+            const j = await res.json().catch(() => ({}));
+            showBuildResult(svc, j);
+          } catch (error) {
+            showBuildResult(svc, { ok: false, error: error.message });
+          } finally {
+            svcBuild.removeAttribute('aria-busy');
+          }
         });
     }
     return;

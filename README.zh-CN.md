@@ -73,8 +73,9 @@
 - **prompt 先看结构再发**：唯一实现 `lib/prompt.mjs`，所有 prompt 都由四块拼成——
   背景 / 当前节点 / 任务 / 输出，发送前先展开结构视图。覆盖优先级：节点级 > 卡片级 > 内置。
 - **服务就在同一条泳道里**：每个项目列出自己依赖的服务，每 5s 探活，一键拉起时按当前平台
-  （`mac` / `windows` / `linux`）挑对应命令。AI 可以读项目自动收集服务——
-  结果是草稿，探活、改完、确认后才写回。
+  （`mac` / `windows` / `linux`）挑对应命令。服务还能带一条 `build` 命令，点「一键编译」跑一次，
+  跑完回退出码与输出尾巴。AI 可以读项目自动收集服务（含项目根与子目录的 `Makefile`，
+  `make build` 就落成 `build`）——结果是草稿，探活、改完、确认后才写回。
 - **跨项目一键拉起 / 一键关闭**：工具栏上有两个批量按钮。**拉起全部**先做端口冲突预检——
   两个服务配了同一端口就整批拒绝、一个都不拉，并把冲突列清楚（fail closed）；已在线的服务跳过。
   **关闭全部**按端口结束监听进程（包括你在终端里手动起的），单端口失败只记录、不打断整批。
@@ -207,6 +208,7 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 | `POST` `GET` | `/rotation/api/run` · `/rotation/api/run/cancel` · `/rotation/api/runs` · `/rotation/api/run-config` | 节点会话与并发上限 |
 | `GET` `PUT` | `/rotation/api/services` | 读 / 写卡片的服务配置 |
 | `POST` | `/rotation/api/service/start` · `/rotation/api/service/stop` | 一键拉起 / 停止 |
+| `POST` | `/rotation/api/service/build` | 一键编译：等退出后回退出码与输出尾巴 |
 | `POST` | `/rotation/api/services/probe` · `/rotation/api/services/collect` | 服务探活 / AI 收集（草稿 → 预览 → 写回） |
 | `GET` | `/rotation/api/services/collect?file=` | 某张卡的待确认服务草稿 |
 | `GET` | `/rotation/api/services/all` | 全部项目的服务、端口与冲突（`?probe=0` 不探活） |

@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 0.20.0 — 服务信息收集读 Makefile，服务块多一个「一键编译」
+
+- **要求**（2026-11-02，用户截图）：卡片里的服务要能分析 Makefile，进而拿到启动与编译命令，
+  一键拉起服务或一键编译。
+- **数据**：`services[]` 新增可选 `build` 字段，形状与 `start` 一致（字符串或 `{ mac, windows, linux, default }`）；
+  `checkServices` 与 `normalizeServices` 都放行它。
+- **收集**：`composeCollectServicesPrompt` 的读取清单加上项目根与子目录的 `Makefile` / `makefile` / `GNUmakefile`；
+  抽 target 行后 `dev|start|serve|run` 落 `start`、`build|compile|dist|package|all` 落 `build`，
+  子目录的 target 只归 cwd 覆盖到它的那条服务；Windows 没有 make 时写等价命令或留空，不复制 mac 那条。
+  预览弹窗多两行可编辑的编译命令（mac / windows），写回时一并落盘。
+- **执行**：新增 `POST /api/service/build` 与 `createServiceRunner().build()`——一次性任务，`spawn(shell)` 后等
+  退出，回 `{ ok, code, output, command, cwd, durationMs }`；同一服务编译中再点 409，缺当前平台命令 400，
+  超过 `ROTATION_BUILD_TIMEOUT_MS`（默认 10 分钟）整组杀掉并报超时。面板点完弹「编译结果」看退出码与输出尾巴。
+- **顺手修**：`showModal` / `hideModal` 的 150ms 关闭定时器会关掉「确认后立刻弹出的结果弹窗」（编译几毫秒就跑完，
+  必现）；重开前先撤掉待执行的关闭。`platformKeysOf` 不再把空字符串算成一个平台，缺命令提示不再自相矛盾。
+- **验证**：`mock:services` 36 项全绿（新增 build 归一化、编译成功/失败退出码、重复点击 409、缺平台拒绝、
+  `POST /api/service/build` 端到端）；Playwright 真浏览器点「一键编译」→ 确认 → 结果弹窗显示
+  「编译成功（退出码 0）· make build · build ok -> dist/」；`npm run preflight` 全绿。
+
 ## 0.19.1 — 还是开系统浏览器：拆掉 `sidebarRightTabs` 前置闸，失败原因留在服务块里
 
 - **症状**（2026-11-02，用户截图）：重启 DSH 后点「打开」，页面仍落在系统 Chrome，面板没有任何提示。

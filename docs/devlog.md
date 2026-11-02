@@ -368,6 +368,9 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 
 1. 点 `⋯` →「服务信息收集」，host 起一次会话，让模型读 `package.json` / vite 配置 / docker-compose /
    README 等，按 JSON 契约返回 `services`（id / name / url / health / start.mac / start.windows / 证据）。
+   **Makefile 也算读对象**（0.20.0）：项目根与子目录的 `Makefile` / `makefile` / `GNUmakefile` 都要抽 target 行，
+   `dev` / `start` / `serve` 落 `start`，`build` / `compile` / `dist` 落 `build`（一键编译），
+   子目录的只归 cwd 覆盖到它的那条服务；Windows 没有 make 就写等价命令或留空，不复制 mac 那条。
 2. 结果落成**草稿**（`~/.dsh/rotation/services/<卡片>.json`），面板弹预览：逐条探活、url 与两端命令可改、
    默认勾选新服务；已有同 id 的默认不勾（勾了才覆盖）。关掉面板草稿也还在，再点一次可继续。
 3. 确认后才 `PUT` 写回 `rotation.json` 的 `services`（校验不过 422 拒绝，原子写、不留 `.bak`），写回后清掉草稿。
@@ -376,7 +379,7 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
    「正在收集，先等它结束」；全局仍受 `ROTATION_MAX_CONCURRENT`（默认 3，含其它会话）限制，超了返回 429。
    两个项目几乎同时完成时只弹一个预览，另一个给 toast 提示，点它自己的「服务信息收集」可从草稿恢复。
 
-接口：`GET /api/services?file=`、`POST /api/service/start`、`POST /api/service/stop`、
+接口：`GET /api/services?file=`、`POST /api/service/start`、`POST /api/service/build`、`POST /api/service/stop`、
 `POST /api/services/collect`、`GET /api/services/collect?file=`、`POST /api/services/probe`、`PUT /api/services`。
 
 ![服务信息收集预览](../assets/preview-services-collect.png)

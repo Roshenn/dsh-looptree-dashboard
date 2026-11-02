@@ -82,7 +82,9 @@ did the work. The panel is the view; DSH is the engine.
   structure before sending. Per-node overrides beat card-level overrides, which beat built-ins.
 - **Services live in the same lane.** Each project lists the services it depends on, probes them every
   5s, and starts them with one click using the command mapped to the current platform (`mac` /
-  `windows` / `linux`). An AI pass can read the project and propose its services — as a draft you
+  `windows` / `linux`). A service can also carry a `build` command and run it with one click — a
+  one-shot job that reports back its exit code and the tail of its output. An AI pass can read the
+  project (including any `Makefile`, root or nested) and propose both commands — as a draft you
   review and probe before anything is written back.
 - **Start all / stop all across projects.** The toolbar has two batch buttons. **Start all** runs a
   port-conflict precheck first: when two services point at the same port, nothing is started and the
@@ -228,6 +230,7 @@ atomically (`tmp` + rename, no `.bak` — git is the history).
 | `POST` `GET` | `/rotation/api/run` · `/rotation/api/runs` · `/rotation/api/run/cancel` · `/rotation/api/run-config` | node sessions and the concurrency cap |
 | `GET` `PUT` | `/rotation/api/services` | read / write the service list of a card |
 | `POST` | `/rotation/api/service/start` · `/rotation/api/service/stop` | one-click start / stop |
+| `POST` | `/rotation/api/service/build` | one-click build; waits for the exit code and returns the output tail |
 | `POST` | `/rotation/api/services/probe` · `/rotation/api/services/collect` | probe a service / AI discovery (draft → preview → write-back) |
 | `GET` | `/rotation/api/services/collect?file=` | the pending service draft for a card |
 | `GET` | `/rotation/api/services/all` | every project's services, ports and conflicts (`?probe=0` skips probing) |

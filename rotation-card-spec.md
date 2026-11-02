@@ -210,12 +210,13 @@
 > 2026-10-30 踩过：模型用 `○` + 单换行写了 5 条，编辑器只认编号/短横线 → 退回 plain 模式（只按空行切）
 > → 5 条被当成 1 个融合块，而卡片 chips 按行数仍显示「5 条」。判据靠行数，写法必须统一。
 
-## 服务（可选，面板用于探活与一键拉起）
+## 服务（可选，面板用于探活、一键拉起与一键编译）
 
 ```json
 "services": [
   { "id": "panel",   "name": "轮转面板 4173", "url": "http://127.0.0.1:4173", "health": "/api/run-config",
-    "start": { "mac": "node serve.mjs", "windows": "node serve.mjs" } },
+    "start": { "mac": "node serve.mjs", "windows": "node serve.mjs" },
+    "build": { "mac": "make build", "windows": "npm run build" }, "evidence": "Makefile:12" },
   { "id": "web5800", "name": "本地预览 5800", "url": "http://127.0.0.1:5800",
     "start": { "mac": "python3 -m http.server 5800", "windows": "python -m http.server 5800" },
     "cwd": "/tmp/rt-workspace", "confidence": "high", "evidence": "README.md:18" }
@@ -229,6 +230,7 @@
 | `url` | ✅ | `http(s)://host:port/...`，**就是访问方式**；信息栏里点一下即在浏览器打开 |
 | `health` | ➖ | 相对路径，探活用（拼在 url 后），缺省直接探测 url 本身 |
 | `start` | ➖ | 一键拉起的命令（shell），在 `cwd` 或 `project.workspace` 下执行。字符串＝全平台共用；也可写成 `{ "mac", "windows", "linux", "default" }` |
+| `build` | ➖ | 一键编译的命令（shell），形状同 `start`：一次性任务，跑完回退出码与输出尾巴，最长 10 分钟（`ROTATION_BUILD_TIMEOUT_MS`）；Makefile 项目的 `make build` 写在这里 |
 | `stop` | ➖ | 停止命令（预留），形状同 `start` |
 | `cwd` | ➖ | 启动目录，缺省用 `project.workspace`；相对路径按项目根拼，也支持平台映射 |
 | `confidence` | ➖ | 仅「服务信息收集」写的出处置信度（`high` / `low`），面板展示用 |
@@ -244,6 +246,8 @@
   宿主没装 / 没启用 `ui-sidebar-browser`（Web profile 默认禁用）、面板被独立打开、或 1.5s 内没收到宿主回执时，
   退回系统默认浏览器并提示退回原因。
 - **一键拉起**：弹窗确认**平台、命令与工作目录**后 `spawn(shell)`，进程组独立，可「停止」。
+- **一键编译**：服务块里 `build` 有当前平台的命令时出现；弹窗确认后用 `spawn(shell)` 跑一次，等退出再看
+  结果（退出码 + 时长 + 输出尾巴，最多 8000 字符）。同一服务编译中再点返回 409，超时整组杀掉并报超时。
 - **复制地址**：复制 `url`，方便贴到别处验证。
 - **项目菜单（`⋯`）**：**服务信息收集**（AI 会话读项目 → 预览探活 → 确认后写回 `services`；草稿在 `~/.dsh/rotation/services/`）
   与**移除项目**（只取消注册表登记，保留 `rotation.json`）。
