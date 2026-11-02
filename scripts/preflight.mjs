@@ -62,6 +62,8 @@ try {
   await run(npm, ['run', 'mock:candtip']);
   console.log('── mock:refresh ──');
   await run(npm, ['run', 'mock:refresh']);
+  console.log('── mock:awaiting ──');
+  await run(npm, ['run', 'mock:awaiting']);
   console.log('── mock:stamp ──');
   await run(npm, ['run', 'mock:stamp'], { PORT: String(Number(port) + 4) });
   console.log('── validate:samples ──');

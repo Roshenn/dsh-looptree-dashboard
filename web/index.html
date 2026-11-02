@@ -757,6 +757,51 @@
   .toast[data-show="true"]{opacity:1;transform:translate(-50%,0)}
   .toast .dot{background:var(--green)}
 
+  /* ───────── 等你选择：节点呼吸 + 「查看会话」主色（判据见 lib/runner.mjs 的 INTERACTIVE_TOOLS）───────── */
+  .tnode[data-ask="1"]{border-color:color-mix(in srgb,var(--amber) 70%,var(--b1));
+    animation:askBreathe 2.2s cubic-bezier(.77,0,.175,1) infinite}
+  .tnode[data-ask="1"]::before{width:3px;background:var(--amber);opacity:1}
+  @keyframes askBreathe{
+    0%,100%{box-shadow:0 0 0 1px color-mix(in srgb,var(--amber) 24%,transparent)}
+    50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--amber) 52%,transparent)}
+  }
+  .askbad{font-size:9.5px;color:#241a05;background:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 70%,#000);
+    border-radius:4px;padding:2px 5px;line-height:1;white-space:nowrap}
+  .tbtn[data-ask-btn="1"],.tbtn[data-ask-btn="1"]:hover{background:var(--amber);border-color:color-mix(in srgb,var(--amber) 74%,#000);
+    color:#241a05;animation:askBtn 2.2s cubic-bezier(.77,0,.175,1) infinite}
+  @keyframes askBtn{
+    0%,100%{box-shadow:0 0 0 0 transparent}
+    50%{box-shadow:0 0 0 2px color-mix(in srgb,var(--amber) 38%,transparent)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .tnode[data-ask="1"],.tbtn[data-ask-btn="1"]{animation:none}
+    .tnode[data-ask="1"]{box-shadow:0 0 0 1px color-mix(in srgb,var(--amber) 45%,transparent)}
+  }
+
+  /* ───────── 待处理交互托盘（右下角，只在有会话等你选择时出现）───────── */
+  .asktray{position:fixed;right:16px;bottom:calc(62px + env(safe-area-inset-bottom,0px));z-index:38;
+    width:min(322px,calc(100vw - 24px));display:flex;flex-direction:column;gap:7px;
+    padding:9px 10px 10px;border-radius:11px;corner-shape:var(--corner);
+    border:1px solid color-mix(in srgb,var(--amber) 44%,var(--b2));background:var(--l3);
+    box-shadow:var(--shadow-pop);font-size:12px;color:var(--tx1)}
+  .asktray[hidden]{display:none}
+  .asktray-head{display:flex;align-items:center;gap:8px}
+  .asktray-title{font-size:11.5px;font-weight:600;color:var(--tx1)}
+  .asktray-title b{color:var(--amber)}
+  .asktray-toggle{margin-left:auto;border:0;background:transparent;color:var(--tx3);font-size:11px;
+    cursor:pointer;padding:2px 5px;border-radius:5px}
+  .asktray-toggle:hover{background:var(--l2);color:var(--tx1)}
+  .asktray-list{display:flex;flex-direction:column;gap:4px;max-height:38vh;overflow:auto}
+  .asktray[data-collapsed="1"] .asktray-list,.asktray[data-collapsed="1"] .asktray-more{display:none}
+  .askrow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:left;width:100%;
+    padding:7px 8px;border-radius:8px;border:1px solid var(--b1);background:var(--l2);cursor:pointer;color:inherit}
+  .askrow:hover{border-color:color-mix(in srgb,var(--amber) 52%,var(--b2));background:var(--l3)}
+  .askrow:active{transform:scale(.995)}
+  .askrow .who{font-size:11.5px;color:var(--tx1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .askrow .waited{font-size:10px;color:var(--amber);white-space:nowrap}
+  .askrow .q{grid-column:1/-1;font-size:11px;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .asktray-more{font-size:10.5px;color:var(--tx4);text-align:center}
+
   @media (prefers-reduced-motion:reduce){ *{transition-duration:1ms !important;animation-duration:1ms !important} }
   @media (hover:none){ .tnode:hover{transform:none} }
 </style>
@@ -950,6 +995,16 @@
 <div id="cand-tip" role="tooltip" aria-hidden="true" hidden></div>
 
 <div class="toast" id="toast" role="status"><span class="dot"></span><span id="toast-text"></span></div>
+
+<!-- 待处理交互托盘：会话挂在 ask 类工具上时出现，点一行直接切进那条会话 -->
+<aside class="asktray" id="ask-tray" hidden aria-label="待处理会话">
+  <div class="asktray-head">
+    <span class="asktray-title">待处理 <b id="ask-tray-count">0</b></span>
+    <button class="asktray-toggle" id="ask-tray-toggle" type="button" aria-expanded="true">收起</button>
+  </div>
+  <div class="asktray-list" id="ask-tray-list"></div>
+  <div class="asktray-more" id="ask-tray-more" hidden></div>
+</aside>
 
 <script src="cards.js"></script>
 <script>
@@ -2166,8 +2221,9 @@ function runBadge(p, n){
   const secs = Math.round((r.elapsedMs || 0) / 1000);
   const el = r.status === 'running' || r.status === 'starting'
     ? (secs >= 60 ? `${Math.floor(secs/60)}m${secs%60}s` : `${secs}s`) : '';
+  const asking = r.awaiting ? '<span class="askbad">⏳ 等你选择</span>' : '';
   return `<div class="tnode-meta"><span class="runbad" style="--tone:${tone}">
-    <i class="rdot"></i>${RUN_LABEL[r.status] || r.status}${el ? ' · ' + el : ''}</span></div>`;
+    <i class="rdot"></i>${RUN_LABEL[r.status] || r.status}${el ? ' · ' + el : ''}</span>${asking}</div>`;
 }
 
 /** 卡片与详情卡共用的会话 id：运行中的优先，其次卡片落盘的 session，最后能力闭环的计划会话 */
@@ -2234,9 +2290,11 @@ function nodeMarkup(n, p){
     : '';
   const planActs = n.kind === 'capability' && p ? capabilityActionButtons(p, n, 'card') : '';
   // 「查看会话」放卡片下缘：点它直接切到 DSH 里这条会话的对话页（独立打开时退化为看全文）
+  // 会话正等你选择时它变主色 + 呼吸：这是唯一能进去答话的入口
   const sessId = p ? sessionIdOf(p, n) : '';
+  const asking = !!(p && runFor(p, n) && runFor(p, n).awaiting);
   const viewSess = sessId
-    ? `<button class="tbtn" data-open-session="${esc(sessId)}" title="切到 DSH 里这条会话的对话页面">查看会话</button>`
+    ? `<button class="tbtn${asking ? ' primary' : ''}"${asking ? ' data-ask-btn="1"' : ''} data-open-session="${esc(sessId)}" title="${asking ? '这条会话正等你选择，点进去答话' : '切到 DSH 里这条会话的对话页面'}">查看会话</button>`
     : '';
   const bars = kidsExist ? `<span class="bars">${kids.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>` : '';
   const issues = (n.issues||[]).map(i=>`<div class="issue">⚠ ${i}</div>`).join('');
@@ -2646,6 +2704,7 @@ function render(){
   updateKpis();
   paintIdle();                     // 刷新 data-idle + 泳道头 + 页脚（run 轮询也走同一处）
   paintUpdatedMarkers();           // 会话完成后打的「新」角标，重绘后要贴回去
+  paintAskTray();                  // 项目/节点标题变了，托盘里的行跟着更新
   if (keepDetail && findProjectByNode(keepDetail)){
     requestAnimationFrame(() => openDetail(keepDetail));
     setTimeout(() => { if (!detailNode) openDetail(keepDetail); }, 60);
@@ -5396,6 +5455,83 @@ function markSave(msg, kind){
   el.textContent = msg;
   el.dataset.state = kind || '';
 }
+/* ─────────── 待处理交互托盘 ───────────
+ * 判据只有一条：run.awaiting（host 的 runner 在 ask 类工具的 tool/call 上打的标记）。
+ * 不做「安静太久」推断，所以托盘里出现的每一条都确实在等人。
+ */
+const ASK_TRAY_MAX = 5;
+const ASK_TRAY_KEY = 'rotation.askTray.collapsed';
+let askTraySig = '';
+
+/** 待处理列表（纯函数，mock 直接断言）：只留 awaiting 的活跃 run → 挂项目/节点 → 等得久的排前面 */
+function awaitingRuns(runs, projects){
+  const list = [];
+  const seen = new Set();
+  for (const r of runs || []){
+    if (!r || !r.awaiting) continue;
+    if (r.status !== 'running' && r.status !== 'starting') continue;
+    const sid = r.sessionId || r.key;
+    if (!sid || seen.has(sid)) continue;
+    seen.add(sid);
+    const p = (projects || []).find((x) => (r.file && x.file === r.file) || (!r.file && x.id === r.projectId));
+    const n = p && findNode(p.root, r.nodeId);
+    const at = Date.parse((r.ask && r.ask.at) || r.startedAt || '');
+    list.push({
+      sessionId: r.sessionId || '',
+      projectName: (p && p.name) || r.file || '未命名项目',
+      nodeTitle: (n && n.title) || r.nodeId || '未知节点',
+      question: (r.ask && r.ask.question) || '',
+      options: (r.ask && Array.isArray(r.ask.options)) ? r.ask.options.length : 0,
+      waitedMs: Math.max(0, Date.now() - (Number.isFinite(at) ? at : Date.now())),
+    });
+  }
+  list.sort((a, b) => b.waitedMs - a.waitedMs);
+  return list;
+}
+
+function waitText(ms){
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `等 ${s} 秒`;
+  if (s < 3600) return `等 ${Math.floor(s / 60)} 分 ${s % 60} 秒`;
+  return `等 ${Math.floor(s / 3600)} 小时 ${Math.floor((s % 3600) / 60)} 分`;
+}
+
+function askTrayCollapsed(){
+  try { return localStorage.getItem(ASK_TRAY_KEY) === '1'; } catch { return false; }
+}
+
+function applyAskTrayCollapsed(){
+  const tray = $('#ask-tray');
+  if (!tray) return;
+  const on = askTrayCollapsed();
+  tray.dataset.collapsed = on ? '1' : '0';
+  const btn = $('#ask-tray-toggle');
+  if (btn){ btn.textContent = on ? '展开' : '收起'; btn.setAttribute('aria-expanded', on ? 'false' : 'true'); }
+}
+
+function paintAskTray(){
+  const tray = $('#ask-tray');
+  if (!tray) return;
+  const list = awaitingRuns([...runMap.values()], PROJECTS);
+  if (!list.length){ tray.hidden = true; askTraySig = ''; return; }
+  tray.hidden = false;
+  $('#ask-tray-count').textContent = String(list.length);
+  // 10 秒粒度做签名：等待时长每 10 秒才需要重画一次，别每 2 秒把行重建掉（悬停会跳）
+  const sig = list.map((x) => `${x.sessionId}|${x.nodeTitle}|${x.question}|${x.options}|${Math.floor(x.waitedMs / 10000)}`).join('~');
+  if (sig === askTraySig) return;
+  askTraySig = sig;
+  $('#ask-tray-list').innerHTML = list.slice(0, ASK_TRAY_MAX).map((x) => `
+    <button class="askrow" type="button" data-ask-jump="${esc(x.sessionId)}" title="切到这条会话去答话">
+      <span class="who">${esc(x.projectName)} · ${esc(x.nodeTitle)}</span>
+      <span class="waited">${esc(waitText(x.waitedMs))}</span>
+      <span class="q">${esc(x.question || '会话在等你选择')}${x.options > 1 ? ` · ${x.options} 个选项` : ''}</span>
+    </button>`).join('');
+  const more = $('#ask-tray-more');
+  const rest = list.length - ASK_TRAY_MAX;
+  more.hidden = rest <= 0;
+  more.textContent = rest > 0 ? `还有 ${rest} 条` : '';
+}
+
 function paintRunBadges(){
   // 先清掉旧的状态点再重画：避免 replace/append 混用留下重复或过期的徽标
   document.querySelectorAll('.tnode .runbad').forEach(el => {
@@ -5406,10 +5542,28 @@ function paintRunBadges(){
     const nid = el.dataset.nid;
     const p = findProjectByNode(nid); const n = p && findNode(p.root, nid);
     if (!p || !n) return;
+    const r = runFor(p, n);
+    if (r && r.awaiting) el.dataset.ask = '1'; else delete el.dataset.ask;   // 呼吸高亮只改属性
+    // 「查看会话」是唯一能进去答话的入口：等交互时变主色。
+    // 首帧渲染时 run 还没到，卡片可能压根没有这个按钮，所以缺了就在这里补一个。
+    let sessBtn = el.querySelector('[data-open-session]');
+    if (r && r.awaiting && !sessBtn){
+      const foot = el.querySelector('.tfootline');
+      const sid = sessionIdOf(p, n);
+      if (foot && sid){
+        foot.insertAdjacentHTML('beforeend', `<button class="tbtn primary" data-ask-btn="1" data-open-session="${esc(sid)}" title="这条会话正等你选择，点进去答话">查看会话</button>`);
+        sessBtn = el.querySelector('[data-open-session]');
+      }
+    }
+    if (sessBtn){
+      if (r && r.awaiting){ sessBtn.dataset.askBtn = '1'; sessBtn.classList.add('primary'); }
+      else { delete sessBtn.dataset.askBtn; sessBtn.classList.remove('primary'); }
+    }
     const html = runBadge(p, n);
     if (html) el.insertAdjacentHTML('beforeend', html);
   });
   paintIdle();          // run 状态变了，「可开工」跟着变；只改属性，不重渲染整页
+  paintAskTray();       // 待处理托盘跟同一份 run 快照走
   if (detailNode) openDetail(detailNode);
 }
 // 调试/自检钩子：从控制台或测试脚本手动触发刷新
@@ -6207,6 +6361,14 @@ document.addEventListener('click', (e)=>{
   if (sessList){ listProjectSessions(); return; }
   const openSess = e.target.closest('[data-open-session]');
   if (openSess){ openInDsh(openSess.dataset.openSession); return; }
+  // 待处理托盘：点行直接切会话；点标题右侧按钮折叠 / 展开
+  const askJump = e.target.closest('[data-ask-jump]');
+  if (askJump){ openInDsh(askJump.dataset.askJump); return; }
+  if (e.target.closest('#ask-tray-toggle')){
+    try { localStorage.setItem(ASK_TRAY_KEY, askTrayCollapsed() ? '0' : '1'); } catch {}
+    applyAskTrayCollapsed();
+    return;
+  }
   const viewSess = e.target.closest('[data-view-session]');
   if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const retryBtn = e.target.closest('[data-retry]');
@@ -6604,6 +6766,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   if (!PROJECTS.some(p => p.id === state.focusId)) state.focusId = PROJECTS[0] ? PROJECTS[0].id : '';
   document.documentElement.dataset.theme = state.theme;
   await loadAllCandidateCounts();   // 先灌候选条数，节点卡首帧就能显示「候选池 n」
+  applyAskTrayCollapsed();          // 托盘折叠状态刷新后保持
   render();
   notifyPendingSplits();
   const src = $('#data-src');

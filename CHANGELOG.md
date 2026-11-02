@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 0.18.0 — 会话等你选择：节点呼吸高亮 + 右下角「待处理」托盘
+
+- **要求**（2026-11-02，用户截图）：会话卡在交互提问上时，面板要主动提示——节点高亮并闪烁、
+  「查看会话」按钮高亮；再加一个悬浮的待处理会话框，点一条就直接进那条会话。
+- **判定来源**：只认工具调用。`lib/runner.mjs` 新增 `INTERACTIVE_TOOLS = {ask_user_question}`；
+  `tool/call` 命中就写 `run.pendingAsk = { tool, callId, at, question, options, questions }`，
+  `/api/runs` 快照多两个字段 `awaiting` / `ask`（纯增量，老面板照常工作）。
+  **不做**「安静太久」的启发式：宁可漏报，不把长任务误标成在等人。
+- **清除时机**：用户回话（`user/message`）、新回合（`turn/start`）、回合结束（`turn/end`）、
+  这次工具调用返回结果（`tool/result` 且 callId 对得上）、会话收尾（`finish`）。
+- **面板**：
+  - 节点卡 `data-ask="1"` → 琥珀色描边 + 2.2s 呼吸（`--ease-in-out` 曲线）；
+    `prefers-reduced-motion` 下只留静态描边。
+  - 卡片下缘「查看会话」在此刻变主色并轻脉冲——它是唯一能进去答话的入口。
+  - 节点徽标多一条 `⏳ 等你选择`。
+  - 右下角 `#ask-tray`：标题「待处理 N」+ 可折叠（状态存 `localStorage`）；每行「项目 · 节点 /
+    等了多久 / 第一句问题 · N 个选项」，最多 5 行、多的显示「还有 N 条」；点行直接 `openInDsh`。
+  - 纯函数 `awaitingRuns(runs, projects)` 负责过滤（只留 awaiting 的活跃 run）、按 `sessionId` 去重、
+    挂项目/节点标题、按等了多久排序；`paintAskTray()` 只在签名变化（10 秒粒度）时重绘，避免悬停闪烁。
+- **边界**：只覆盖面板自己发起的会话（托盘读 runner 的 `runMap`），用户在 DSH 里手开的会话不会出现；
+  `stale`（进程已不在）不算等待，继续走原有渲染。
+- **验证**：`mock:awaiting` 35 项全绿（过滤/去重/排序/时长文案/清除时机/reduced-motion/接线）；
+  Playwright 真浏览器：伪造一条 awaiting 快照 → `data-ask`、按钮主色、托盘行、点击发出
+  `rotation-open-session`、reduced-motion 下无 animation，全部通过；`npm run preflight` 全绿。
+
 ## 0.17.3 — 手动添加子节点后，新节点立刻出现在树上
 
 - **症状**（2026-11-02，用户报告）：详情卡里点「手动添加子节点」，写盘成功了，但父节点下缘不出新节点；
