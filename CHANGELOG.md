@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 未发布 — Windows 一键拉起不再弹控制台黑窗，停止改整树结束
+
+- **问题**（2026-11-03，Windows）：面板点「启动」会弹出一个空的 Windows Terminal / conhost 窗口。
+  根因是 host 用 `spawn(cmd, { shell: true, detached: true })` 拉起服务，而 DSH Desktop 宿主本身
+  没有控制台——Windows 只能给这个控制台子进程新建一个窗口。同一处的 `detached` 在 Windows 也换不来
+  POSIX 的进程组语义：`process.kill(-pid)` 永远失败，`stop()` 只杀到外层 `cmd.exe`，pnpm / node
+  孙进程继续占着端口，面板再点「启动」就报冲突。
+- **修**：`lib/services.mjs` 的 `start` / `build` 加 `windowsHide: true`；Windows 上不再传 `detached`
+  （顺带避开「detached + 管道 stdio 吞输出」的老坑）；`stop` / `dispose` 在 Windows 改走
+  `taskkill /PID <pid> /T /F` 整树结束，POSIX 仍是 `SIGTERM` 进程组 → 3s → `SIGKILL`。
+  `serve.mjs` 的两处 spawn（服务拉起、`dsh --profile headless`）与 `lib/index.js` 的 `zstd` 兜底
+  同步加 `windowsHide`。
+- **验证**：新增 `npm run mock:svc-console`（17 条断言：win32 spawn 选项、`taskkill /T /F` 参数、
+  darwin 进程组信号、dispose 整树、未跑服务 404）。真实「无控制台宿主」复现：旧写法新开 2 个窗口
+  （`CASCADIA_HOSTING_WINDOW_CLASS` + `PseudoConsoleWindow`），新写法 0 个；`npm run preflight` 全绿。
+
 ## 0.22.0 — 零散但确定的小修：`docs/backlog.md` 第五节 10 条全部收口
 
 - **计划书校验不再判已退役的 `support`**（`lib/core.mjs`）：每次写 `capability.plan` 都吐一条

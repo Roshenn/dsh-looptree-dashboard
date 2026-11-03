@@ -17,7 +17,7 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, rename, readdir, stat } from 'node:fs/promises';
 import { join, extname, resolve, sep } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { validateCard } from './lib/core.mjs';
 
@@ -173,6 +173,8 @@ function startRun({ file, nodeId, prompt, taskId, workspace, card }) {
 
   const child = spawn(DSH_BIN, ['--profile', 'headless', '--json', prompt], {
     cwd: workspace,
+    // 别给宿主新开一个控制台黑窗（Windows 上无控制台父进程会新建一个）
+    windowsHide: true,
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -347,7 +349,11 @@ const server = createServer(async (req, res) => {
     const cwd = svc.cwd || (card.project && card.project.workspace) || ROOT;
     try {
       const child = spawn(svc.start, {
-        cwd, shell: true, detached: true,
+        cwd, shell: true,
+        // Windows 没有 POSIX 进程组语义：detached 反而吞掉管道输出，停止改走 taskkill /T
+        detached: process.platform !== 'win32',
+        // 宿主无控制台时，不隐藏就会新开一个黑窗
+        windowsHide: true,
         env: { ...process.env, NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'],
       });
       const rt = { child, pid: child.pid, startedAt: new Date().toISOString(), stopped: false, output: '', exitCode: null };
@@ -368,6 +374,11 @@ const server = createServer(async (req, res) => {
     const rt = services.get(key);
     if (!rt) return send(res, 404, { ok: false, error: '没有在跑的服务' });
     rt.stopped = true;
+    if (process.platform === 'win32') {
+      // Windows 只能整树结束：process.kill(-pid) 必然失败，只杀 shell 会留下占端口的孤儿
+      try { spawnSync('taskkill', ['/PID', String(rt.pid), '/T', '/F'], { stdio: 'ignore' }); } catch {}
+      return send(res, 200, { ok: true });
+    }
     try { process.kill(-rt.pid, 'SIGTERM'); } catch { try { rt.child.kill('SIGTERM'); } catch {} }
     setTimeout(() => { try { process.kill(-rt.pid, 'SIGKILL'); } catch {} }, 3000);
     return send(res, 200, { ok: true });

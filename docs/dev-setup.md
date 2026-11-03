@@ -110,6 +110,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\profiles\rotationtest
 | `scripts/real-plugin-check.sh` | bash | Windows 用 Git Bash 跑，或照 §2.5 手工执行 |
 | 路径分隔符 | `/` | host 侧一律用 `node:path` 拼接；面板里只用 `/` 拼 URL，不拼文件路径 |
 | `~` 展开 | shell 展开 | 文档/脚本里不要用 `~`，写绝对路径 |
+| 服务拉起 / 一键编译的控制台窗口 | mac 上 `windowsHide` 被忽略，无窗口 | host 侧统一带 `windowsHide: true`（`lib/services.mjs`、`serve.mjs`，以及 `lib/index.js` 的 `zstd` 兜底）；Windows 上**不要**再传 `detached`，它换不来进程组语义，还会吞掉管道输出 |
+| 停止已拉起的服务 | 进程组 `SIGTERM` → 3s → `SIGKILL` | Windows 用 `taskkill /PID <pid> /T /F` 整树结束；`process.kill(-pid)` 在那边必然失败，只杀外层 `cmd.exe` 会留下占端口的孤儿 |
 
 ---
 
