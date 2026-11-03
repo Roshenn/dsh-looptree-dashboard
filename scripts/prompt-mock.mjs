@@ -29,6 +29,7 @@ import {
   composeTaskPrompt,
   lintPrompt,
   listTaskPrompts,
+  BLOCK_LABELS,
 } from '../lib/prompt.mjs';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -58,6 +59,33 @@ const blocksOk = (text) => {
  * 所以 plan 提到 1800，exec / reflect 按 1200 收（实测 740 / 487）。
  */
 const ACTION_MAX = { plan: 1800, exec: 1200, reflect: 1200 };
+
+/* ── 0. 三方块标签一致性：lib/prompt.mjs ↔ docs/prompts.md ↔ 面板 PROMPT_BLOCKS ──
+   三份各写各的时候，`场景` 只在 lib/面板有、`失败处理` 谁都没有，lint 的 empty-block
+   覆盖不到，面板结构视图也不会加粗。这里直接读另外两处比对。 */
+const DOC_LABELS = (() => {
+  const lines = readFileSync(join(ROOT, 'docs/prompts.md'), 'utf8').split('\n');
+  const start = lines.findIndex((line) => line.includes('允许的块标签'));
+  const kept = [];
+  for (let i = start; start >= 0 && i < lines.length && i < start + 6; i += 1) {
+    if (i > start && /新模板不再使用|这份清单必须/.test(lines[i])) break;
+    kept.push(lines[i]);
+  }
+  return [...kept.join('\n').matchAll(/`([^`\n]+)`/g)].map((m) => m[1]);
+})();
+const PANEL_LABELS = (() => {
+  const html = readFileSync(join(ROOT, 'web/index.html'), 'utf8');
+  const m = html.match(/const PROMPT_BLOCKS = \[([^\]]*)\]/);
+  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : null;
+})();
+const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+const libLabels = [...BLOCK_LABELS];
+check('三方标签：docs 与 lib 一致', sameSet(DOC_LABELS, libLabels), `docs=${DOC_LABELS.join('/')} | lib=${libLabels.join('/')}`);
+check('三方标签：面板 PROMPT_BLOCKS 与 lib 一致',
+  Array.isArray(PANEL_LABELS) && sameSet(PANEL_LABELS, libLabels),
+  PANEL_LABELS ? PANEL_LABELS.join('/') : '没解析到 PROMPT_BLOCKS');
+check('已退役的「场景 / 验收」不再是允许标签',
+  !libLabels.includes('场景') && !libLabels.includes('验收'), '');
 
 /* ── 1. 样例卡：每一类 prompt 都过结构 lint ── */
 const files = readdirSync(SAMPLES).filter((f) => f.endsWith('.rotation.json'));
@@ -135,6 +163,8 @@ check('计划要求 exit_plan_mode', planText.includes('exit_plan_mode'));
 check('计划要「证据要求」块', planText.includes('\n证据要求\n'), '');
 check('计划要 path:line 证据', planText.includes('path:line'), '');
 check('计划要「非目标」块', planText.includes('\n非目标\n'), '');
+check('计划要「失败处理」块', planText.includes('\n失败处理\n'), '');
+check('失败处理要写判定与不放宽验证', planText.includes('失败时怎么判定') && planText.includes('不放宽验证命令'), '');
 check('计划步骤要文件+命令+预期+指标', planText.includes('改哪些文件 / 做什么 / 验证命令 / 预期结果 / 对应指标'), '');
 check('计划吃能力闭环的只读字段与落点', planText.includes('- 承接能力闭环：') && planText.includes('  - 与闭环的关系：') && planText.includes('  - 功能模块：'), '');
 check('计划不出现已退役的验收判据', !planText.includes('## 验收') && !planText.includes('达成判据'), '');

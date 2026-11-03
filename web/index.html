@@ -79,6 +79,13 @@
   .chip:active{transform:scale(.97)}
   /* 全部服务批量操作：请求中禁用 + 关闭按钮用危险色 */
   .chip[aria-busy="true"]{opacity:.55;cursor:progress;pointer-events:none}
+  /* 全局搜索：命中节点描边，泳道里没有命中的整条收掉 */
+  .searchbox{height:26px;width:176px;padding:0 8px;border-radius:7px;border:1px solid var(--b2);
+    background:transparent;color:var(--tx1);font-size:12px;font-family:inherit;outline:none;
+    transition:border-color 160ms var(--ease-out),background-color 160ms var(--ease-out)}
+  .searchbox::placeholder{color:var(--tx4)}
+  .searchbox:focus{border-color:color-mix(in srgb,var(--brand) 55%,transparent);background:var(--hover)}
+  .tnode[data-hit="1"]{outline:2px solid color-mix(in srgb,var(--amber) 62%,transparent);outline-offset:1px}
   /* 刷新按钮（.iconbtn）：串行三请求期间锁住，避免连点叠请求 */
   .iconbtn[aria-busy="true"]{opacity:.55;cursor:progress;pointer-events:none}
   .chip.chip-danger{color:color-mix(in srgb,var(--red) 74%,var(--tx2))}
@@ -921,6 +928,7 @@
       <button class="chip" data-filter="all" aria-pressed="true">全部项目</button>
       <button class="chip" data-filter="blocked" aria-pressed="false">仅看阻塞</button>
       <button class="chip" data-filter="open" aria-pressed="false">未关闭</button>
+      <input id="search" class="searchbox" type="search" placeholder="搜节点 / 证据 / 指标" aria-label="搜索节点（Ctrl+K）" spellcheck="false">
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="density" aria-pressed="true">紧凑</button>
       <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的能力闭环 / 执行记录（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
@@ -1761,6 +1769,25 @@ let API_BASE = (() => {
 const API_ATTEMPTS = [];
 window.__rotationApiAttempts = API_ATTEMPTS;
 
+/**
+ * 写接口令牌：host 把它注入这份 HTML，跨源页面读不到（同源策略）。
+ * 面板自己不改任何调用点——在这里包一层 fetch，非 GET 请求统一带上。
+ */
+const ROT_TOKEN = (() => { try { return String(window.__ROTATION_TOKEN__ || ''); } catch { return ''; } })();
+(function patchFetchForToken(){
+  if (!ROT_TOKEN || typeof window.fetch !== 'function') return;
+  const rawFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const opts = { ...(init || {}) };
+    const method = String(opts.method || (input && input.method) || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && /\/api(\/|$)/.test(url)) {
+      opts.headers = { ...(opts.headers || {}), 'x-rotation-token': ROT_TOKEN };
+    }
+    return rawFetch(input, opts);
+  };
+})();
+
 async function resolveApiBase() {
   if (/^https?:/.test(location.protocol)) return API_BASE;
   const list = Array.isArray(window.__ROTATION_API_CANDIDATES__) ? window.__ROTATION_API_CANDIDATES__ : [];
@@ -1816,7 +1843,7 @@ let PROJECTS = CARDS.length ? CARDS.map(cardToProject) : MOCK_PROJECTS;
 const USING_REAL = CARDS.length > 0;
 
 /* ─────────── 状态 ─────────── */
-const state = { view:'matrix', filter:'all', focusId:'', theme:'dark', stamp:'', hideClosed:false };
+const state = { view:'matrix', filter:'all', focusId:'', theme:'dark', stamp:'', hideClosed:false, q:'' };
 state.focusId = (PROJECTS[0] && PROJECTS[0].id) || '';
 /**
  * 顶栏「数据 · <时间>」= **最近一次成功拉到卡片**的时刻。
@@ -2550,7 +2577,7 @@ function nodeMarkup(n, p){
   // 右侧留给「继续生成」那组动作（生成候选 / 候选池 / 查看会话）
   const leadKids = [closeBtn, genBtn, manualAdd].filter(Boolean).join('');
   const lead = leadKids ? `<span class="lead">${leadKids}</span>` : '';
-  return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${idleMode ? ` data-idle="${idleMode}"` : ''}${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
+  return `<div class="tnode" data-nid="${n.id}" data-state="${st.key}" data-blocked="${hasIssues(n) && !n.closed ? '1' : '0'}" data-kind="${n.kind}"${searchHit(n) ? ' data-hit="1"' : ''}${idleMode ? ` data-idle="${idleMode}"` : ''}${upstream ? ` data-frozen="1" title="上游「${esc(upstream.title || upstream.id)}」正在生成，暂时不能发起"` : ''} style="--tone:${tone};--st-tone:${st.tone}">
     <div class="tnode-top">
       <span class="kind">${kindLabel(n)}</span>
       <span class="nid mono">${n.id}</span>
@@ -2770,9 +2797,35 @@ function laneMarkup(p){
 }
 
 function visibleProjects(){
-  if (state.filter==='blocked') return PROJECTS.filter(hasBlocked);
-  if (state.filter==='open') return PROJECTS.filter(p=>!p.root.closed);
-  return PROJECTS;
+  let list = PROJECTS;
+  if (state.filter==='blocked') list = list.filter(hasBlocked);
+  else if (state.filter==='open') list = list.filter(p=>!p.root.closed);
+  // 搜索是第三层过滤：只留下「真的有命中节点」的泳道，命中节点自己带 data-hit 高亮
+  if (state.q) list = list.filter(p => projectHitCount(p) > 0);
+  return list;
+}
+
+/* ─────────── 全局搜索（跨项目找节点） ───────────
+   泳道一多只能靠翻或靠页脚随机跳。这里只查内存里的卡片，不打接口：
+   标题 / id / 验证 / 证据 / 指标 / 实现思路 / 承接条目 / 阻塞反馈 都算关键词。
+   命中节点在画布上描边，泳道里没有命中的整条收掉。 */
+function searchTextOf(n){
+  const raw = n.raw || {};
+  return [
+    n.title, n.id, raw.verify, raw.proof, raw.metric, raw.approach, raw.capability,
+    raw.necessity, raw.causal, raw.gap, raw.module, raw.collaboration,
+    (raw.issues || []).map(i => i.text).join(' '),
+  ].filter(Boolean).join('\n').toLowerCase();
+}
+function searchHit(n){
+  if (!state.q) return false;
+  return searchTextOf(n).includes(state.q);
+}
+function projectHitCount(p){
+  if (!state.q || !p || !p.root) return 0;
+  let hits = 0;
+  walk(p.root, (x) => { if (searchHit(x)) hits += 1; });
+  return hits;
 }
 
 function renderMatrix(){
@@ -2925,9 +2978,11 @@ function render(){
   $('#stamp').textContent = state.stamp || '—';
   const src = $('#data-src');
   if (src) src.textContent = USING_REAL ? `数据源：${CARDS.length} 张 rotation/v1 卡` : '数据源：内置 mock';
-  $('#toolbar-hint').textContent = state.view==='matrix'
-    ? '里程碑 → 能力闭环 → 执行记录；能力闭环记录全闭环自动完成，能力闭环全部关闭后点「确认达成」'
-    : '聚焦单项目：从执行记录开始，一层层确认关闭，直到里程碑达成';
+  $('#toolbar-hint').textContent = state.q
+    ? `搜索「${state.q}」：命中 ${visibleProjects().reduce((sum, p) => sum + projectHitCount(p), 0)} 个节点（Esc 清空）`
+    : (state.view==='matrix'
+      ? '里程碑 → 能力闭环 → 执行记录；能力闭环记录全闭环自动完成，能力闭环全部关闭后点「确认达成」'
+      : '聚焦单项目：从执行记录开始，一层层确认关闭，直到里程碑达成');
   focusSwitch();
   const emptyEl = $('#empty'), matrixEl = $('#matrix'), focusEl = $('#focus');
   const isEmpty = PROJECTS.length === 0;
@@ -3807,7 +3862,7 @@ const TEXT_EDITOR_FIELDS = new Set(['vision']);
  * 这里只负责：列表摘要、结构视图、原文编辑、发送预览。
  */
 const promptCache = new Map();          // `${file}::${nodeId}` → { from, list, error }
-const PROMPT_BLOCKS = ['背景','当前节点','场景','任务','要做什么','证据要求','非目标','验收','约束','输出','验证命令','步骤','提交方式','收尾','质量要求','示例'];
+const PROMPT_BLOCKS = ['背景','当前节点','任务','要做什么','证据要求','非目标','失败处理','约束','输出','验证命令','步骤','提交方式','收尾','质量要求','示例'];
 const pkeyOf = (file, nid) => `${file}::${nid}`;
 
 /** 拉一次某个节点的模板列表（from + list[{id,title,summary,prompt,warnings}]） */
@@ -6503,6 +6558,26 @@ $('#btn-refresh').addEventListener('click', async ()=>{
   }
 });
 $('#export-json').addEventListener('click', () => exportCard());
+// 全局搜索：输入即筛（120ms 防抖），Esc 清空，Ctrl/⌘+K 聚焦
+(() => {
+  const el = $('#search');
+  if (!el) return;
+  let timer = null;
+  const apply = () => { state.q = el.value.trim().toLowerCase(); render(); };
+  el.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(apply, 120); });
+  el.addEventListener('keydown', (ev) => {
+    // Esc 只清搜索，不冒泡去关详情卡 / 弹窗
+    if (ev.key === 'Escape'){ el.value = ''; apply(); el.blur(); ev.stopPropagation(); }
+    ev.stopPropagation();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && String(ev.key).toLowerCase() === 'k'){
+      ev.preventDefault();
+      el.focus();
+      el.select();
+    }
+  });
+})();
 // 全部服务：跨项目批量拉起 / 按端口批量关闭（host 端做端口冲突预检）
 $('#svc-start-all').addEventListener('click', () => startAllServices());
 $('#svc-stop-all').addEventListener('click', () => stopAllServices());

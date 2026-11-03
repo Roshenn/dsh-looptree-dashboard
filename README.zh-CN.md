@@ -253,9 +253,13 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 除了 DSH 本来就要发出的模型调用，数据不出本机。
 
 - 面板由 DSH 自己的 web server 托管，只监听回环地址。
-- **没有鉴权**：host 半设 `access-control-allow-origin: *`，并接受 `x-rotation-token` 头，
-  但值是固定的 `in-process`——它只是路由约定，不是密钥。DSH 运行时，本机任意页面都能读写卡片。
-  装了本插件就别把 DSH 绑到公网接口。
+- **写接口要令牌，读接口不设防**：`POST` / `PUT` / `DELETE` 由浏览器以 http(s) 来源发起时
+  必须带 `x-rotation-token`。令牌每个进程随机生成，只注入插件自己托管的那份面板 HTML——
+  跨源页面受同源策略限制读不到它，所以本机任意网页都不能再跨源调 `stop-all`（按端口杀进程）、
+  `probe`、`run`。非浏览器客户端（命令行 / 脚本，不带 `Origin`）与 `dsh-app://` 外壳放行，
+  它们本来就能直接跑 shell；要把令牌固定成已知值给脚本用，设 `ROTATION_TOKEN`。
+  读接口（`GET`）仍然开放——**DSH 运行时本机任意页面都能读卡片内容**，装了本插件就别把 DSH 绑到公网接口。
+  `npm run mock:auth` 是这条口径的回归测试。
 - **「一键拉起」执行的是卡片里的 shell 命令**：别人写的 `rotation.json` 当作可执行代码看待。
   面板在 spawn 前一定先显示平台、命令与 `cwd`，进程独立成组，可以停。
 - 节点会话走进程内 `ctx.agents`，沿用 GUI 的凭据与 provider 路由——插件自己不存任何 key。
@@ -264,7 +268,7 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 ## 已知限制
 
 - 面板没有会话列表与对话历史；执行记录只带会话 id，不带 transcript。
-- 只监听回环、不鉴权，这是设计取舍（见上）。
+- 只监听回环、读接口不鉴权，这是设计取舍（见上）；写接口要令牌。
 - UI 文案目前只有中文；数据模型与接口是中性的。
 - prompt 里的 Markdown 是纯文本，这是故意的——DSH 聊天气泡不渲染 markdown。
 - 候选池是运行时数据，存在 `~/.dsh/rotation/candidates/`，不随项目 git 同步：换机器候选带不过去，

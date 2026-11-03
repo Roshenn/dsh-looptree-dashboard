@@ -44,6 +44,8 @@ try {
   await run(npm, ['run', 'mock:prompt']);
   console.log('── mock:registry ──');
   await run(npm, ['run', 'mock:registry']);
+  console.log('── mock:auth ──');
+  await run(npm, ['run', 'mock:auth'], { AUTH_MOCK_PORT: String(Number(port) + 6) });
   console.log('── mock:services ──');
   await run(npm, ['run', 'mock:services'], { PORT: String(Number(port) + 3) });
   console.log('── mock:services-batch ──');
