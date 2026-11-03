@@ -50,6 +50,9 @@
   - 因果：<causal>
   - 核心指标：<metric>
   - 实现思路：<approach>
+- 已有经验：<n> 条（避免重复踩坑）      ← 回流：milestone.lessons
+  - <本能力闭环自己的经验优先，其余按时间倒序>
+- 上次执行：<记录标题>（已完成/进行中）→ <证据，失败时是原因>
 
 要做什么
 1. 一行一个动作
@@ -101,8 +104,9 @@
 5. 单行视觉宽度 ≤ 72 列（CJK 记 2、ASCII 记 1），超了按标点/空格折行、续行缩进两格。
    代码块与 JSON 契约行不折。中文标签变长（如「承接能力闭环」）时优先换行，别破 72 列。
 6. 不用 `#` / `**` / `>`；唯一例外是「输出」块里要求模型产出的 markdown 小节。
-7. 动作 prompt ≤ 1500 字；超了把细节留在卡片里，用 id 引用。注入的长字段
-   （里程碑愿景 / 主要能力闭环 / 能力闭环四件套 / 计划步骤）有裁剪预算（120–220 字，`supportLines` /
+7. 动作 prompt 字数上限**按动作分开**：`plan` ≤ 1800、`exec` ≤ 1200、`reflect` ≤ 1200。
+   plan 多出的额度是给回流的（注入部分自己有 ≤320 字的预算，见下节）；超了把细节留在卡片里，用 id 引用。
+   注入的长字段（里程碑愿景 / 主要能力闭环 / 能力闭环四件套 / 计划步骤）有裁剪预算（120–220 字，`supportLines` /
    `numberedItems` / `clipText`），截断处标 `…（全文见卡片）`——全文本来就在 `rotation.json` 里，
    执行者需要时自己读。
 8. 不复述上下文；同一事实只出现一次。`背景` 已有能力闭环核心指标时，计划正文不再单列重复判据。
@@ -130,9 +134,24 @@
 | `capability.approach`（实现思路） | `背景` + 计划的思路骨架 | 核心思路，通俗简短；生成计划的前置条件（`409 FILL_REQUIRED`） |
 | `capability.plan`（计划书） | 执行计划时读 `plan.goal / verify / steps` | 由「生成计划」写回；缺失时执行被拒（`409 PLAN_MISSING`） |
 | `exec.verify` / `proof` / `issues[]` | 记录卡的 `当前节点` | 验证命令 / 证据 / 未处置反馈；执行完自动反馈提炼写 `milestone.lessons` |
+| `milestone.lessons`（经验积累） | 动作 `背景` 的「已有经验」 | 先取 `from` 前缀 = 本能力闭环 id 的（相关性高），其余按 `at` 倒序补齐；默认 3 条，`reflect` 看满 5 条做去重边界；单条裁剪 70 字 |
+| `capability.children[]` 的执行记录 | 动作 `背景` 的「上次执行」 | 取最近一条**执行类**记录（`action` 为空或 `exec`；计划 / 反馈记录不算）；摘要优先 `proof`，失败时用 `error`；裁剪 90 字 |
 
 `capability` / `necessity` / `causal` 是**只读三件套**（候选论证的落点），
 `metric` / `approach` 是**可写两项**（人的判断），两者在 prompt 里的注入位置一样、来源不同。
+
+### 回流（已有经验 / 上次执行）
+
+`lib/prompt.mjs` 的 `refluxLines()` 给三个动作 prompt 的 `背景` 补两段：`已有经验` 与 `上次执行`。
+这是「复盘写下的经验真的被下一次会话读到」的唯一通路——此前 `lessons` 只写不读，经验是一次性消耗品。
+
+- **注入不是装饰**：三个动作的指令块里各有一行要求引用它（计划「写清这次怎么避开」、
+  执行「先按已有经验处理」、提炼「已经有的不要重复输出」）。改了背景却不加这行，等于白注入。
+- **上限**：默认 3 条经验（`reflect` 5 条）、单条 70 字、记录摘要 90 字，整段注入 ≤320 字；
+  `plan` 的字数上限因此从 1500 提到 1800。
+- **关掉**：`prompt_context.reflux = 0`（节点级或卡片级都认）。批量迁移或某张卡经验太多时用它。
+- **验收**：`npm run mock:prompt` 的「回流」小节——覆盖本闭环经验优先、默认 3 条、`reflux=0` 关闭、
+  注入预算、三个动作各自都带回流且 lint 仍全绿。
 
 ### lint
 
@@ -296,15 +315,19 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 - 项目自定义：卡片根 `prompts.<类型>` 或节点 `prompts` 数组（节点级 > 卡片级 > 内置），
   类型是 `milestone` / `capability` / `exec`。
   `ask` 里写一行一个要求；多行会原样进「任务」块（过长会触发 lint 警告）。
-- 上下文取舍：`prompt_context.fields` 有序列表、`siblings` 条数、`refs` 引用节点；
-  处理逻辑见 `CTX_FIELDS`（旧键 `loop.*` / `goal.*` / `idea.*` 读入即映射成 `milestone.*` / `capability.*`）。
+- 上下文取舍：`prompt_context.fields` 有序列表、`siblings` 条数、`refs` 引用节点、
+  `reflux` 经验注入条数（`0` 关闭）；处理逻辑见 `CTX_FIELDS` 与 `refluxLines()`
+  （旧键 `loop.*` / `goal.*` / `idea.*` 读入即映射成 `milestone.*` / `capability.*`）。
 
 ## 八、验证
 
 ```bash
-npm run mock:prompt      # 结构 lint + 命令编排 + 契约字面量 + 覆盖优先级
+npm run mock:prompt      # 结构 lint + 命令编排 + 契约字面量 + 覆盖优先级 + 回流注入
 npm run mock:action      # 动作链路：/plan 多行正文、/goal 单行、覆盖发送、命令退路
 npm run mock:candidates  # 候选生成/采纳：排序、字段保留、409 CAPABILITIES_REQUIRED
 npm run mock:genbtn      # 「生成 N 项」的缺项表与按钮接线
 npm run preflight        # 全部自检
 ```
+
+`mock:prompt` 会遍历样例卡里每一个**能力闭环**跑 plan / exec / reflect 三条动作 prompt
+（2026-11-03 前这里判的是已退役的 `support`，整段静默跳过，「0 条动作 prompt」而无人发现）。

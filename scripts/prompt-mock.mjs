@@ -52,6 +52,13 @@ const blocksOk = (text) => {
   return lines[1] === '' && lines.filter((line, i) => i > 1 && line.trim() === '').length > 0;
 };
 
+/**
+ * 动作 prompt 的字数上限（气泡读得完为止）。
+ * plan 本来最长：完整背景 + 证据要求 + 输出契约；回流注入又占了其中 ≤320 字，
+ * 所以 plan 提到 1800，exec / reflect 按 1200 收（实测 740 / 487）。
+ */
+const ACTION_MAX = { plan: 1800, exec: 1200, reflect: 1200 };
+
 /* ── 1. 样例卡：每一类 prompt 都过结构 lint ── */
 const files = readdirSync(SAMPLES).filter((f) => f.endsWith('.rotation.json'));
 const cards = files.map((f) => ({ f, card: readCard(f) }));
@@ -81,8 +88,11 @@ for (const { f, card } of cards) {
       check(`${label} lint`, task.warnings.length === 0, JSON.stringify(task.warnings.slice(0, 3)));
       check(`${label} 无 markdown 粗体`, !task.prompt.includes('**'), '');
     }
-    // 动作只挂在支撑项上：计划 / 执行 / 反馈
-    if (node.kind === 'support') {
+    // 动作只挂在能力闭环上：计划 / 执行 / 反馈
+    // 2026-11-03：这里原本判 `kind === 'support'`，support 退役后整段断言静默跳过
+    //（输出「0 条动作 prompt」而没人发现）。改成 capability，动作 prompt 的长度与
+    // 结构才真的被守住；长度上限按 action 分开，不再对 reflect 用 plan 的额度。
+    if (node.kind === 'capability') {
       for (const action of ['plan', 'exec', 'reflect']) {
         actionCount += 1;
         const prompt = composeActionPrompt({ action, projectName: name, workspace, card, nodeId: node.id });
@@ -90,7 +100,7 @@ for (const { f, card } of cards) {
         check(`${label} 首行格式`, titleOk(prompt), lineOf(prompt, 0));
         check(`${label} 有空行分块`, blocksOk(prompt), '');
         check(`${label} lint`, lintPrompt(prompt).warnings.length === 0, JSON.stringify(lintPrompt(prompt).warnings.slice(0, 3)));
-        check(`${label} ≤1500 字`, [...prompt].length <= 1500, String([...prompt].length));
+        check(`${label} ≤${ACTION_MAX[action]} 字`, [...prompt].length <= ACTION_MAX[action], String([...prompt].length));
       }
       const objective = composeGoalObjective({ projectName: name, workspace, card, nodeId: node.id });
       check(`${f}/${node.id} /goal 单行`, !objective.includes('\n'), objective.slice(0, 40));
@@ -130,6 +140,38 @@ check('计划吃能力闭环的只读字段与落点', planText.includes('- 承�
 check('计划不出现已退役的验收判据', !planText.includes('## 验收') && !planText.includes('达成判据'), '');
 const reflectText = composeActionPrompt({ ...fxArgs, action: 'reflect' });
 check('反馈提炼要 JSON lessons', reflectText.includes('{"lessons"'));
+
+/* ── 3.8 回流：已有经验 + 上次执行进 plan / exec / reflect 的背景 ── */
+// 回流闭环（2026-11-03）：lessons 从「只写不读」变成真的进下一轮 prompt。
+// 样例卡 sw-i1 自带 lessons（from=sw-i1）+ 一条已完成的执行记录，可直接当夹具。
+const RE_FLUX_OFF = (() => {
+  const copy = JSON.parse(JSON.stringify(fx));
+  const cap = copy.milestone.children.find((x) => x.id === 'sw-i1');
+  cap.prompt_context = { reflux: 0 };
+  return copy;
+})();
+const refluxPlan = composePlanPrompt(fxArgs);
+const refluxOff = composePlanPrompt({ ...fxArgs, card: RE_FLUX_OFF });
+check('计划背景带本能力闭环的经验', refluxPlan.includes('- 已有经验：') && refluxPlan.includes('章节 id + 情节 id'), '');
+check('计划背景带上一次执行', refluxPlan.includes('- 上次执行：') && refluxPlan.includes('4 个测试用例全绿'), '');
+check('计划把「避开已知坑」写进成功标准', refluxPlan.includes('写清这次怎么避开'), '');
+check('回流先排本能力闭环自己的经验', refluxPlan.indexOf('三层图的数据底座') < refluxPlan.indexOf('首屏优化先埋点'), '');
+const refluxExec = composeActionPrompt({ ...fxArgs, action: 'exec' });
+check('执行背景带经验与上次执行', refluxExec.includes('- 已有经验：') && refluxExec.includes('- 上次执行：'), '');
+check('执行要求先按已有经验处理', refluxExec.includes('先按「已有经验」处理'), '');
+const refluxReflect = composeActionPrompt({ ...fxArgs, action: 'reflect' });
+check('提炼背景带已有经验（去重边界）', refluxReflect.includes('- 已有经验：') && refluxReflect.includes('已经有的不要重复输出'), '');
+check('提炼背景带上一次执行证据', refluxReflect.includes('- 上次执行：'), '');
+check('回流注入后 plan lint 仍全绿', lintPrompt(refluxPlan).warnings.length === 0, JSON.stringify(lintPrompt(refluxPlan).warnings.slice(0, 2)));
+check('回流注入后 reflect lint 仍全绿', lintPrompt(refluxReflect).warnings.length === 0, JSON.stringify(lintPrompt(refluxReflect).warnings.slice(0, 2)));
+const refluxInjected = [...refluxPlan].length - [...refluxOff].length;
+check('回流注入有预算（≤320 字）', refluxInjected > 0 && refluxInjected <= 320, String(refluxInjected));
+const manyLessons = JSON.parse(JSON.stringify(fx));
+manyLessons.milestone.lessons = Array.from({ length: 6 }, (_, i) => ({ text: `经验条目 ${i + 1}`, from: 'sw-i1', at: `2026-10-2${i}T00:00:00Z` }));
+const manyText = composePlanPrompt({ ...fxArgs, card: manyLessons });
+check('回流默认只带 3 条经验', manyText.includes('- 已有经验：3 条'), manyText.split('\n').find((l) => l.includes('已有经验')) || '');
+check('prompt_context.reflux = 0 关掉经验注入', !refluxOff.includes('- 已有经验：'), '');
+check('关掉经验注入不影响上次执行', refluxOff.includes('- 上次执行：'), '');
 
 /* ── 3.5 拆主要能力闭环：只输出 {"capabilities":[...]} ── */
 const splitText = composeSplitPrompt({ ...fxArgs, nodeId: 'sw-loop' });
