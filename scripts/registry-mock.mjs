@@ -15,6 +15,7 @@
  *   · 本机登记但卡片丢了 → 接管，注册表不留重复 id
  *   · 移除只删本机条目
  */
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,7 +28,16 @@ process.env.ROTATION_HOME = home;
 
 const store = await import('../lib/store.mjs');
 
-const FOREIGN = { id: 'english-shadow', name: 'english-shadow', workspace: 'I:\\dev\\business\\english-shadow', file: 'english-shadow.rotation.json' };
+/**
+ * 夹具：别的机器登记的那条，`workspace` 在本机必须**不存在**——
+ * `isLocalEntry()` 就是拿「目录在不在」区分本机与另一台机器的。
+ *
+ * 这里原本写死 `I:\dev\business\english-shadow`，而本机恰好有 I: 盘和这个目录，
+ * 于是它被判成本机条目，后面 7 条断言连锁失败。改成 tmpdir 下一条**从不创建**的路径，
+ * 与机器无关；下面那条 `check` 会把前提显式断言出来，破了就一眼看出原因。
+ */
+const FOREIGN_WS = join(tmpdir(), 'rotation-registry-foreign-machine', 'english-shadow');
+const FOREIGN = { id: 'english-shadow', name: 'english-shadow', workspace: FOREIGN_WS, file: 'english-shadow.rotation.json' };
 const REGISTRY = join(home, 'registry.json');
 const readReg = async () => JSON.parse(await readFile(REGISTRY, 'utf8'));
 let failed = 0;
@@ -56,6 +66,7 @@ await writeFile(join(ws, '.dsh', 'rotation.json'), JSON.stringify({
 
 await writeFile(REGISTRY, JSON.stringify([FOREIGN], null, 1));
 
+check(!existsSync(FOREIGN_WS), '夹具前提：别的机器路径在本机不存在');
 check((await store.listProjects()).length === 0, '别的机器条目不出现在本机项目列表');
 
 const added = await store.addProject({ name: 'english-shadow', workspace: ws }).catch((error) => error);
