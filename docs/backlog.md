@@ -11,6 +11,8 @@
 
 ## 〇、已落地
 
+- **零散但确定的小修（0.22.0）**：第五节 10 条全部完成（计划书校验的 support 残留、失败提示可回看、
+  顶栏时间、刷新进行态、候选池三态、会话入口、全局搜索、失败处理块 + 三方标签断言、写接口令牌、删除撤销）。
 - **回流闭环（0.21.0）**：`milestone.lessons` 与上一次执行记录进 plan / exec / reflect 的背景，
   `prompt_context.reflux` 可关。见 [prompts.md](prompts.md) 的「回流」节与 `CHANGELOG.md` 0.21.0。
 - 会话崩溃恢复（动作记录）：`resume` / `rebound` / `retry` / `abandon` + 启动对账（0.17.0 → 0.20.8）。
@@ -96,20 +98,27 @@
 
 ---
 
-## 五、零散但确定的小修
+## 五、零散但确定的小修（2026-11-03 全部完成，见 CHANGELOG 0.22.0）
 
-| # | 证据 | 现状 | 标注 |
+| # | 证据 | 当时的问题 | 现在 |
 |---|---|---|---|
-| 1 | `lib/core.mjs` 的计划书校验 | 仍判 `n.kind !== 'support'`，而 `support` 已退役——每次写 `capability.plan` 都吐一条假警告「只有支撑项挂计划书，这一项会被忽略」，把真告警稀释掉 | 必须现在（5 分钟） |
-| 2 | `web/index.html` `toast()` | 单槽、固定 2.4s、圆点恒绿，成功失败同函数；连续操作前一条被顶掉，失败无处回看 | 可延后 |
-| 3 | `web/index.html` 顶栏「数据 · 时间」 | 初值取 `cards.js` 样例的 `updated`，render 无条件写；只有手动刷新才重设，自动刷新不更新——显示的时间既不是数据时间也不随刷新变 | 必须现在 |
-| 4 | `web/index.html` `#btn-refresh` | 串行三请求，不进「刷新中」禁用态、无 `aria-busy` | 可延后 |
-| 5 | `web/index.html` `openCandidatePool` | 先 `await loadCandidates` 再开窗，失败被 catch 成空数组，标题统一写「已清空」——失败与真空池不可区分 | 可延后 |
-| 6 | `web/index.html` 信息列「会话 ↗」与聚焦视图会话行 | 落到 `data-act` 的 else 分支只 toast「原型未接宿主」，而旁边文案写着「点一行＝切回该会话」；可用的 `data-open-session` 就在附近 | 必须现在（接线即可） |
-| 7 | 全局搜索 | 只有 all / blocked / open 三颗预设筛选，`visibleProjects()` 按这两条过滤；节点多了只能翻或靠页脚随机跳 | 可延后 |
-| 8 | `docs/prompt-audit.md` §5 | 已写出二期落地方案（补 `证据要求 / 非目标 / 失败处理 / 示例` 四标签、10 条模板改写、三方一致性断言、按 action 长度断言），标「本阶段不执行」——其中长度断言已被 0.21.0 的 `ACTION_MAX` 部分补上 | 可延后 |
-| 9 | `lib/index.js` CORS 与鉴权 | `access-control-allow-origin: *`，声明了 `x-rotation-token` 但全仓没有读取该头的代码；本机任意页面能跨源调 `stop-all`（按端口杀进程）、`probe`（探任意地址）、`run`（起能 spawn shell 的会话） | 可延后（个人回环自用） |
-| 10 | `web/index.html` 长按删除 | `[data-del]` 绑定 pointerdown 长按 800ms 且 `preventDefault`，无键盘路径、无撤销 | 可延后 |
+| 1 | `lib/core.mjs` 的计划书校验 | 仍判 `n.kind !== 'support'`，`support` 已退役——每次写 `capability.plan` 都吐一条假警告，把真告警稀释掉 | ✅ 改成 `capability`；`checkPlan` 这才真正跑起来，`exec.plan` 仍正确告警 |
+| 2 | `web/index.html` `toast()` | 单槽、固定 2.4s、圆点恒绿；连续操作前一条被顶掉，失败无处回看 | ✅ 失败标红 + 停 8s + 可点掉，并在顶栏留一条「最近一次失败」直到点开 |
+| 3 | `web/index.html` 顶栏「数据 · 时间」 | 初值取 `cards.js` 样例的 `updated`，只有手动刷新才重设——显示的时间既不是数据时间也不随刷新变 | ✅ 改成 `markDataStamp()` 一处口径（首次载入 / 手动刷新 / 自动刷新都走它），没连上显示「—」 |
+| 4 | `web/index.html` `#btn-refresh` | 串行三请求，不进「刷新中」禁用态、无 `aria-busy` | ✅ 请求期间 `disabled` + `aria-busy`，连点不再叠请求 |
+| 5 | `web/index.html` `openCandidatePool` | 先 `await` 再开窗，失败被吞成 `[]`，标题统一写「已清空」 | ✅ 先开窗给「读取中」，读完分三态：列表 / 空池 / 读取失败 + 重试 |
+| 6 | `web/index.html` 信息列「会话 ↗」与聚焦视图会话行 | 只弹「原型未接宿主」，而可用的 `data-open-session` 就在旁边 | ✅ 接上真实 `/api/sessions` 列表；点一条切回该会话（独立打开时退化为看全文） |
+| 7 | 全局搜索 | 只有 all / blocked / open 三颗预设筛选，节点多了只能翻或靠页脚随机跳 | ✅ 顶栏搜索框（Ctrl/⌘+K 聚焦、Esc 清空）：按标题 / id / 证据 / 指标 / 实现思路 / 阻塞反馈过滤泳道，命中节点描边，提示条给命中数 |
+| 8 | `docs/prompt-audit.md` §5 | 已写出二期方案，标「本阶段不执行」 | ✅ 补 `失败处理` 块并真的写进「生成计划」；三方标签一致性改成**断言**（lib / docs / 面板 `PROMPT_BLOCKS` 直接比对）；退役的 `场景` / `验收` 从允许标签里清掉 |
+| 9 | `lib/index.js` CORS 与鉴权 | `access-control-allow-origin: *`，声明了 `x-rotation-token` 但全仓没读它——本机任意网页能跨源调 `stop-all` / `probe` / `run` | ✅ 写接口要令牌：每进程随机生成、只注入插件托管的面板 HTML；http(s) 跨源写无令牌 → 403。非浏览器客户端与 `dsh-app://` 放行，`ROTATION_TOKEN` 可固定。新增 `npm run mock:auth`（10 项）进 preflight |
+| 10 | `web/index.html` 长按删除 | `[data-del]` 绑 pointerdown 长按 800ms 且 `preventDefault`，无键盘路径、无撤销 | ✅ 补 Enter/Space 与 Delete/Backspace 两条键盘路径 + 删完可撤销；长按只对树节点生效，字段编辑器的 × 不再被一个删不掉的长按抢事件 |
+
+**顺带修掉的 pre-existing 问题**（不在本清单里，但挡着 preflight 绿）：
+
+- `scripts/registry-mock.mjs` 的把「另一台机器」写死成 `I:\dev\business\english-shadow`，
+  本机真有这个目录 → 7 项断言长期连锁失败。改成 tmpdir 下一条从不创建的路径。
+- `lib/services.mjs` 的「一键编译」用 `detached: true` + 管道 stdio，Windows 上输出整个丢掉
+  （退出码正常、`output` 恒空）。Windows 改不 detach、整组中止走 `taskkill /T`。
 
 ---
 
