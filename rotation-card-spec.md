@@ -287,6 +287,15 @@ DSH 崩溃或强制重启后，卡片不会再卡在 `session "…" already exis
 失败记录保持打开时不阻塞面板其它操作，但能力闭环不会自动收口；要么重跑成功（`outcome=success`），
 要么放弃后人工点「完成」。
 
+**无 `host` 的老记录（2026-11-03）**：2026-11-01 之前写下的记录没有 `session.host`，`reconcileOrphans`
+按「别机器的一律不动」的原则会永远跳过它们——卡片里写着 `running`，面板显示「进程已不在」，
+但既没有重跑 / 放弃按钮（`recordFailed` 只认 failed / cancelled / abandoned + error），
+父级能力闭环又因为「有未关记录」不给「完成」，整条分支死锁。
+现在 `recordFailed(n, p)` 多认一条：`session.status` 是 running / starting 但本机进程里没有对应 run
+（即面板已显示「进程已不在」）也算需要人工处理，重跑 / 放弃按钮随即出现。
+**不自动判死**：缺 `host` 时无法区分是哪台机器发起的，误判另一台正在跑的会话代价太大，
+所以这一类只给人工出口。
+
 ## 节点会话（可选，面板写入）
 
 节点上可挂 `session`，记录「这个节点对应的 DSH 会话」：

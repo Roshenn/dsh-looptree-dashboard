@@ -2545,7 +2545,7 @@ function nodeMarkup(n, p){
     ${n.hiddenClosed ? `<button class="foldchip" data-fold="${n.id}" title="把 ${n.hiddenClosed} 个已闭环节点收在这里，点开可看">▸ 已闭环 ${n.hiddenClosed}</button>` : ''}
     ${n.closedShown ? `<button class="foldchip on" data-fold="${n.id}" title="收起 ${n.closedShown} 个已闭环节点">▾ 收起已闭环 ${n.closedShown}</button>` : ''}
     ${issues}
-    ${recordErrorLine(n)}
+    ${recordErrorLine(n, p)}
     ${foldedMarkup(n)}
     ${(bars||lead||foot) ? `<div class="tfootline">${lead}${bars}<span class="grow"></span>${foot}</div>` : ''}
   </div>`;
@@ -3994,18 +3994,25 @@ function capabilityActionButtons(p, n, where){
 }
 
 /** 记录是否处于「需要人工处理」的失败态（失败 / 取消 / 人工放弃 / 进程已不在） */
-function recordFailed(n){
+function recordFailed(n, p){
   if (!isRecord(n)) return false;
   const raw = n.raw || {};
   const sess = raw.session || {};
   if (BAD_OUTCOMES.has(raw.outcome)) return true;
   if (BAD_OUTCOMES.has(sess.status)) return true;
+  // 卡片写着 running / starting，但本机进程里已经没有这条 run（显示成「进程已不在」）：
+  // 以前只有展示层降级成 stale，恢复按钮靠这里判定 → 老记录永远没有重跑 / 放弃，
+  // 父级能力闭环又因为「有未关记录」不给关，整条分支就死锁（0.20.8）
+  if (p && (sess.status === 'running' || sess.status === 'starting')) {
+    const r = runFor(p, n);
+    if (r && r.status === 'stale') return true;
+  }
   return !!raw.error && !n.closed;
 }
 
 /** 失败/陈旧记录的两条出口：重跑（原地复用记录）、放弃（关闭并写原因） */
 function recordRecoveryBtns(p, n){
-  if (!p || !recordFailed(n)) return '';
+  if (!p || !recordFailed(n, p)) return '';
   const rid = n.id;
   const retry = `<button class="tbtn primary" data-retry="${rid}" data-proj="${p.id}" title="原地重跑：复用这条记录，换一个新会话">重跑</button>`;
   const abandon = n.closed
@@ -4024,11 +4031,11 @@ function recordSourceNote(n){
 }
 
 /** 记录卡：失败的会话把错误摘要摆在卡片上（完成记录折叠进「已关闭」） */
-function recordErrorLine(n){
+function recordErrorLine(n, p){
   if (!isRecord(n)) return '';
   const sess = n.raw.session || {};
   const err = n.raw.error || sess.error || '';
-  if (!err || !recordFailed(n)) return '';
+  if (!err || !recordFailed(n, p)) return '';
   return `<div class="issue">⚠ ${esc(err.length > 140 ? err.slice(0, 140) + '…' : err)}</div>`;
 }
 
