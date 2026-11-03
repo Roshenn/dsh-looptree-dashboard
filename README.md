@@ -332,6 +332,7 @@ Architecture, event flow and directory map: [docs/architecture.md](docs/architec
 | [docs/dev-setup.md](docs/dev-setup.md) | setting up a machine to develop the plugin |
 | [CHANGELOG.md](CHANGELOG.md) | checking what changed between versions |
 | [docs/devlog.md](docs/devlog.md) | the historical log behind the current design |
+| [docs/backlog.md](docs/backlog.md) | catalogued-but-unbuilt improvements, grouped by loop and tagged "do now / defer" |
 
 ## Contributing
 

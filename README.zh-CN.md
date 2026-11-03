@@ -303,6 +303,7 @@ npm run check          # 对着正在跑的 DSH 验 health / panel / registry
 | [docs/dev-setup.md](docs/dev-setup.md) | 配一台机器来开发这个插件 |
 | [CHANGELOG.md](CHANGELOG.md) | 查版本之间改了什么 |
 | [docs/devlog.md](docs/devlog.md) | 当前设计背后的历史记录 |
+| [docs/backlog.md](docs/backlog.md) | 已盘点但还没做的提升点（按闭环分组，标了「必须现在 / 可延后」） |
 
 ## 贡献
 
