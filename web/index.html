@@ -79,6 +79,8 @@
   .chip:active{transform:scale(.97)}
   /* 全部服务批量操作：请求中禁用 + 关闭按钮用危险色 */
   .chip[aria-busy="true"]{opacity:.55;cursor:progress;pointer-events:none}
+  /* 刷新按钮（.iconbtn）：串行三请求期间锁住，避免连点叠请求 */
+  .iconbtn[aria-busy="true"]{opacity:.55;cursor:progress;pointer-events:none}
   .chip.chip-danger{color:color-mix(in srgb,var(--red) 74%,var(--tx2))}
   .chip.chip-danger:hover{color:var(--red);background:color-mix(in srgb,var(--red) 12%,transparent);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
   .hint{font-size:11.5px;color:var(--tx4)}
@@ -813,6 +815,19 @@
     transition:opacity 200ms var(--ease-out),transform 200ms var(--ease-out)}
   .toast[data-show="true"]{opacity:1;transform:translate(-50%,0)}
   .toast .dot{background:var(--green)}
+  /* 失败：标红、停久一点，并允许点掉（成功提示仍然轻量、点不到） */
+  .toast[data-tone="error"]{border-color:color-mix(in srgb,var(--red) 45%,var(--b2))}
+  .toast[data-tone="error"] .dot{background:var(--red)}
+  .toast[data-show="true"][data-tone="error"]{pointer-events:auto;cursor:pointer}
+  .toast[data-tone="error"] #toast-text{max-width:min(560px,70vw)}
+  /* 可撤销的提示：默认不拦鼠标，只有带动作时才可点 */
+  .toast .toast-act{font:inherit;font-size:12px;color:var(--brand);background:transparent;border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);
+    border-radius:6px;corner-shape:var(--corner);padding:2px 8px;margin-left:4px;cursor:pointer}
+  .toast .toast-act:hover{background:color-mix(in srgb,var(--brand) 14%,transparent)}
+  .toast[data-show="true"][data-act="1"]{pointer-events:auto}
+  /* 顶栏「最近一次失败」：toast 消失后还能回看（点开看完整原因） */
+  .chip#last-error{color:color-mix(in srgb,var(--red) 78%,var(--tx1))}
+  .chip#last-error:hover{color:var(--red);background:color-mix(in srgb,var(--red) 12%,transparent);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
 
   /* ───────── 等你选择：节点呼吸 + 「查看会话」主色（判据见 lib/runner.mjs 的 INTERACTIVE_TOOLS）───────── */
   .tnode[data-ask="1"]{border-color:color-mix(in srgb,var(--amber) 70%,var(--b1));
@@ -920,6 +935,7 @@
       <button class="chip chip-danger" id="svc-stop-all" title="所有项目：按端口结束监听进程（含终端里手动起的）">关闭全部服务</button>
       <span class="hint" id="save-state" style="margin-left:6px"></span>
       <span class="hint" id="data-src" style="margin-left:6px"></span>
+      <button class="chip" id="last-error" hidden title="最近一次失败；点开看完整原因">⚠ 最近一次失败</button>
     </div>
     <div class="grow"></div>
     <div id="focus-switch" class="chipbar" hidden></div>
@@ -1050,7 +1066,7 @@
 <!-- 候选池悬浮详情卡：body 级单例，绝不放进 #ask / 行内（见 CSS 注释） -->
 <div id="cand-tip" role="tooltip" aria-hidden="true" hidden></div>
 
-<div class="toast" id="toast" role="status"><span class="dot"></span><span id="toast-text"></span></div>
+<div class="toast" id="toast" role="status"><span class="dot"></span><span id="toast-text"></span><button class="toast-act" id="toast-act" type="button" hidden>撤销</button></div>
 
 <!-- 待处理交互托盘：会话挂在 ask 类工具上时出现，点一行直接切进那条会话 -->
 <aside class="asktray" id="ask-tray" hidden aria-label="待处理会话">
@@ -1802,9 +1818,15 @@ const USING_REAL = CARDS.length > 0;
 /* ─────────── 状态 ─────────── */
 const state = { view:'matrix', filter:'all', focusId:'', theme:'dark', stamp:'', hideClosed:false };
 state.focusId = (PROJECTS[0] && PROJECTS[0].id) || '';
-state.stamp = (CARDS[0] && CARDS[0].updated)
-  ? new Date(CARDS[0].updated).toLocaleString('sv-SE').slice(0,16)
-  : '2026-10-26 23:20';
+/**
+ * 顶栏「数据 · <时间>」= **最近一次成功拉到卡片**的时刻。
+ * 以前初值取 cards.js 样例里的 updated，那既不是数据时间也不是本次读取时刻；
+ * 而且只有手动刷新会重设，自动刷新（会话完成 / 窗口切回）不更新，等于一直显示一个旧值。
+ * 没连上服务时留空 → 顶栏显示「—」，不编一个时间出来。
+ */
+state.stamp = '';
+/** 卡片真的拉成功了才走这里：一处口径，手动刷新、自动刷新、首次载入都对得上 */
+function markDataStamp(){ state.stamp = new Date().toLocaleString('sv-SE').slice(0,16); }
 const collapsed = new Set();
 /** 内嵌浏览器打不开时留下的原因（{ file, id, why }），渲染在对应服务块里；
  *  只弹 toast 会随 2.4s 消失，用户回头根本看不到为什么退回了系统浏览器。 */
@@ -2866,13 +2888,11 @@ function renderFocus(){
         </ol>
       </section>
       <section class="pane">
-        <div class="pane-head"><span class="k">本项目最近会话</span><span class="n mono">${(p.sessions||[]).length} 条</span></div>
+        <div class="pane-head"><span class="k">本项目最近会话</span><span class="n mono" id="focus-sess-count">按需加载</span></div>
         <div class="sesslist">
-          ${(p.sessions||[]).map(x=>`<button class="sessrow" data-sess="${x.id}">
-            <span class="dot ${x.live?'doing':''}"></span><span class="sess-title">${x.title}</span>
-            <span class="sess-at mono">${x.at}</span></button>`).join('')}
+          <button class="tbtn" data-sess-list="focus">查看最近会话</button>
         </div>
-        <div class="pane-foot">点一行＝切回该会话，上下文由里程碑卡承担</div>
+        <div class="pane-foot">点一条＝切回该会话；独立打开面板时退化为看全文</div>
       </section>
       <section class="pane" style="grid-column:1/-1">
         <div class="pane-head"><span class="k">轮转轨迹</span><span class="n mono">自动记录</span></div>
@@ -2902,7 +2922,7 @@ function render(){
   $('#tab-focus').setAttribute('aria-pressed', state.view==='focus');
   $('#matrix').hidden = state.view!=='matrix';
   $('#focus').hidden = state.view!=='focus';
-  $('#stamp').textContent = state.stamp;
+  $('#stamp').textContent = state.stamp || '—';
   const src = $('#data-src');
   if (src) src.textContent = USING_REAL ? `数据源：${CARDS.length} 张 rotation/v1 卡` : '数据源：内置 mock';
   $('#toolbar-hint').textContent = state.view==='matrix'
@@ -4343,11 +4363,14 @@ function _openDetail(id, origin){
   setTimeout(showIt, 48);
 }
 
-/** 某项目在 DSH 里的最近会话列表（磁盘上的真实会话） */
-async function listProjectSessions(){
-  const p0 = detailNode ? findProjectByNode(detailNode) : null;
-  if (!p0 || !p0.file) return toast('先选中一个项目节点');
-  askConfirm('最近会话', `<div class="mnote">读取中…</div>`, '关闭', null);
+/**
+ * 某项目在 DSH 里的最近会话列表（磁盘上的真实会话）。
+ * @param {object} [project] 指定项目；省略时取当前详情节点所属项目（详情卡底部「最近会话」的老口径）。
+ */
+async function listProjectSessions(project){
+  const p0 = project || (detailNode ? findProjectByNode(detailNode) : null);
+  if (!p0 || !p0.file) return toast('这个项目还没有绑定卡片文件，读不到会话');
+  askConfirm(`最近会话 · ${p0.name || '项目'}`, `<div class="mnote">读取中…</div>`, '关闭', null);
   try {
     const r = await fetch(api('/sessions?file=' + encodeURIComponent(p0.file)));
     const j = await r.json();
@@ -4358,11 +4381,11 @@ async function listProjectSessions(){
       return;
     }
     body.innerHTML = `<div class="sess-list">${j.sessions.map((x) => `
-        <button class="tbtn sess-pick" data-view-session="${esc(x.id)}">
+        <button class="tbtn sess-pick" data-open-session="${esc(x.id)}">
           <span class="mono">${esc(String(x.id).replace(/^session-/, '').slice(0, 18))}…</span>
           <span class="mnote">${esc(String(x.updatedAt || '').slice(0, 16).replace('T', ' '))}</span>
         </button>`).join('')}</div>
-      <div class="mnote">点一条查看全文（${j.sessions.length} 条，按时间倒序）</div>`;
+      <div class="mnote">点一条切回该会话（独立打开面板时退化为看全文）· 共 ${j.sessions.length} 条，按时间倒序</div>`;
   } catch (error) {
     const body = $('#ask-body');
     if (body) body.innerHTML = `<div class="mnote">读取失败：${esc(error.message)}</div>`;
@@ -4539,16 +4562,32 @@ async function loadAllCandidateCounts(){
   await Promise.all(PROJECTS.filter(p => p.file).map(loadCandidateCounts));
 }
 
-async function loadCandidates(p, n){
-  if (!p || !n || !p.file) return [];
+/**
+ * 读候选池，并把「接口失败」与「真的没有候选」分开。
+ * 原来的 loadCandidates 把异常吞成缓存里的旧值（多数时候是 []），
+ * 上层再统一写成「已清空」——定位问题时完全看不出是哪一种。
+ * @returns {Promise<{ok:boolean, list:Array, error:string}>}
+ */
+async function loadCandidatesResult(p, n){
+  if (!p || !n || !p.file) return { ok: false, list: [], error: '这个节点还没有绑定卡片文件' };
   try {
     const r = await fetch(api(`/candidates?file=${encodeURIComponent(p.file)}&nodeId=${encodeURIComponent(n.id)}`));
-    const j = await r.json();
-    const list = (j.candidates || []);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) {
+      return { ok: false, list: [], error: (j && j.error) || `HTTP ${r.status}` };
+    }
+    const list = Array.isArray(j.candidates) ? j.candidates : [];
     CAND_POOL.set(candKeyOf(p, n), list);
     CAND_COUNTS.set(candKeyOf(p, n), list.length);
-    return list;
-  } catch { return CAND_POOL.get(candKeyOf(p, n)) || []; }
+    return { ok: true, list, error: '' };
+  } catch (error) {
+    return { ok: false, list: [], error: error.message || '读不到候选池' };
+  }
+}
+
+async function loadCandidates(p, n){
+  const res = await loadCandidatesResult(p, n);
+  return res.ok ? res.list : (CAND_POOL.get(candKeyOf(p, n)) || []);
 }
 
 async function generateCandidates(pid, nid, btn){
@@ -4728,7 +4767,9 @@ async function pollCapabilityAction({ pollKey, p0, n0, run, cfg }){
 }
 
 /** 候选池弹窗的临时状态：当前项目 / 节点、剩余候选顺序、本次已加入条数 */
-const CAND_META = { p0: null, n0: null, list: [], added: 0 };
+const CAND_META = { p0: null, n0: null, list: [], added: 0, error: '' };
+/** 候选池窗口的「读取中」正文；再用它判断这一窗还是不是我们开的（读的过程中可能被关掉/换掉） */
+const CAND_LOADING_HTML = '<div class="mnote" data-cand-loading="1">读取中…</div>';
 let CAND_UID = 0;
 /** 每行只认前端一次性 uid；服务器索引在每次操作时现算，避免删除/添加后错位 */
 const candUid = (c) => c.__uid || (c.__uid = ++CAND_UID);
@@ -4849,14 +4890,26 @@ const candNoteText = () => {
   return '一条主要能力闭环对应一条候选（1:1，条数由能力闭环决定）；重要度 5 最高、1 最低，未评分显示「–」。点「添加」写入为子节点，悬停候选行或 Tab 聚焦可看模块归属 / 缺失影响 / 协同面。';
 };
 
-const candPoolBody = () => CAND_META.list.length
-  ? `<div class="cand-list">${CAND_META.list.map((c) => candRowHtml(c, CAND_META.p0, CAND_META.n0)).join('')}</div>
+const candPoolBody = () => CAND_META.error
+  ? `<div class="cand-list"><div class="mnote" style="color:var(--red)">读不到候选池：${esc(CAND_META.error)}</div>
+      <div class="mnote">候选池存在本地 <span class="mono">~/.dsh/rotation/candidates/</span>，读不到通常是宿主还没应答。</div>
+      <button class="tbtn" data-cand-retry="1">重试</button></div>`
+  : CAND_META.list.length
+    ? `<div class="cand-list">${CAND_META.list.map((c) => candRowHtml(c, CAND_META.p0, CAND_META.n0)).join('')}</div>
     <div class="mnote">${candNoteText()}</div>`
-  : `<div class="cand-list">${candEmptyHtml(CAND_META.added)}</div>`;
+    : `<div class="cand-list">${candEmptyHtml(CAND_META.added)}</div>`;
 
 /** 标题计数与底部按钮换挡；行内容交给退场动画处理，不整窗重建 */
 function paintCandChrome(){
   const n = CAND_META.list.length;
+  if (CAND_META.error){
+    $('#ask-title').textContent = '候选池 · 读取失败';
+    $('#ask-ok').textContent = '关闭';
+    askCb = null;
+    hideCandTip();
+    $('#ask-cancel').style.display = 'none';
+    return;
+  }
   $('#ask-title').textContent = n ? `候选池 · ${n} 条` : '候选池 · 已清空';
   $('#ask-ok').textContent = n ? '清空候选池' : '关闭';
   if (!n){
@@ -4888,28 +4941,32 @@ function paintPoolButtons(){
 async function openCandidatePool(pid, nid){
   const p0 = PROJECTS.find(x => x.id === pid), n0 = p0 && findNode(p0.root, nid);
   if (!p0 || !n0) return;
-  const list = await loadCandidates(p0, n0);
   CAND_META.p0 = p0; CAND_META.n0 = n0;
-  CAND_META.list = list.slice();
-  CAND_META.added = 0;
+  CAND_META.list = []; CAND_META.added = 0; CAND_META.error = '';
   hideCandTip();
+  // 先开窗再读：本地接口也可能卡（宿主没挂上时每个候选地址要各等 1.5s），
+  // 以前是 await 完才开窗，读失败又被吞成 []，窗一开就写「已清空」——看不出是哪种空。
+  askConfirm('候选池 · 读取中…', CAND_LOADING_HTML, '关闭', null);
   paintPoolButtons();
-  askConfirm(
-    CAND_META.list.length ? `候选池 · ${CAND_META.list.length} 条` : '候选池 · 已清空',
-    candPoolBody(),
-    CAND_META.list.length ? '清空候选池' : '关闭',
-    CAND_META.list.length ? async () => {
-      hideCandTip();
-      await fetch(api('/candidates/delete'), {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ file: CAND_META.p0.file, nodeId: CAND_META.n0.id, all: true }),
-      });
-      await loadCandidates(CAND_META.p0, CAND_META.n0);
-      CAND_META.list = [];
-      paintPoolButtons();
-      toast('候选池已清空');
-    } : null,
-  );
+  const res = await loadCandidatesResult(p0, n0);
+  const body = $('#ask-body');
+  // 读的这段时间里窗口可能被关掉或被别的窗替换：只在还是这一窗时换正文
+  if (!body || !body.querySelector('[data-cand-loading]')) return;
+  if (res.ok){ CAND_META.list = res.list.slice(); CAND_META.error = ''; }
+  else { CAND_META.list = []; CAND_META.error = res.error || '读不到候选池'; }
+  body.innerHTML = candPoolBody();
+  paintCandChrome();
+  askCb = CAND_META.list.length ? async () => {
+    hideCandTip();
+    await fetch(api('/candidates/delete'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file: CAND_META.p0.file, nodeId: CAND_META.n0.id, all: true }),
+    });
+    await loadCandidates(CAND_META.p0, CAND_META.n0);
+    CAND_META.list = [];
+    paintPoolButtons();
+    toast('候选池已清空');
+  } : null;
   bindCandTip();   // 悬停 / Tab 聚焦出悬浮卡；scroll / resize / 关窗时收起
 }
 
@@ -5074,6 +5131,7 @@ async function reloadProjects(){
     const j = await r.json();
     const list = (j.cards || []).filter(x => x.card);
     PROJECTS = list.map(x => cardToProject(x.card, x.file));
+    markDataStamp();                  // 顶栏时间只跟「这次真的拉到了卡片」走
     promptCache.clear();              // 卡片变了，prompt 的上下文也跟着变
     await loadAllCandidateCounts();   // 节点卡上的「候选池 n」要跟着卡片一起刷新
     render();
@@ -5273,7 +5331,7 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
       <div class="fp-item" data-hue="${i % 6}" data-i="${i}">
         <div class="fp-item-idx">${numbered ? i + 1 : '·'}</div>
         <textarea class="fp-item-body" data-body="${i}" rows="2" spellcheck="false">${esc(it.content || '')}</textarea>
-        <button class="fp-item-del" type="button" data-del="${i}" title="删除这一条" aria-label="删除第 ${i + 1} 条">×</button>
+        <button class="fp-item-del" type="button" data-del="${i}" title="删除这一条（可点、回车或 Delete，删完能撤销）" aria-label="删除第 ${i + 1} 条">×</button>
       </div>`).join('');
     listEl.querySelectorAll('[data-body]').forEach((el) => {
       el.addEventListener('input', () => {
@@ -5283,14 +5341,37 @@ function openFieldEditor(label, value, nodeLabel, maxLen = 300, opts = {}){
         syncCount();
       });
     });
+    /** 删掉第 idx 条并给一次撤销；键鼠两条路都走它，长按点击也走它 */
+    const removeAt = (idx) => {
+      const removed = items[idx];
+      if (!removed) return;
+      items.splice(idx, 1);
+      const addedPlaceholder = !items.length;
+      if (addedPlaceholder) items.push({ content: '' });   // 至少留一个空块，不然没地方写
+      renderItems();
+      syncCount();
+      toast(`已删除第 ${idx + 1} 条`, 'ok', {
+        label: '撤销',
+        onClick: () => {
+          if (addedPlaceholder && items.length === 1 && !String(items[0].content || '').trim()) items.pop();
+          items.splice(Math.min(idx, items.length), 0, removed);
+          renderItems();
+          syncCount();
+        },
+      });
+    };
     listEl.querySelectorAll('[data-del]').forEach((el) => {
       el.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        items.splice(Number(el.dataset.del), 1);
-        if (!items.length) items.push({ content: '' });   // 至少留一个空块，不然没地方写
-        renderItems();
-        syncCount();
+        removeAt(Number(el.dataset.del));
+      });
+      // 键盘路径：按钮本身能被 Enter/Space 触发，另外让 Delete / Backspace 直接删
+      el.addEventListener('keydown', (event) => {
+        if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+        event.preventDefault();
+        event.stopPropagation();
+        removeAt(Number(el.dataset.del));
       });
     });
   }
@@ -6337,11 +6418,39 @@ document.addEventListener('change', (e) => {
 });
 
 let toastTimer;
-function toast(msg){
-  $('#toast-text').textContent = msg;
-  $('#toast').dataset.show = 'true';
+let toastAction = null;   // 当前提示带的动作（撤销之类），由 toast() 的第三参写入
+/**
+ * 失败提示的判据：文案里带这些词的当失败处理（标红、停 8s、留一条可回看）。
+ * 需要强制指定时传第二参：`toast(msg, 'error')` / `toast(msg, 'ok')`。
+ * 之前所有提示共用一个绿点 + 2.4s，连点两下前一条被顶掉，失败根本回看不到。
+ */
+const FAILURE_TEXT = /(失败|错误|异常|连不上|未连接|无法|不能|被拒|超时)/;
+let LAST_ERROR = '';
+function paintLastError(){
+  const btn = $('#last-error');
+  if (!btn) return;
+  btn.hidden = !LAST_ERROR;
+  if (LAST_ERROR) btn.title = `最近一次失败：${LAST_ERROR}（点开看完整原因）`;
+}
+function toast(msg, tone, action){
+  const text = String(msg == null ? '' : msg);
+  const isError = tone === 'error' || (tone == null && FAILURE_TEXT.test(text));
+  const el = $('#toast');
+  el.dataset.tone = isError ? 'error' : 'ok';
+  $('#toast-text').textContent = text;
+  // 带动作的提示（撤销之类）：弹出按钮，点击后自己收掉；下次 toast 一律先清掉
+  const act = $('#toast-act');
+  if (act){
+    act.hidden = !action;
+    el.dataset.act = action ? '1' : '0';
+    toastAction = action || null;
+    if (action) act.textContent = action.label || '撤销';
+  }
+  el.dataset.show = 'true';
+  if (isError){ LAST_ERROR = text; paintLastError(); }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>{ $('#toast').dataset.show='false'; }, 2400);
+  const dwell = action ? 6000 : (isError ? 8000 : 2400);
+  toastTimer = setTimeout(() => { el.dataset.show = 'false'; }, dwell);
 }
 
 /* ─────────── 事件 ─────────── */
@@ -6353,14 +6462,45 @@ const freshJump = $('#fresh-jump');
 if (freshJump) freshJump.addEventListener('click', jumpToNextUpdated);   // 页脚「已更新 N →」：跳到下一个有新内容的节点
 window.addEventListener('pagehide', stopActionPolls);
 $('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
+// 失败提示的两条出口：点 toast 收掉；顶栏「最近一次失败」留到你点开为止
+$('#toast').addEventListener('click', ()=>{
+  if ($('#toast').dataset.tone !== 'error') return;
+  $('#toast').dataset.show = 'false';
+});
+// 「撤销」：动作由发起方塞进 toast()，执行完立刻收掉提示
+$('#toast-act').addEventListener('click', (event)=>{
+  event.stopPropagation();
+  const action = toastAction;
+  toastAction = null;
+  $('#toast').dataset.show = 'false';
+  $('#toast-act').hidden = true;
+  $('#toast').dataset.act = '0';
+  if (action && typeof action.onClick === 'function') action.onClick();
+});
+$('#last-error').addEventListener('click', ()=>{
+  const text = LAST_ERROR;
+  LAST_ERROR = '';
+  paintLastError();
+  askInfo('最近一次失败',
+    `<pre class="pgen" style="white-space:pre-wrap;max-height:340px">${esc(text)}</pre>
+     <div class="mnote">成功提示只在右下角停 2.4s；失败会停 8s，并在这里留到你点开为止。</div>`);
+});
 // 刷新：真实重新拉一次 /api/cards + 服务/会话状态，再报数量（旧版只重绘内存，提示还写着 mock）
 $('#btn-refresh').addEventListener('click', async ()=>{
-  const ok = await reloadProjects();
-  if (ok) await refreshServices();
-  if (ok) refreshRuns();
-  state.stamp = new Date().toLocaleString('sv-SE').slice(0,16);
-  render();
-  toast(ok ? `已刷新 · ${PROJECTS.length} 个项目` : '刷新失败：连不上本地服务');
+  const btn = $('#btn-refresh');
+  if (btn.disabled) return;              // 连点不再叠三请求
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  try {
+    const ok = await reloadProjects();   // 成功时 reloadProjects 内部已刷新顶栏时间
+    if (ok) await refreshServices();
+    if (ok) refreshRuns();
+    render();
+    toast(ok ? `已刷新 · ${PROJECTS.length} 个项目` : '刷新失败：连不上本地服务');
+  } finally {
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+  }
 });
 $('#export-json').addEventListener('click', () => exportCard());
 // 全部服务：跨项目批量拉起 / 按端口批量关闭（host 端做端口冲突预检）
@@ -6524,10 +6664,13 @@ function startHold(button, onDone){
 document.addEventListener('pointerdown', (event) => {
   const btn = event.target.closest('[data-del]');
   if (!btn || btn.disabled) return;
-  event.preventDefault();
-  event.stopPropagation();
   const id = btn.dataset.del;
   const p0 = findProjectByNode(id);
+  // 字段编辑器条目行的 × 带的是「第几条」而不是节点 id：没有对应节点就交回给点击，
+  // 不抢事件、也不装出一个删不掉的长按蓄力。
+  if (!p0) return;
+  event.preventDefault();
+  event.stopPropagation();
   startHold(btn, () => deleteNode(p0, id));
 }, true);
 ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => {
@@ -6592,7 +6735,13 @@ document.addEventListener('click', (e)=>{
   // 详情卡内部交互
   if (e.target.closest('#detail-x')){ closeDetail(); return; }
   const sessList = e.target.closest('[data-sess-list]');
-  if (sessList){ listProjectSessions(); return; }
+  if (sessList){
+    // 聚焦视图里没有打开的详情卡，项目要从 state.focusId 取；详情卡底部则沿用「当前详情项目」
+    listProjectSessions(sessList.dataset.sessList === 'focus'
+      ? PROJECTS.find(x => x.id === state.focusId)
+      : undefined);
+    return;
+  }
   const openSess = e.target.closest('[data-open-session]');
   if (openSess){ openInDsh(openSess.dataset.openSession); return; }
   // 待处理托盘：点行直接切会话；点标题右侧按钮折叠 / 展开
@@ -6603,8 +6752,6 @@ document.addEventListener('click', (e)=>{
     applyAskTrayCollapsed();
     return;
   }
-  const viewSess = e.target.closest('[data-view-session]');
-  if (viewSess){ viewSession(viewSess.dataset.viewSession); return; }
   const retryBtn = e.target.closest('[data-retry]');
   if (retryBtn){
     const p0 = PROJECTS.find(x => x.id === retryBtn.dataset.proj);
@@ -6683,6 +6830,12 @@ document.addEventListener('click', (e)=>{
       if (up0){ toast(`上游「${up0.title || up0.id}」正在生成，先等它结束`); return; }
       generateMissing(genBtn.dataset.proj, genBtn.dataset.nid, genBtn);
     }
+    return;
+  }
+  const candRetry = e.target.closest('[data-cand-retry]');
+  if (candRetry){
+    e.stopPropagation();
+    if (CAND_META.p0 && CAND_META.n0) openCandidatePool(CAND_META.p0.id, CAND_META.n0.id);
     return;
   }
   const delBtn = e.target.closest('[data-del]');
@@ -6934,7 +7087,7 @@ document.addEventListener('click', (e)=>{
   const exp = e.target.closest('[data-export]');
   if (exp){ const p0 = PROJECTS.find(x=>x.id===exp.dataset.export); if (p0) exportCard(p0); return; }
   const sess = e.target.closest('[data-sess]');
-  if (sess){ toast(`已请求切回会话 ${sess.dataset.sess}（原型未接宿主）`); return; }
+  if (sess){ openInDsh(sess.dataset.sess); return; }
   const projVisionBtn = e.target.closest('[data-proj-vision]');
   if (projVisionBtn){ e.stopPropagation(); editProjectVision(); return; }
   const histView = e.target.closest('[data-hist-view]');
@@ -6966,7 +7119,7 @@ document.addEventListener('click', (e)=>{
     }
     else if (act.dataset.act==='history') openProjectHistory(p);
     else if (act.dataset.act==='new-loop') newLoopConfirm(p);
-    else toast(`已请求打开 ${p.name} 的最近会话 ${p.session}（原型未接宿主）`);
+    else if (act.dataset.act==='open') listProjectSessions(p);   // 真实会话列表；以前这里只弹「原型未接宿主」
   }
 });
 window.addEventListener('resize', ()=>{ hideCandTip(); render(); });
@@ -6998,6 +7151,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
         // 不能退回 cards.js 样例，否则用户永远看不到空状态引导。
         const list = (j.cards || []).filter(x => x.card);
         PROJECTS = list.map(x => cardToProject(x.card, x.file));
+        markDataStamp();   // 连上了并且真的读到了卡片，顶栏才有时间
         source = 'server';
       }
     } catch {}
