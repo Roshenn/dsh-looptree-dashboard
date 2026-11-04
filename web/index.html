@@ -4497,6 +4497,7 @@ window.addEventListener('message', (e) => {
   dshUrlPending.delete(d.reqId);
   clearTimeout(pending.timer);
   if (!d.ok) return pending.fallback(d.error || 'DSH 没有打开内嵌浏览器');
+  if (d.note) toast(d.note);
   // 这次开成了：把同一条服务上的失败提示收掉
   if (svcOpenFail && pending.at && svcOpenFail.file === pending.at.file && svcOpenFail.id === pending.at.id){
     svcOpenFail = null;
@@ -4514,11 +4515,27 @@ function openInSystemBrowser(url){
   }
 }
 
-function openInDshBrowser(url, at){
+/** 打开服务前先问一句：这个项目该落在哪条会话。
+ *  会话 = 该项目工作区里最近活跃的一条（目录 mtime 最新）；一条都没有时只带 workspaceId，
+ *  由宿主 client 半新建一条。读不到（接口失败 / 没绑卡片文件）返回 null，退回老行为。 */
+async function resolveProjectSession(p0){
+  if (!p0 || !p0.file) return null;
+  try {
+    const res = await fetch(api('/sessions?file=' + encodeURIComponent(p0.file)));
+    const j = await res.json().catch(() => ({}));
+    if (!j || !j.ok) return null;
+    const first = (j.sessions || [])[0];
+    return { sessionId: (first && first.id) || '', workspaceId: j.workspaceId || '' };
+  } catch { return null; }
+}
+
+async function openInDshBrowser(url, at, p0){
   if (!url) return;
   let embedded = false;
   try { embedded = !!(window.parent && window.parent !== window); } catch { embedded = false; }
   if (!embedded) return openInSystemBrowser(url);
+  // 不带会话 id 时页面会开在「当前这条会话」的右栏：多项目并行就串台
+  const target = await resolveProjectSession(p0);
   const reqId = 'rotation-url-' + (++dshUrlSeq);
   const fallback = (why) => {
     // 失败原因留在服务块里：toast 只活 2.4s，用户回头看时只剩「怎么又开 Chrome」
@@ -4526,14 +4543,21 @@ function openInDshBrowser(url, at){
     toast(`内嵌浏览器不可用（${why}），已改用默认浏览器`);
     openInSystemBrowser(url);
   };
+  const switching = !!(target && (target.sessionId || target.workspaceId));
   const timer = setTimeout(() => {
     if (!dshUrlPending.has(reqId)) return;
     dshUrlPending.delete(reqId);
     fallback('宿主没有响应');
-  }, 3000);   // 宿主可能要等右栏挂载后再重试开 tab（约 0.9s），别过早判成失败
+  }, switching ? 8000 : 3000);
+  // 切会话要等宿主渲染出新会话的右栏（最坏约 1.8s 轮询 + 0.9s 重试），所以带会话时放宽到 8s
   dshUrlPending.set(reqId, { timer, fallback, at });
   try {
-    window.parent.postMessage({ type: 'rotation-open-url', url: String(url), reqId }, '*');
+    window.parent.postMessage({
+      type: 'rotation-open-url', url: String(url), reqId,
+      sessionId: (target && target.sessionId) || '',
+      workspaceId: (target && target.workspaceId) || '',
+      project: (p0 && (p0.name || p0.id)) || '',
+    }, '*');
   } catch (error) {
     clearTimeout(timer);
     dshUrlPending.delete(reqId);
@@ -6961,8 +6985,8 @@ document.addEventListener('click', (e)=>{
       const u = svc.health
         ? new URL(String(svc.health).replace(/^\//, ''), svc.url.endsWith('/') ? svc.url : svc.url + '/').toString()
         : svc.url;
-      openInDshBrowser(u, at);
-    } else if (svc){ openInDshBrowser(svc.url, at); }
+      openInDshBrowser(u, at, p0);
+    } else if (svc){ openInDshBrowser(svc.url, at, p0); }
     return;
   }
   const svcCopy = e.target.closest('[data-svc-copy]');

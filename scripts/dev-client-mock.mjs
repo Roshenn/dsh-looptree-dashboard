@@ -10,6 +10,7 @@
  *   3) apply(ctx) 在提供 slots 时会注册 sidebar.right.pane.tab 与 .title
  *   4) 插槽的名字 / key / 组件形状符合现有插件的写法
  *   5) 没有 slots 时静默降级，不抛错
+ *   6) 打开服务时先切到面板给的项目会话，再把它开在那条会话的右栏（多项目并行不串台）
  */
 import { readFile } from 'node:fs/promises';
 
@@ -99,6 +100,66 @@ ok('内嵌浏览器可用时开 browser tab', openCalls.length === 1 && openCall
 ok('带原地址与 params', openCalls[0]?.[1]?.params?.url === 'http://127.0.0.1:40100/',
   JSON.stringify(openCalls[0]?.[1]));
 ok('成功回执 ok=true', replies.length === 1 && replies[0].ok === true, JSON.stringify(replies[0]));
+
+// ── 会话绑定：面板带了 sessionId 时，先切会话，再开在那条会话的右栏 ──
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+openCalls.length = 0;
+const sessionCalls = [];
+services = {
+  sidebarRight: {
+    openTab: (...args) => openCalls.push(args),
+    screen: () => ({ sessionId: 'session-aaaa', surface: { layout: {} } }),
+  },
+  uiWorkspace: { openSession: (id) => sessionCalls.push(id) },
+};
+replies = dispatch({
+  type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u1b',
+  sessionId: 'session-aaaa', project: 'english-chunk',
+});
+await sleep(80);
+ok('带 sessionId 时先切到该会话', sessionCalls[0] === 'session-aaaa', JSON.stringify(sessionCalls));
+ok('切完再开右栏 tab', openCalls.length === 1 && replies[0]?.ok === true, JSON.stringify(replies[0]));
+ok('回执写清切到了哪个项目', /english-chunk/.test(replies[0]?.note || ''), JSON.stringify(replies[0]));
+
+// 工作区里一条会话都没有：按 workspaceId 新建一条，再开在它的右栏
+openCalls.length = 0;
+sessionCalls.length = 0;
+const connectCalls = [];
+services = {
+  sidebarRight: {
+    openTab: (...args) => openCalls.push(args),
+    screen: () => ({ sessionId: 'session-new', surface: { layout: {} } }),
+  },
+  uiWorkspace: {
+    openSession: (id) => sessionCalls.push(id),
+    connectWorkspace: async (id) => { connectCalls.push(id); return 'session-new'; },
+  },
+};
+replies = dispatch({
+  type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u1c',
+  workspaceId: 'ws-english-chunk', project: 'english-chunk',
+});
+await sleep(120);
+ok('没有会话时按 workspaceId 新建', connectCalls[0] === 'ws-english-chunk', JSON.stringify(connectCalls));
+ok('新建的会话被选中', sessionCalls[0] === 'session-new', JSON.stringify(sessionCalls));
+ok('新建后照样开成右栏 tab', replies[0]?.ok === true && replies[0]?.mode === 'sidebar', JSON.stringify(replies[0]));
+
+// 宿主拿不到 uiWorkspace：不阻断，退回当前会话打开，并把原因写回面板
+openCalls.length = 0;
+services = {
+  sidebarRight: {
+    openTab: (...args) => openCalls.push(args),
+    screen: () => ({ sessionId: 'session-other', surface: { layout: {} } }),
+  },
+};
+replies = dispatch({
+  type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u1d',
+  sessionId: 'session-aaaa', project: 'english-chunk',
+});
+await sleep(80);
+ok('切不了会话时仍用当前会话打开', openCalls.length === 1 && replies[0]?.ok === true,
+  JSON.stringify(replies[0]));
+ok('失败原因随回执带回面板', /切换会话失败/.test(replies[0]?.note || ''), JSON.stringify(replies[0]));
 
 openCalls.length = 0;
 services = {};

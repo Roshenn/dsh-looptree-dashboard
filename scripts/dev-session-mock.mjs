@@ -30,6 +30,8 @@ const ctx = {
     return () => handlers.get(event).delete(handler);
   },
   agentDefaultModel: { currentSelection: () => ({ provider: 'mock-provider', model: 'mock-model' }) },
+  // 面板「打开服务」要按项目工作区找会话：/sessions 得带 workspaceId（真机由 workspaceRegistry 提供）
+  workspaceRegistry: { async resolveByPath(path) { return { id: 'ws-mock', path }; } },
   sessions: { get: () => null },
   agents: {
     async create({ sessionId, meta, agentOptions }) {
@@ -91,6 +93,13 @@ const fetchJson = async (path, init) => {
 server.listen(PORT, '127.0.0.1', async () => {
   console.log(`[mock] ${project.id} → ${project.workspace}`);
 
+  // 面板「打开」前先问会话：这条接口带回 workspaceId，工作区没有会话时靠它新建
+  const sessions = await fetchJson('/sessions?file=' + encodeURIComponent(project.id));
+  const sessionsOk = sessions.status === 200 && sessions.body?.ok === true
+    && Array.isArray(sessions.body.sessions) && sessions.body.workspaceId === 'ws-mock';
+  console.log('[mock] GET /sessions →', sessions.status, sessions.body?.workspaceId,
+    sessions.body?.sessions?.length ?? '-');
+
   const started = await fetchJson('/run', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -120,6 +129,7 @@ server.listen(PORT, '127.0.0.1', async () => {
   } else {
     ok = run.status === 'done' && /MOCK 回答/.test(run.result || '') && node?.session?.status === 'done';
   }
+  ok = ok && sessionsOk;
   console.log(ok ? '[mock] PASS' : '[mock] FAIL');
   server.close();
   process.exit(ok ? 0 : 1);

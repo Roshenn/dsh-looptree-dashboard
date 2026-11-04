@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 未发布 — 打开服务先落到该项目工作区的会话，多项目并行不再串台
+
+- **问题**（2026-11-04）：面板点服务的「打开」，页面会开在**当前这条会话的右栏**。面板是主区页面，
+  本身不绑定会话，所以你在 A 项目的会话里点了 B 项目的服务，B 的页面就落进 A 的会话——
+  多项目并行时打开的服务和内嵌浏览器对不上工作区。
+- **诊断**：`rotation-open-url` 只带了地址，`lib/client.js` 拿到后直接
+  `sidebarRight.openTab('browser')`，而 `openTab` 的落点由 `sidebarRight` 的 on-screen 会话决定；
+  面板这一侧从头到尾没说过「这个服务属于哪个项目」。
+- **修**：面板点「打开」时先问 `/api/sessions?file=<项目>`（该项目工作区 mtime 最新的会话），
+  把 `sessionId`（没有会话时带 `workspaceId`）随消息发给宿主。client 半先
+  `uiWorkspace.openSession(id)` 把主区切过去，**再**开右栏 tab；一条会话都没有的工作区用
+  `uiWorkspace.connectWorkspace(workspaceId)` 新建一条再切（`/api/sessions` 新增 `workspaceId`
+  字段，由 host 的 `workspaceRegistry.resolveByPath` 解析）。切会话与开 tab 之间靠
+  `sidebarRight.screen()` 轮询确认主区真的换了会话——早一帧开 tab 会开在旧会话的右栏。
+  拿不到 `uiWorkspace` / 切不过去时退回「用当前会话打开」并把原因写回提示，不阻断操作。
+- **验证**：`npm run mock:client` 新增 6 条断言（先切后开、按 workspaceId 新建、切换失败回退）；
+  `npm run mock:session` 新增 `/api/sessions` 带 `workspaceId` 的断言；`npm run preflight` 全绿。
+  真机验证需要重启 DSH 让 host 半重新加载（面板侧刷新即可）。
+
 ## 未发布 — Windows 一键拉起不再弹控制台黑窗，停止改整树结束
 
 - **问题**（2026-11-03，Windows）：面板点「启动」会弹出一个空的 Windows Terminal / conhost 窗口。
