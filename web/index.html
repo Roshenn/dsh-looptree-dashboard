@@ -1585,8 +1585,8 @@ const runMap = new Map();           // `${file}::${nodeId}` -> run
 const runKey = (p, n) => `${p.file || ''}::${n.id}`;
 const serviceMap = new Map();      // file -> [{ id, name, url, status, latencyMs, ... }]
 let servicePlatform = { id: '', label: '当前平台' };   // 当前宿主平台（host 用 process.platform 解析 start）
-const SVC_LABEL = { up:'运行中', down:'未启动', starting:'启动中', failed:'启动失败' };
-const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)', failed:'var(--red)' };
+const SVC_LABEL = { up:'运行中', down:'未启动', starting:'启动中', failed:'启动失败', watch:'不探活' };
+const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)', failed:'var(--red)', watch:'var(--tx3)' };
 
 /* 「一键拉起」按钮的瞬时状态机：idle → loading → check / error → idle。
    存在 Map 里而不是 DOM 上：服务块每 5s 会被整体重画一次，DOM 上的状态会被抹掉。 */
@@ -2094,15 +2094,19 @@ function svcRows(p){
     const ph = svcPhaseOf(p.file, svc.id);
     const isRunning = svc.status === 'up' || svc.status === 'starting';
     const showRunning = isRunning && ph.phase === 'idle';
+    const hasUrl = Boolean(svc.url);
     const copyCommand = startCommand ? `cd "${svc.cwd || ''}" && ${startCommand}` : '';
     const actCell = (html) => html || '<span class="svc-cell"></span>';
+    const urlLine = hasUrl
+      ? `<button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>`
+      : `<div class="svc-url mono" title="watch 服务没有地址；用「启动 / 编译」按钮">watch · 无地址（不探活）</div>`;
     return `<div class="svc">
       <div class="svc-top">
         <i class="svc-dot" style="--tone:${tone}"></i>
         <span class="svc-name">${esc(svc.name)}</span>
         <span class="svc-st" style="color:${tone}">${st}${lat}</span>
       </div>
-      <button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>
+      ${urlLine}
       ${openFail}
       ${startFail}
       ${cmdLine}
@@ -2114,9 +2118,9 @@ function svcRows(p){
           ${actCell(buildCommand ? `<button class="pbtn build" data-svc-build="${svc.id}" data-file="${esc(p.file)}" title="在 ${esc(svc.cwd || '项目目录')} 执行 ${esc(buildCommand)}">编译</button>` : '')}
         </div>
         <div class="svc-acts-layer" data-on="${showRunning ? 1 : 0}" data-kind="running">
-          <button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>
+          ${hasUrl ? `<button class="pbtn" data-svc-open="${svc.id}" data-file="${esc(p.file)}">打开</button>` : '<span class="svc-cell"></span>'}
           <button class="pbtn" data-svc-stop="${svc.id}" data-file="${esc(p.file)}"${svc.pid ? '' : ' title="这个服务不是面板拉起的；结束不了就用「关闭全部服务」按端口关"'}>停止</button>
-          <button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>
+          ${hasUrl ? `<button class="pbtn" data-svc-copy="${svc.id}" data-file="${esc(p.file)}">复制地址</button>` : '<span class="svc-cell"></span>'}
         </div>
       </div>
       ${svc.output ? `<button class="svc-loglink" data-svc-log="${svc.id}" data-file="${esc(p.file)}">查看日志</button>` : ''}
@@ -3573,7 +3577,9 @@ function openServicesPreview(p, services, draft){
     const cmds = platformCommandsOf(s.start);
     const bcmds = platformCommandsOf(s.build);
     const dup = existingIds.has(s.id);
+    const isWatch = s.kind === 'watch';
     const meta = [
+      isWatch ? 'watch（无 URL）' : '',
       s.evidence ? `证据：${s.evidence}` : '',
       s.confidence ? `置信度 ${s.confidence}` : '',
       s.health ? `health ${s.health}` : '',
@@ -3583,8 +3589,10 @@ function openServicesPreview(p, services, draft){
     return `<label class="svc-cand" data-svc-cand="${i}" data-dup="${dup ? 1 : 0}">
       <input type="checkbox" data-svc-pick="${i}" ${dup ? '' : 'checked'}>
       <span class="svc-cand-main">
-        <span class="svc-cand-head"><b>${esc(s.name || s.id)}</b><i class="svc-probe mono" data-svc-probe="${i}" data-ok="pending">探活中…</i></span>
-        <input class="dfield mono" data-svc-url="${i}" value="${esc(s.url)}" spellcheck="false" aria-label="服务地址">
+        <span class="svc-cand-head"><b>${esc(s.name || s.id)}</b><i class="svc-probe mono" data-svc-probe="${i}" data-ok="${isWatch ? 'skip' : 'pending'}">${isWatch ? '不探活（watch）' : '探活中…'}</i></span>
+        ${isWatch
+          ? `<span class="svc-cand-meta mono">watch · 无地址（不探活，只做启动 / 编译）</span>`
+          : `<input class="dfield mono" data-svc-url="${i}" value="${esc(s.url)}" spellcheck="false" aria-label="服务地址">`}
         <span class="svc-cand-cmds">
           <input class="dfield mono" data-svc-kind="start" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(cmds.mac)}" placeholder="mac 启动命令" spellcheck="false" aria-label="mac 启动命令">
           <input class="dfield mono" data-svc-kind="start" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(cmds.windows)}" placeholder="windows 启动命令" spellcheck="false" aria-label="windows 启动命令">
@@ -3622,12 +3630,15 @@ function openServicesPreview(p, services, draft){
       services.forEach((s, i) => {
         const box = document.querySelector(`#ask-body [data-svc-pick="${i}"]`);
         if (!box || !box.checked) return;
+        const isWatch = s.kind === 'watch';
         const urlEl = document.querySelector(`#ask-body [data-svc-url="${i}"]`);
         const url = urlEl ? urlEl.value.trim() : '';
-        if (!url) return;
+        if (!url && !isWatch) return;
         const start = cmdsOf(i, 'start');
         const build = cmdsOf(i, 'build');
-        const svc = { id: s.id, name: s.name || s.id, url };
+        const svc = { id: s.id, name: s.name || s.id };
+        if (isWatch) svc.kind = 'watch';
+        if (url) svc.url = url;
         if (s.health) svc.health = s.health;
         if (start) svc.start = start;
         if (build) svc.build = build;
@@ -3641,8 +3652,13 @@ function openServicesPreview(p, services, draft){
       const merged = old.filter(o => !picked.some(x => x.id === o.id)).concat(picked);
       putServices(p0, merged);
     });
-  // 逐条探活：在线 / 离线 / 超时只作参考，不拦截写回
+  // 逐条探活：在线 / 离线 / 超时只作参考，不拦截写回；watch 没有端口，直接跳过
   services.forEach((s, i) => {
+    if (s.kind === 'watch') {
+      const el = document.querySelector(`#ask-body [data-svc-probe="${i}"]`);
+      if (el){ el.textContent = '不探活（watch）'; el.dataset.ok = '1'; }
+      return;
+    }
     fetch(api('/services/probe'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ url: s.url, health: s.health || '' }),

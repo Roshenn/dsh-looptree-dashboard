@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 未发布 — 服务收集支持 watch：小程序 watch 不再被过滤掉
+
+- **问题**（2026-11-04，english-chunk）：点「服务信息收集」，候选里永远只有 api / h5 / site，
+  小程序 watch 一条都不出现。
+- **根因**：三层过滤各挡一次，缺一不可——`lib/prompt.mjs` 第 7 条写死「小程序 watch、纯构建不算服务」；
+  `lib/services.mjs` 的 `normalizeServices` 要求 `url` 必须是 http(s)，无 url 直接丢；
+  `lib/core.mjs` 的卡片校验同样把 `url` 当必填。面板侧还有两处同假设：
+  预览确认 `if (!url) return`，服务块 `svc.url.replace(...)` 默认 url 一定存在。
+- **修**：服务新增可选 `kind: "watch"`（长跑构建/开发进程，没有端口）。
+  - `lib/prompt.mjs`：服务分 http / watch 两类，小程序 watch 必须列出（`kind: "watch"`、不写 url）；上限 4 → 6。
+  - `lib/services.mjs`：`normalizeServices` 保留 watch；`list()` 跳过 HTTP 探活；`view()` 给 watch 独立状态 `watch`。
+  - `lib/core.mjs`：watch 不要求 url，但必须有 `start`。
+  - `lib/index.js`：`/services/probe` 对 watch 返回 `skipped`，不再 400。
+  - `web/index.html`：watch 服务块不渲染地址链接、运行态隐藏「打开 / 复制地址」；预览行不显示 url 输入、不探活；确认时允许无 url。
+  - `rotation-card-spec.md`：补 `kind` 字段、watch 语义与状态说明。
+- **验证**：`npm run mock:services` 43/43（新增「watch 无 url 也保留」「watch 探活跳过」「列表状态不探活」三条断言）；
+  `node validate-rotation.mjs` 通过；`npm run lint:plugin` 全绿。
+  **host 半需要重启 DSH 后生效；面板侧刷新即可看到新渲染。**
+
 ## 未发布 — 打开服务先落到该项目工作区的会话，多项目并行不再串台
 
 - **问题**（2026-11-04）：面板点服务的「打开」，页面会开在**当前这条会话的右栏**。面板是主区页面，

@@ -219,7 +219,11 @@
     "build": { "mac": "make build", "windows": "npm run build" }, "evidence": "Makefile:12" },
   { "id": "web5800", "name": "本地预览 5800", "url": "http://127.0.0.1:5800",
     "start": { "mac": "python3 -m http.server 5800", "windows": "python -m http.server 5800" },
-    "cwd": "/tmp/rt-workspace", "confidence": "high", "evidence": "README.md:18" }
+    "cwd": "/tmp/rt-workspace", "confidence": "high", "evidence": "README.md:18" },
+  { "id": "weapp", "name": "微信小程序 watch", "kind": "watch",
+    "start": { "mac": "pnpm dev:weapp", "windows": "pnpm dev:weapp" },
+    "build": { "mac": "pnpm build:weapp", "windows": "pnpm build:weapp" },
+    "cwd": "weixin-ui", "confidence": "high", "evidence": "weixin-ui/package.json:14-16" }
 ]
 ```
 
@@ -227,7 +231,8 @@
 |---|---|---|
 | `id` | ✅ | 字母数字与 `-_`，卡内唯一 |
 | `name` | ✅ | 信息栏里显示的名字 |
-| `url` | ✅ | `http(s)://host:port/...`，**就是访问方式**；信息栏里点一下即在浏览器打开 |
+| `kind` | ➖ | `http`（默认）或 `watch`。`watch` 是长跑构建/开发进程（如小程序 watch），**没有 URL、不探活** |
+| `url` | http ✅ / watch ➖ | `http(s)://host:port/...`，**就是访问方式**；信息栏里点一下即在浏览器打开。`watch` 可省略 |
 | `health` | ➖ | 相对路径，探活用（拼在 url 后），缺省直接探测 url 本身 |
 | `start` | ➖ | 一键拉起的命令（shell），在 `cwd` 或 `project.workspace` 下执行。字符串＝全平台共用；也可写成 `{ "mac", "windows", "linux", "default" }` |
 | `build` | ➖ | 一键编译的命令（shell），形状同 `start`：一次性任务，跑完回退出码与输出尾巴，最长 10 分钟（`ROTATION_BUILD_TIMEOUT_MS`）；Makefile 项目的 `make build` 写在这里 |
@@ -240,7 +245,8 @@
 
 面板侧的语义（服务块与统计都在**第一列项目列**）：
 
-- **状态**：每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒。
+- **状态**：http 服务每 5s 由服务端探测一次（1.2s 超时）→ `运行中 / 未启动 / 启动中 / 启动失败`，带延迟毫秒；
+  `kind: "watch"` 没有端口，显示 `不探活`，只认面板自己拉起的进程（拉起来后显示 `运行中`）。
 - **打开**：在 **DSH 内嵌浏览器**打开 `url`（有 `health` 时打开 `url + health`），默认落点是
   **右栏 browser tab —— 对话留在左、页面在右**。三级兜底：
   1. `layout.openRightbar(true, false)` 先把右栏拉起来（非全屏），再 `sidebarRight.openTab('browser')`。

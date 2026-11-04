@@ -6,7 +6,7 @@
  *
  * 覆盖：
  *   · POST /api/services/collect 起会话 → 结束后把候选落成草稿
- *   · 草稿里的 start 统一成 { mac, windows }；url 不合法 / 缺 url 的条目被丢掉
+ *   · 草稿里的 start 统一成 { mac, windows }；http 缺 url / url 不合法被丢掉，watch 无 url 保留
  *   · GET /api/services 带上当前平台，startCommand 按平台解析
  *   · PUT /api/services 只替换 services 字段（校验后原子写），写完草稿清掉
  *   · POST /api/services/probe 真发请求探活
@@ -147,6 +147,9 @@ try {
         build: { mac: 'make build', windows: '' }, evidence: 'vite.config.ts:12', confidence: 'high' },
       { id: 'api', name: 'API 8786', url: 'http://127.0.0.1:8786', health: '/api/health',
         start: { mac: 'PORT=8786 pnpm --filter @echo/server dev', windows: 'set PORT=8786 && pnpm --filter @echo/server dev' } },
+      { id: 'weapp', name: '小程序 watch', kind: 'watch',
+        start: { mac: 'make weapp', windows: 'pnpm dev:weapp' },
+        build: { mac: 'make build-weapp', windows: 'pnpm build:weapp' }, cwd: 'weixin-ui' },
       { name: '没有 url 的服务' },
       { id: 'bad', name: '坏地址', url: 'not-a-url', start: 'x' },
     ],
@@ -181,8 +184,12 @@ try {
     if (draft?.services?.length && draftB?.services?.length) break;
   }
   check('草稿已落盘', !!draft && Array.isArray(draft.services), JSON.stringify(draft));
-  check('B 项目草稿独立落盘', !!draftB && draftB.file === FILE_B && draftB.services?.length === 2, JSON.stringify(draftB));
-  check('只保留合法 url 的条目', draft?.services?.length === 2, `got ${draft?.services?.length}`);
+  check('B 项目草稿独立落盘', !!draftB && draftB.file === FILE_B && draftB.services?.length === 3, JSON.stringify(draftB));
+  check('只保留合法 url 的条目 + watch', draft?.services?.length === 3, `got ${draft?.services?.length}`);
+  check('watch 服务无 url 也保留', (() => {
+    const s = (draft?.services || []).find(x => x.id === 'weapp');
+    return s && s.kind === 'watch' && !s.url && s.start && s.build;
+  })(), JSON.stringify((draft?.services || []).find(x => x.id === 'weapp')));
   check('start 归一成 mac/windows', JSON.stringify(draft?.services?.[0]?.start) === JSON.stringify({ mac: 'pnpm dev', windows: 'pnpm.cmd dev' }),
     JSON.stringify(draft?.services?.[0]?.start));
   check('保留证据与置信度', draft?.services?.[0]?.evidence === 'vite.config.ts:12' && draft?.services?.[0]?.confidence === 'high',
@@ -196,13 +203,15 @@ try {
   check('探活接口可用', probed.status === 200 && probed.body?.probe?.ok === true, JSON.stringify(probed.body));
   const probeBad = await sendJson('POST', '/api/services/probe', { url: 'ftp://x' });
   check('非法 url 被拒', probeBad.status === 400, JSON.stringify(probeBad.body));
+  const probeWatch = await sendJson('POST', '/api/services/probe', { kind: 'watch' });
+  check('watch 探活跳过而不是报错', probeWatch.status === 200 && probeWatch.body?.probe?.skipped === true, JSON.stringify(probeWatch.body));
 
   /* 4. 写回：只替换 services，草稿随后清掉 */
   const edited = draft.services.map((s, i) => (i === 0 ? { ...s, name: '本地预览（改名）' } : s));
   const put = await sendJson('PUT', '/api/services', { file: FILE, services: edited });
   check('写回成功', put.status === 200 && put.body?.ok === true, JSON.stringify(put.body));
   const disk = await cardOnDisk();
-  check('卡片里有了 services', Array.isArray(disk.services) && disk.services.length === 2, JSON.stringify(disk.services));
+  check('卡片里有了 services', Array.isArray(disk.services) && disk.services.length === 3, JSON.stringify(disk.services));
   check('写回的是平台映射', JSON.stringify(disk.services?.[0]?.start) === JSON.stringify({ mac: 'pnpm dev', windows: 'pnpm.cmd dev' }),
     JSON.stringify(disk.services?.[0]?.start));
   check('改名生效', disk.services?.[0]?.name === '本地预览（改名）', disk.services?.[0]?.name);
@@ -218,6 +227,9 @@ try {
   check('startCommand 按平台解析', firstSvc?.startCommand === wantCommand, `${firstSvc?.startCommand} vs ${wantCommand}`);
   check('startPlatforms 标出两端', (firstSvc?.startPlatforms || []).includes('mac') && (firstSvc?.startPlatforms || []).includes('windows'),
     JSON.stringify(firstSvc?.startPlatforms));
+  const weappSvc = (listed.body?.services || []).find(s => s.id === 'weapp');
+  check('watch 服务列表状态为「不探活」', weappSvc?.kind === 'watch' && weappSvc?.status === 'watch' && weappSvc?.url === '',
+    JSON.stringify(weappSvc));
 
   /* 6. 清空 / 非法请求 */
   const cleared = await sendJson('PUT', '/api/services', { file: FILE, services: [] });
