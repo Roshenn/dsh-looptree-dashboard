@@ -91,6 +91,12 @@ did the work. The panel is the view; DSH is the engine.
   panel lists the collision (fail closed); services already up are skipped. **Stop all** kills whatever
   is listening on the configured loopback ports, including services you started in a terminal, and
   reports per-port failures instead of stopping the batch.
+- **Two buttons in the composer.** Beside the model selector, every session whose workspace is a
+  registered project gets a compact card. **Services** starts every offline service of that project
+  (port conflicts still fail closed); **Loop** switches the main area to the project's focus view and
+  scrolls to the current node (running → ready → milestone), and the panel grows a **← Back to chat**
+  button so the round trip is one click each way. The card renders nothing in workspaces that are not
+  registered yet.
 - **Item fields are lists you edit in place.** Important-capability and core-metric editors add and remove
   one item at a time (`+ Add one` / `×`), and renumber on save. There is no drag ordering: the order you
   type is the order that is written back.
@@ -235,6 +241,7 @@ atomically (`tmp` + rename, no `.bak` — git is the history).
 | `GET` | `/rotation/api/services/collect?file=` | the pending service draft for a card |
 | `GET` | `/rotation/api/services/all` | every project's services, ports and conflicts (`?probe=0` skips probing) |
 | `POST` | `/rotation/api/services/start-all` | start all offline services; `409` + conflicts means nothing was started |
+| `GET` | `/rotation/api/session/context?sessionId=` | session → workspace → project, plus a service summary for the composer card |
 | `POST` | `/rotation/api/services/stop-all` | kill listeners on the configured loopback ports; remote hosts are reported as skipped |
 
 The panel also calls a few UI-only endpoints (`/rotation/api/sessions`, `/session`, `/workspaces`,

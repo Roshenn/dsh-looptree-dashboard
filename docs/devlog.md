@@ -577,3 +577,18 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
 | 风险 | 阻塞执行项数、未处置 `issues` 条数、缺 `verify` / 已关闭但缺 `proof` 的节点数 |
 | 下一步 | 取第一条：解阻断 → 可确认关闭 → 继续执行（doing 优先，其次 plan） |
 
+
+## 2026-11-05 · composer 双按钮卡片：起服务 / 展开闭环
+
+- 需求：会话里要验证时得切面板找服务、找当前闭环；希望模型选择器旁边两颗按钮一步到位，
+  并能在「对话 ↔ 闭环视图」之间快进快出。
+- 调研：宿主 `conversation.input.right` 正好渲染在 `conversation.input.model` 之前（即截图红框），
+  `kind: list`、`replaceRisk: none`；面板已有 `?view=focus&project=`，只缺 `current=1` 的定位与回程。
+- 决策：两个按钮分别是「服务」（复用 `start-all`，只作用于当前工作区的项目，端口冲突整批拒绝）
+  与「闭环」（主区切到项目聚焦并滚到当前节点：运行中 → 可开工 → 里程碑）；工作区没登记就整张卡不渲染。
+- 坑：跨源写接口要 `x-rotation-token`，client 半拿不到；用 `webServer.tapIndex` 注入 DSH 首页，
+  与面板 HTML 同一信任边界，不放松跨源校验。拿不到令牌时只禁用「服务」。
+- 坑：主区面板切换会卸载 iframe，回去要重新加载（与现有左栏入口同代价）；回程按钮放在面板里而不是
+  composer 上，因为上了面板 composer 就不在屏幕上了。
+- 验证：`mock:context` / `mock:focus-current` 两个新 mock + `mock:client` 的 composer 断言，
+  `npm run preflight` 全绿；真机验证需重启 DSH 让 host 半重载。

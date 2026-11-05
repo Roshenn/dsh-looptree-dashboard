@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## 未发布 — 会话对话框右下角双按钮卡片：一键起服务 / 展开闭环
+
+- **需求**（2026-11-05）：在会话 composer 的模型选择器左边加一张卡片：快速拉起当前项目的服务、
+  直接定位项目当前的能力闭环，省掉「切面板 → 找项目 → 找服务 / 找节点」的来回。
+- **落点**：宿主 `conversation.input.right`（渲染在 `conversation.input.model` 之前，即截图红框）；
+  client 半只加一个 cell，不替换任何自带控件。
+- **实现**：
+  - host：新增 `GET /rotation/api/session/context?sessionId=`（`lib/context.mjs`）。会话 → cwd 四级回退
+    （`ctx.sessions` → `ctx.workingDirectory` → `session.header.cwd` → `workspace.json` 的 `sessionIds`）
+    → 本机注册表最长祖先匹配；服务概览只用配置算 `{total, startable, hasUrl}`，**不探活**。
+    `inject` 增加 `sessions` / `workingDirectory`，`/api/health` 增加 `client: { token, context }`。
+  - 写令牌：`webServer.tapIndex` 把 `window.__ROTATION_TOKEN__` 与 `__ROTATION_API_ABS__` 注入 DSH 首页
+    （旧宿主没有 `tapIndex` 时只禁用「服务」，闭环不受影响）；`needsWriteToken` 的跨源防护不变。
+  - client：注册 `conversation.input.right` 的 `rotation-launch` cell。「服务」调
+    `POST /services/start-all {file}`（只拉当前项目，端口冲突整批拒绝，已在线跳过）；「闭环」调
+    `layout.selectPanel('rotation')`，面板以 `?view=focus&project=…&current=1` 挂载。
+  - 面板：`currentNodeOf()`（运行中 → 可开工 → 里程碑根）+ `focusCurrentLoop()` 滚动并短暂高亮；
+    `rotation-focus` 消息与 `?current=1` 共用同一条定位逻辑；嵌入态显示「← 回会话」。
+- **边界**：工作区没登记成项目 → 整张卡不渲染；项目没服务 / 当前平台没启动命令 → 「服务」禁用并给原因；
+  语音输入展开时 `standardControls` 被宿主收起，卡片随模型选择器一起隐藏；worktree 落在项目目录外时
+  匹配不到（已知限制，后续可用 git common dir 扩展）。
+- **验证**：`npm run mock:context`（路径匹配 / 四级回退 / 服务概览 / 三种响应）、
+  `npm run mock:focus-current`（定位优先级 + 源码接线）、`npm run mock:client` 新增 composer 卡片断言
+  （注册、隐藏、两颗按钮、start-all 带令牌、切面板、回会话）；`npm run preflight` 全绿。
+  **host 半需要重启 DSH 后生效；面板侧刷新即可。**
+
 ## 未发布 — 服务收集支持 watch：小程序 watch 不再被过滤掉
 
 - **问题**（2026-11-04，english-chunk）：点「服务信息收集」，候选里永远只有 api / h5 / site，

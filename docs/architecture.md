@@ -19,9 +19,26 @@ DSH 进程
 │   ├─ /rotation/api/service*       单个服务拉起 / 停止（lib/services.mjs）
 │   ├─ /rotation/api/services/all   全部项目的服务、端口与冲突
 │   ├─ /rotation/api/services/start-all · stop-all   跨项目批量拉起（有冲突整批拒绝）/ 按端口关闭
+│   ├─ /rotation/api/session/context  会话 → 工作区 → 项目（composer 卡片用，只读）
 │   └─ /rotation/api/services*      服务收集（AI 会话 → 草稿 → 预览探活 → 写回）
 └─ client 半 lib/client.js          （__ModuleLoader__ 模块）
-    └─ sidebar.right.pane.tab       右栏「轮转」入口 → 打开 /rotation/app/
+    ├─ sidebar.panellist + main     左栏「轮转闭环树」→ 主区 iframe /rotation/app/
+    ├─ conversation.input.right     composer 右下角双按钮卡片（服务拉起 / 展开闭环）
+    └─ webServer.tapIndex 注入       window.__ROTATION_TOKEN__ / __ROTATION_API_ABS__（写接口用）
+```
+
+### composer 卡片的数据链
+
+```
+会话（sessionId）
+  └─ GET /rotation/api/session/context?sessionId=…
+       lib/context.mjs：ctx.sessions.get → ctx.workingDirectory.get → session.header.cwd
+                        → ~/.dsh/storages/workspace.json 的 sessionIds（回退）
+       cwd → 本机注册表里最长祖先匹配 → 项目 + 服务配置概览（不探活）
+  ├─ 点「服务」：POST /rotation/api/services/start-all {file}（只拉当前项目；端口冲突整批拒绝）
+  └─ 点「闭环」：layout.selectPanel('rotation')
+               面板以 ?view=focus&project=<id>&current=1 挂载，随后滚到当前节点并高亮
+               面板里的「← 回会话」→ postMessage → layout.selectPanel(null)
 ```
 
 ## 三、数据
@@ -55,6 +72,10 @@ DSH 进程
    与网关规则冲突。
 4. **写入永远先校验**：`validateCard` → 422 拒绝 → tmp+rename 原子替换；不另留 `.bak`，历史版本由 git 负责。
 5. **折叠/状态都是渲染层**：收敛进度、健康度、节点统计用完整树计算，不受折叠影响。
+6. **composer 卡片只做「查上下文 + 一个写动作」**：会话 → 目录 → 项目由 host 推导（`lib/context.mjs`），
+   卡片不猜路径；写动作只复用 `services/start-all` 与 `x-rotation-token`，令牌用 `webServer.tapIndex`
+   注入 DSH 首页（与面板 HTML 同一信任边界），`needsWriteToken` 的跨源防护不变。
+   落点是宿主的 `conversation.input.right`（模型选择器之前）；没登记的项目整张卡不渲染。
 
 ## 五、会话生命周期与崩溃恢复
 
