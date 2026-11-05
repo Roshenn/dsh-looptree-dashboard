@@ -105,6 +105,7 @@ globalThis.document = {
 const fetchCalls = [];
 let contextPayload = null;
 let serviceRows = [];            // GET /services?file 的替身：up / down / watch 行
+let statusDeferred = null;       // 挂起状态请求，用来验证「缓存先行」
 let startAllPayload = () => ({ ok: true, started: [{ id: 'web' }], skipped: [], failed: [] });
 globalThis.fetch = async (url, options = {}) => {
   fetchCalls.push({ url: String(url), options });
@@ -112,6 +113,7 @@ globalThis.fetch = async (url, options = {}) => {
     return { ok: true, status: 200, json: async () => contextPayload };
   }
   if (String(url).includes('/services?file=')) {
+    if (statusDeferred) await statusDeferred.promise;
     return { ok: true, status: 200, json: async () => ({ ok: true, services: serviceRows }) };
   }
   if (String(url).includes('/services/start-all')) {
@@ -472,6 +474,38 @@ const tree6 = rt6.paint();
 const tree6Buttons = (tree6.children || []).filter(Boolean);
 ok('项目没有服务时只留「闭环」', tree6Buttons.length === 1 && labelOf(tree6Buttons[0]) === '闭环',
   JSON.stringify(tree6Buttons.map(labelOf)));
+
+// ── 切会话：先用缓存出正确状态（<100ms 目标），状态请求未回也不闪 ──
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+];
+contextPayload = {
+  ok: true, sessionId: 'session-8', project: PROJECT,
+  services: { total: 2, startable: 0, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtWarm = createRuntime(launcher.component, { sessionId: 'session-8', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtWarm.paint();
+await flush();
+ok('预热缓存：查到两个在线服务', labelOf(rtWarm.paint().children[0]) === '打开服务', labelOf(rtWarm.paint().children[0]));
+
+// 状态请求挂起、实际状态改成空：新会话仍应先用缓存画出「打开服务」
+serviceRows = [];
+let releaseStatus;
+statusDeferred = { promise: new Promise((resolve) => { releaseStatus = resolve; }) };
+contextPayload = {
+  ok: true, sessionId: 'session-9', project: PROJECT,
+  services: { total: 2, startable: 0, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtSwitch = createRuntime(launcher.component, { sessionId: 'session-9', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtSwitch.paint();
+await flush();
+const treeSwitch = rtSwitch.paint();
+ok('切会话首帧用缓存（状态请求还没回）', labelOf(treeSwitch.children[0]) === '打开服务', labelOf(treeSwitch.children[0]));
+releaseStatus();
+statusDeferred = null;
+await flush();
+ok('后台复核后按实际状态更新', labelOf(rtSwitch.paint().children[0]) === '服务', labelOf(rtSwitch.paint().children[0]));
 
 // 面板里的「← 回会话」
 window.__ROTATION_TOKEN__ = 'test-token';
