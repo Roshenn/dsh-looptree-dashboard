@@ -36,8 +36,10 @@ DSH 进程
                         → ~/.dsh/storages/workspace.json 的 sessionIds（回退）
        cwd → 本机注册表里最长祖先匹配 → 项目 + 服务配置概览（不探活）
   ├─ 点「服务」：POST /rotation/api/services/start-all {file}（只拉当前项目；端口冲突整批拒绝）
-  ├─ 已在线：GET /rotation/api/services?file= 探活后按钮变「打开服务」，
-  │         每个在线服务各开一个右栏 browser tab（openServiceUrl，右栏不可用才退主区内嵌页）
+  ├─ 实况：GET /rotation/api/services?file= 探活，结果按卡片文件进 client 内存缓存；
+  │         切会话首帧用缓存渲染（不等网络），后台复核 + 挂载期间每 5s 刷新
+  ├─ 已在线：按钮变「打开服务」，每个在线服务各开一个右栏 browser tab
+  │         （openServiceUrl，右栏不可用才退主区内嵌页）
   └─ 点「闭环」：layout.selectPanel('rotation')
                面板以 ?view=focus&project=<id>&current=1 挂载，随后滚到当前节点并高亮
                面板里的「← 回会话」→ postMessage → layout.selectPanel(null)

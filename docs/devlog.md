@@ -614,3 +614,11 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
   统一 `color-mix(状态色 62%, 次级文字色)` + 7% 极浅底色，悬停只加深到 9%。
   踩坑：`--dsw-alias-brand-primary` 是黑白对比色（浅色近黑、深色近白），不是蓝色，不能拿它做强调色。
 - 验证：mock:client 断言两种图标形状、data-tone 与 CSS 里的低饱和写法；preflight 全绿。
+
+## 2026-11-06 · 服务状态改为缓存先行
+
+- 反馈：切会话后按钮要过一阵才从「服务」翻成「打开服务」，切换体感不干脆。
+- 根因：状态走 `GET /services?file=` 探活，cell 每次重建都要等网络回来才知道有没有在线服务。
+- 改法：`statusCache`（按卡片文件）先画缓存，后台复核；挂载期间每 5s 轻量刷新；点击时缓存 >10s 才补查。
+  状态请求做 in-flight 去重，同一项目的会话来回切不再闪错状态。
+- 验证：mock:client 新增「预热 / 切会话首帧用缓存（状态请求挂起）/ 后台复核更新」三条断言；preflight 全绿。
