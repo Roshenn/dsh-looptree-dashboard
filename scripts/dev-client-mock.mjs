@@ -104,13 +104,18 @@ globalThis.document = {
 // fetch 替身：session/context 与 services/start-all 两条链路
 const fetchCalls = [];
 let contextPayload = null;
+let serviceRows = [];            // GET /services?file 的替身：up / down / watch 行
+let startAllPayload = () => ({ ok: true, started: [{ id: 'web' }], skipped: [], failed: [] });
 globalThis.fetch = async (url, options = {}) => {
   fetchCalls.push({ url: String(url), options });
   if (String(url).includes('/session/context')) {
     return { ok: true, status: 200, json: async () => contextPayload };
   }
+  if (String(url).includes('/services?file=')) {
+    return { ok: true, status: 200, json: async () => ({ ok: true, services: serviceRows }) };
+  }
   if (String(url).includes('/services/start-all')) {
-    return { ok: true, status: 200, json: async () => ({ ok: true, started: [{ id: 'web' }], skipped: [], failed: [] }) };
+    return { ok: true, status: 200, json: async () => startAllPayload() };
   }
   return { ok: false, status: 404, json: async () => ({ ok: false }) };
 };
@@ -179,6 +184,7 @@ const browserServices = () => ({
 
 services = browserServices();
 let replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u1' });
+await flush();
 ok('内嵌浏览器可用时开 browser tab', openCalls.length === 1 && openCalls[0][0] === 'browser',
   JSON.stringify(openCalls[0]));
 ok('带原地址与 params', openCalls[0]?.[1]?.params?.url === 'http://127.0.0.1:40100/',
@@ -248,6 +254,7 @@ ok('失败原因随回执带回面板', /切换会话失败/.test(replies[0]?.no
 openCalls.length = 0;
 services = {};
 replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40150/', reqId: 'u2' });
+await flush();
 ok('拿不到 sidebar 服务时回失败', replies[0]?.ok === false && /sidebarRight\.openTab/.test(replies[0].error || ''),
   JSON.stringify(replies[0]));
 ok('拿不到 sidebar 时不调用 openTab', openCalls.length === 0);
@@ -258,6 +265,7 @@ services = {
   sidebarRight: { openTab: () => { throw new Error('sidebarRight: no tab type is registered as "browser"'); } },
 };
 replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/', reqId: 'u2b' });
+await flush();
 ok('没有主区兜底位时回失败', replies[0]?.ok === false
   && /no tab type is registered as "browser"/.test(replies[0].error || ''), JSON.stringify(replies[0]));
 ok('不因 sidebarRightTabs 缺失就提前拒绝', openCalls.length === 0);
@@ -322,7 +330,7 @@ contextPayload = {
   panelId: 'card-proj-milestone',
 };
 const cellProps = { sessionId: 'session-1', usePanelInfo: (select) => select({ activePanelId: null }) };
-const labelOf = (btn) => ((btn.children || [])[1]?.children || []).join('');
+const labelOf = (btn) => (((btn && btn.children) || [])[1]?.children || []).join('');
 
 fetchCalls.length = 0;
 const rt = createRuntime(launcher.component, cellProps);
@@ -374,6 +382,74 @@ await flush();
 const tree3 = rt3.paint();
 ok('没有写令牌时禁用「服务」', tree3?.children?.[0]?.props?.disabled === true);
 ok('没有写令牌时「闭环」仍可用', tree3?.children?.[1]?.props?.disabled !== true);
+
+// ── 已在线服务：按钮变「打开服务」，点击在右栏逐个开 tab ──
+const railCalls = [];
+services = {
+  layout: { selectPanel: (key) => panelCalls.push(key), openRightbar: () => {} },
+  sidebarRight: { openTab: (kind, opts) => railCalls.push([kind, opts]) },
+};
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+];
+contextPayload = {
+  ok: true, sessionId: 'session-4', project: PROJECT,
+  services: { total: 2, startable: 0, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rt4 = createRuntime(launcher.component, { sessionId: 'session-4', usePanelInfo: (select) => select({ activePanelId: null }) });
+rt4.paint();
+await flush();
+let tree4 = rt4.paint();
+ok('有在线服务时按钮变「打开服务」', labelOf(tree4.children[0]) === '打开服务', labelOf(tree4.children[0]));
+railCalls.length = 0;
+fetchCalls.length = 0;
+tree4.children[0].props.onClick();
+await flush(12);
+ok('点「打开服务」不调 start-all', !fetchCalls.some((c) => c.url.includes('/services/start-all')),
+  fetchCalls.map((c) => c.url).join(','));
+ok('每个在线服务各开一个右栏 tab', railCalls.length === 2 && railCalls.every(([kind]) => kind === 'browser'),
+  JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
+
+// ── 启动报「已在运行」但端口已在听：不显示失败，直接变「打开服务」──
+serviceRows = [];
+startAllPayload = () => {
+  serviceRows = [{ id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' }];
+  return {
+    ok: true, started: [], skipped: [],
+    failed: [{ serviceId: 'site', serviceName: 'site', error: '已在运行（pid 1）' }],
+  };
+};
+contextPayload = {
+  ok: true, sessionId: 'session-5', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rt5 = createRuntime(launcher.component, { sessionId: 'session-5', usePanelInfo: (select) => select({ activePanelId: null }) });
+rt5.paint();
+await flush();
+let tree5 = rt5.paint();
+ok('没有在线服务时按钮是「服务」', labelOf(tree5.children[0]) === '服务', labelOf(tree5.children[0]));
+tree5.children[0].props.onClick();
+await new Promise((resolve) => setTimeout(resolve, 720));
+await flush();
+tree5 = rt5.paint();
+ok('「已在运行」但探到在线时不再显示失败', labelOf(tree5.children[0]) !== '失败', labelOf(tree5.children[0]));
+ok('并且切回「打开服务」', labelOf(tree5.children[0]) === '打开服务', labelOf(tree5.children[0]));
+
+// ── 项目没有服务配置：只留「闭环」，不给永远禁用的按钮 ──
+serviceRows = [];
+startAllPayload = () => ({ ok: true, started: [], skipped: [], failed: [] });
+contextPayload = {
+  ok: true, sessionId: 'session-6', project: PROJECT,
+  services: { total: 0, startable: 0, hasUrl: false }, token: true, panelId: 'card-proj-milestone',
+};
+const rt6 = createRuntime(launcher.component, { sessionId: 'session-6', usePanelInfo: (select) => select({ activePanelId: null }) });
+rt6.paint();
+await flush();
+const tree6 = rt6.paint();
+const tree6Buttons = (tree6.children || []).filter(Boolean);
+ok('项目没有服务时只留「闭环」', tree6Buttons.length === 1 && labelOf(tree6Buttons[0]) === '闭环',
+  JSON.stringify(tree6Buttons.map(labelOf)));
 
 // 面板里的「← 回会话」
 window.__ROTATION_TOKEN__ = 'test-token';
