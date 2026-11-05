@@ -331,6 +331,11 @@ contextPayload = {
 };
 const cellProps = { sessionId: 'session-1', usePanelInfo: (select) => select({ activePanelId: null }) };
 const labelOf = (btn) => (((btn && btn.children) || [])[1]?.children || []).join('');
+const iconOf = (btn) => {
+  const first = (((btn && btn.children) || [])[0]);
+  if (!first) return null;
+  return typeof first.$$type === 'function' ? first.$$type(first.props) : first;
+};
 
 fetchCalls.length = 0;
 const rt = createRuntime(launcher.component, cellProps);
@@ -402,6 +407,17 @@ rt4.paint();
 await flush();
 let tree4 = rt4.paint();
 ok('有在线服务时按钮变「打开服务」', labelOf(tree4.children[0]) === '打开服务', labelOf(tree4.children[0]));
+const openIcon = iconOf(tree4.children[0]);
+ok('打开态用面板图标（与拉起态形状不同）',
+  !!openIcon && openIcon.$$type === 'svg' && (openIcon.children || []).length > 0
+  && openIcon.children.some((c) => c.$$type === 'rect'),
+  openIcon ? openIcon.children.map((c) => c.$$type).join(',') : 'none');
+ok('打开态用浅色状态色 data-tone=open', tree4.children[0].props['data-tone'] === 'open',
+  String(tree4.children[0].props['data-tone']));
+const launcherCss = String(styleNodes[0].textContent || '');
+ok('状态色走低饱和混色，不是纯主题色',
+  launcherCss.includes('[data-tone="open"]{color:color-mix')
+  && !launcherCss.includes('[data-tone="open"]{color:var(--dsw-alias-brand-primary)}'));
 railCalls.length = 0;
 fetchCalls.length = 0;
 tree4.children[0].props.onClick();
@@ -429,6 +445,12 @@ rt5.paint();
 await flush();
 let tree5 = rt5.paint();
 ok('没有在线服务时按钮是「服务」', labelOf(tree5.children[0]) === '服务', labelOf(tree5.children[0]));
+const startIcon = iconOf(tree5.children[0]);
+ok('拉起态用电源图标（两条 path，无 rect）',
+  !!startIcon && startIcon.$$type === 'svg' && (startIcon.children || []).length === 2
+  && startIcon.children.every((c) => c.$$type === 'path'),
+  startIcon ? startIcon.children.map((c) => c.$$type).join(',') : 'none');
+ok('拉起态不带状态色', !tree5.children[0].props['data-tone'], String(tree5.children[0].props['data-tone']));
 tree5.children[0].props.onClick();
 await new Promise((resolve) => setTimeout(resolve, 720));
 await flush();
