@@ -233,7 +233,7 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 | `basePath` | `/rotation` | 路由前缀；和别的插件抢 `/rotation` 时改这里 |
 | `provider` / `model` | 跟随 GUI | 把节点会话钉到指定 provider 路由，不用 GUI 默认值 |
 
-**环境变量**：`ROTATION_MAX_CONCURRENT`（默认 `3`），限制动作、会话、服务收集的全局并发。
+**环境变量**：`ROTATION_MAX_CONCURRENT`（默认 `3`），限制节点会话的并发；服务收集不设上限，也不占这个名额。
 
 **服务**写在卡片里，每个命令字段既可以是字符串，也可以是平台映射：
 

@@ -258,8 +258,8 @@ The panel also calls a few UI-only endpoints (`/rotation/api/sessions`, `/sessio
 | `basePath` | `/rotation` | route prefix; change it if another plugin claims `/rotation` |
 | `provider` / `model` | GUI selection | pin node sessions to a provider route instead of the GUI default |
 
-**Environment:** `ROTATION_MAX_CONCURRENT` (default `3`) caps concurrent sessions across actions,
-runs and service collection.
+**Environment:** `ROTATION_MAX_CONCURRENT` (default `3`) caps concurrent node sessions. Service
+collection has no cap and does not count toward that budget.
 
 **Services** are per card, and every command field accepts either a string or a per-platform map:
 

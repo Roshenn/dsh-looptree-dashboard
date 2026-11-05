@@ -1755,8 +1755,13 @@ function currentNodeOf(p){
   return p.root.id;
 }
 function liveRunCount() {
+  // 只数节点会话：服务收集不设上限，也不占并发名额（host 侧同一口径）
   let n = 0;
-  for (const r of runMap.values()) if (r.status === 'starting' || r.status === 'running') n += 1;
+  for (const r of runMap.values()) {
+    if (r.status !== 'starting' && r.status !== 'running') continue;
+    if (r.nodeId === 'services-collect' || r.taskId === 'collect-services') continue;
+    n += 1;
+  }
   return n;
 }
 /** 只看当前视图里看得见的项目：矩阵按筛选，聚焦视图只看当前项目 */

@@ -24,7 +24,7 @@ const home = await mkdtemp(join(tmpdir(), 'rotation-svc-home-'));
 const ws = await mkdtemp(join(tmpdir(), 'rotation-svc-ws-'));
 process.env.ROTATION_HOME = home;
 process.env.DSH_HOME = home;
-// 全局上限调成 2，方便在 mock 里验证第 3 个请求拿到 429
+// 节点会话上限调成 2：验证服务收集不受它限制、也不占它的名额
 process.env.ROTATION_MAX_CONCURRENT = '2';
 
 const { apply } = await import('../lib/index.js');
@@ -160,7 +160,7 @@ try {
   });
   replies.push(GOOD, GOOD);   // A、B 各一次会话
 
-  /* 1. 并发：不同项目可同时收集；同项目串行；全局受上限约束 */
+  /* 1. 并发：不同项目可同时收集；同项目串行；收集不受节点会话上限约束 */
   const started = await sendJson('POST', '/api/services/collect', { file: FILE });
   check('收集会话已发起', started.status === 200 && started.body?.ok === true, JSON.stringify(started.body));
   check('返回 run.key', typeof started.body?.run?.key === 'string', JSON.stringify(started.body?.run?.key));
@@ -172,8 +172,20 @@ try {
   check('另一个项目可同时收集（不再全局 409）', startedB.status === 200 && startedB.body?.ok === true, JSON.stringify(startedB.body));
   const againA = await sendJson('POST', '/api/services/collect', { file: FILE });
   check('同一项目第二次仍 409', againA.status === 409, JSON.stringify(againA.body));
+  replies.push(GOOD);   // C 项目的一次会话
   const startedC = await sendJson('POST', '/api/services/collect', { file: FILE_C });
-  check('超过 ROTATION_MAX_CONCURRENT 返回 429', startedC.status === 429, JSON.stringify(startedC.body));
+  check('服务收集不受 ROTATION_MAX_CONCURRENT 限制', startedC.status === 200, JSON.stringify(startedC.body));
+
+  // 收集不占节点会话名额：A/B/C 的收集还在跑时，节点会话仍能起满 2 个，第 3 个才 429
+  const runsNow = (await getJson('/api/runs')).body?.runs || [];
+  const activeCollect = runsNow.filter((r) => (r.status === 'starting' || r.status === 'running') && r.nodeId === 'services-collect').length;
+  check('此时至少 2 个收集在跑（下一条并发断言才有意义）', activeCollect >= 2, `active=${activeCollect}`);
+  replies.push('节点会话 A', '节点会话 B');
+  const nodeA = await sendJson('POST', '/api/run', { file: FILE, nodeId: 'svc-loop', prompt: 'mock 节点会话 A' });
+  const nodeB = await sendJson('POST', '/api/run', { file: FILE_B, nodeId: 'svcb-loop', prompt: 'mock 节点会话 B' });
+  check('收集会话不占节点会话并发名额', nodeA.status === 200 && nodeB.status === 200, JSON.stringify([nodeA.body, nodeB.body]));
+  const nodeC = await sendJson('POST', '/api/run', { file: FILE_C, nodeId: 'svcc-loop', prompt: 'mock 节点会话 C' });
+  check('节点会话仍受 ROTATION_MAX_CONCURRENT 限制', nodeC.status === 429, JSON.stringify(nodeC.body));
 
   /* 2. 等两份草稿（A、B 各一份，互不覆盖） */
   let draft = null, draftB = null;
