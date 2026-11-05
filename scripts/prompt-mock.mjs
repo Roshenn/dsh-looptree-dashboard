@@ -339,6 +339,11 @@ check('收集服务禁止真跑起服务', collectText.includes('不要执行 ma
 check('收集服务要求端口三处取证', collectText.includes('Makefile 变量') && collectText.includes('vite.config'));
 check('收集服务带「没有工具就报 error」的逃生口', collectText.includes('{"error"'));
 check('收集服务要求小程序 watch 不算服务', collectText.includes('小程序 watch') && collectText.includes('不算服务'));
+// 生产 / 部署入口不是本地服务：收集一直把它们列进来（如 pnpm start 的生产端口），永久排除
+check('收集服务只收开发入口，排除生产 / 部署入口',
+  collectText.includes('只收集开发 / 预览入口')
+  && collectText.includes('生产 / 部署入口不算本地服务')
+  && collectText.includes('systemd unit'));
 
 /* ── 结果 ── */
 const failed = results.filter((r) => !r.pass);
