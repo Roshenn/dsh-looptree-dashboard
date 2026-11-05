@@ -387,12 +387,21 @@
   .svc-cand-main{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
   .svc-cand-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx1);min-width:0}
   .svc-cand-head b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .svc-cand-del{margin-left:2px;flex:0 0 auto;height:18px;padding:0 6px;font-size:10px;border-radius:5px;
+    border:1px solid var(--b1);background:transparent;color:var(--tx4);cursor:pointer;
+    transition:background-color 160ms var(--ease-out),color 160ms var(--ease-out),border-color 160ms var(--ease-out)}
+  .svc-cand-del:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--b1));
+    background:color-mix(in srgb,var(--red) 10%,transparent)}
   .svc-probe{margin-left:auto;font-style:normal;font-size:10px;color:var(--tx4);white-space:nowrap}
   .svc-probe[data-ok="1"]{color:var(--green)}
   .svc-probe[data-ok="0"]{color:var(--amber)}
   .svc-cand .dfield{font-size:11px;padding:4px 6px}
   .svc-cand-cmds{display:grid;grid-template-columns:1fr 1fr;gap:5px}
   .svc-cand-meta{font-size:10px;color:var(--tx4);line-height:1.5;word-break:break-all}
+  /* 预览顶部：逐条移除之外，多一条「整份丢掉重新收集」的出口 */
+  .svc-cand-tools{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+  .svc-cand-tip{flex:1;min-width:0;font-size:10.5px;color:var(--tx4);line-height:1.5}
+  .svc-cand-tools .tbtn{flex:0 0 auto}
   .tfootline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
     margin:7px -9px 0 -11px;padding:5px 9px 6px 11px;
     border-top:1px solid var(--b1);background:color-mix(in srgb,var(--bg-base) 34%,transparent);border-radius:0 0 8px 8px}
@@ -3616,109 +3625,224 @@ function openCollectPreview(p, list, draft){
   openServicesPreview(p, list, draft);
 }
 
+/**
+ * 收集结果预览：逐条勾选 / 改地址与平台命令 / 移除（同步删草稿）→ 确认写回。
+ * 移除只动预览与草稿，不碰已写回的卡片；整份不要时用「丢弃并重新收集」。
+ */
 function openServicesPreview(p, services, draft){
   const existingIds = new Set(((p.card && Array.isArray(p.card.services)) ? p.card.services : []).map(s => s.id));
-  const rows = services.map((s, i) => {
-    const cmds = platformCommandsOf(s.start);
-    const bcmds = platformCommandsOf(s.build);
-    const dup = existingIds.has(s.id);
-    const isWatch = s.kind === 'watch';
-    const meta = [
-      isWatch ? 'watch（无 URL）' : '',
-      s.evidence ? `证据：${s.evidence}` : '',
-      s.confidence ? `置信度 ${s.confidence}` : '',
-      s.health ? `health ${s.health}` : '',
-      s.cwd ? `cwd ${s.cwd}` : '',
-      dup ? '已有同 id（默认不勾，勾了会覆盖）' : '',
-    ].filter(Boolean).join(' · ');
-    return `<label class="svc-cand" data-svc-cand="${i}" data-dup="${dup ? 1 : 0}">
-      <input type="checkbox" data-svc-pick="${i}" ${dup ? '' : 'checked'}>
+  // 每条一个稳定 uid（= 原始下标）：移除会重排数组，DOM 仍靠 uid 找回自己
+  const items = services.map((svc, i) => {
+    const dup = existingIds.has(svc.id);
+    return {
+      uid: i,
+      svc,
+      dup,
+      isWatch: svc.kind === 'watch',
+      checked: !dup,
+      url: svc.kind === 'watch' ? '' : String(svc.url || ''),
+      cmds: { start: platformCommandsOf(svc.start), build: platformCommandsOf(svc.build) },
+      probe: null,
+      probing: false,
+    };
+  });
+
+  const metaOf = (it) => [
+    it.isWatch ? 'watch（无 URL）' : '',
+    it.svc.evidence ? `证据：${it.svc.evidence}` : '',
+    it.svc.confidence ? `置信度 ${it.svc.confidence}` : '',
+    it.svc.health ? `health ${it.svc.health}` : '',
+    it.svc.cwd ? `cwd ${it.svc.cwd}` : '',
+    it.dup ? '已有同 id（默认不勾，勾了会覆盖）' : '',
+  ].filter(Boolean).join(' · ');
+
+  const probeText = (it) => (it.isWatch
+    ? '不探活（watch）'
+    : (it.probe ? it.probe.text : '探活中…'));
+
+  const rowsHtml = () => items.map((it) => {
+    const s = it.svc;
+    return `<label class="svc-cand" data-svc-cand="${it.uid}" data-dup="${it.dup ? 1 : 0}">
+      <input type="checkbox" data-svc-pick="${it.uid}" ${it.checked ? 'checked' : ''}>
       <span class="svc-cand-main">
-        <span class="svc-cand-head"><b>${esc(s.name || s.id)}</b><i class="svc-probe mono" data-svc-probe="${i}" data-ok="${isWatch ? 'skip' : 'pending'}">${isWatch ? '不探活（watch）' : '探活中…'}</i></span>
-        ${isWatch
+        <span class="svc-cand-head"><b>${esc(s.name || s.id)}</b><i class="svc-probe mono" data-svc-probe="${it.uid}" data-ok="${it.isWatch ? 'skip' : (it.probe ? (it.probe.ok ? '1' : '0') : 'pending')}">${esc(probeText(it))}</i><button type="button" class="svc-cand-del" data-svc-remove="${it.uid}" title="从这次收集结果里移除（同步删掉草稿）" aria-label="移除 ${esc(s.name || s.id)}">移除</button></span>
+        ${it.isWatch
           ? `<span class="svc-cand-meta mono">watch · 无地址（不探活，只做启动 / 编译）</span>`
-          : `<input class="dfield mono" data-svc-url="${i}" value="${esc(s.url)}" spellcheck="false" aria-label="服务地址">`}
+          : `<input class="dfield mono" data-svc-url="${it.uid}" value="${esc(it.url)}" spellcheck="false" aria-label="服务地址">`}
         <span class="svc-cand-cmds">
-          <input class="dfield mono" data-svc-kind="start" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(cmds.mac)}" placeholder="mac 启动命令" spellcheck="false" aria-label="mac 启动命令">
-          <input class="dfield mono" data-svc-kind="start" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(cmds.windows)}" placeholder="windows 启动命令" spellcheck="false" aria-label="windows 启动命令">
-          <input class="dfield mono" data-svc-kind="build" data-svc-cmd="mac" data-svc-cmd-i="${i}" value="${esc(bcmds.mac)}" placeholder="mac 编译命令（Makefile 的 make build）" spellcheck="false" aria-label="mac 编译命令">
-          <input class="dfield mono" data-svc-kind="build" data-svc-cmd="windows" data-svc-cmd-i="${i}" value="${esc(bcmds.windows)}" placeholder="windows 编译命令（没有就留空）" spellcheck="false" aria-label="windows 编译命令">
+          <input class="dfield mono" data-svc-kind="start" data-svc-cmd="mac" data-svc-cmd-i="${it.uid}" value="${esc(it.cmds.start.mac)}" placeholder="mac 启动命令" spellcheck="false" aria-label="mac 启动命令">
+          <input class="dfield mono" data-svc-kind="start" data-svc-cmd="windows" data-svc-cmd-i="${it.uid}" value="${esc(it.cmds.start.windows)}" placeholder="windows 启动命令" spellcheck="false" aria-label="windows 启动命令">
+          <input class="dfield mono" data-svc-kind="build" data-svc-cmd="mac" data-svc-cmd-i="${it.uid}" value="${esc(it.cmds.build.mac)}" placeholder="mac 编译命令（Makefile 的 make build）" spellcheck="false" aria-label="mac 编译命令">
+          <input class="dfield mono" data-svc-kind="build" data-svc-cmd="windows" data-svc-cmd-i="${it.uid}" value="${esc(it.cmds.build.windows)}" placeholder="windows 编译命令（没有就留空）" spellcheck="false" aria-label="windows 编译命令">
         </span>
-        <span class="svc-cand-meta">${esc(meta || '没有证据说明（来自 AI 推断）')}</span>
+        <span class="svc-cand-meta">${esc(metaOf(it) || '没有证据说明（来自 AI 推断）')}</span>
       </span>
     </label>`;
   }).join('');
+
   const note = draft && draft.at
     ? `生成于 ${new Date(draft.at).toLocaleString('sv-SE').slice(0, 16)}；打开时自动探活（未启动的显示离线，不影响写回）。`
     : '打开时自动探活（未启动的显示离线，不影响写回）。';
-  askConfirm('服务信息收集 · 确认后写回',
-    `<div class="cand-list">${rows}</div>
-     <div class="mnote">${esc(note)}<br>
-     start / build 都按平台各存一条：当前机器（${esc(servicePlatform.label || '当前平台')}）点「一键拉起」跑 start，「一键编译」跑 build（Makefile 的 <code>make build</code> 也走这条）；确认后写入 <code>rotation.json</code> 的 <code>services</code>。</div>`,
-    '写回 services', () => {
-      const p0 = PROJECTS.find(x => x.id === p.id);
-      if (!p0) return toast('项目列表已变，刷新后重试');
-      // 某个字段的两条平台命令都空 → 不写这个字段（不生成空对象）
-      const cmdsOf = (i, kind) => {
-        const pick = (plat) => {
-          const el = document.querySelector(`#ask-body [data-svc-kind="${kind}"][data-svc-cmd-i="${i}"][data-svc-cmd="${plat}"]`);
-          return el ? el.value.trim() : '';
-        };
-        const out = {};
-        const mac = pick('mac');
-        const win = pick('windows');
-        if (mac) out.mac = mac;
-        if (win) out.windows = win;
-        return Object.keys(out).length ? out : null;
+
+  const bodyHtml = () => `<div class="svc-cand-tools">
+      <span class="svc-cand-tip">不满意就逐条移除（草稿同步删掉），或者整份丢掉重新收集。</span>
+      <button type="button" class="tbtn danger" data-svc-redo>丢弃并重新收集</button>
+    </div>
+    ${items.length
+      ? `<div class="cand-list">${rowsHtml()}</div>`
+      : `<div class="info-empty">这次收集的 ${services.length} 条已全部移除。点「丢弃并重新收集」重新跑 AI，或「取消」关掉（草稿已同步清空）。</div>`}
+    <div class="mnote">${esc(note)}<br>
+      start / build 都按平台各存一条：当前机器（${esc(servicePlatform.label || '当前平台')}）点「一键拉起」跑 start，「一键编译」跑 build（Makefile 的 <code>make build</code> 也走这条）；确认后写入 <code>rotation.json</code> 的 <code>services</code>。</div>`;
+
+  /** 移除 / 重画前先把改过的地址与命令收回 items，否则重画会把编辑丢掉 */
+  const snapshot = () => {
+    items.forEach((it) => {
+      const pick = document.querySelector(`#ask-body [data-svc-pick="${it.uid}"]`);
+      if (pick) it.checked = pick.checked;
+      const urlEl = document.querySelector(`#ask-body [data-svc-url="${it.uid}"]`);
+      if (urlEl) it.url = urlEl.value;
+      const cmd = (kind, plat) => {
+        const el = document.querySelector(`#ask-body [data-svc-kind="${kind}"][data-svc-cmd="${plat}"][data-svc-cmd-i="${it.uid}"]`);
+        return el ? el.value : '';
       };
-      const picked = [];
-      services.forEach((s, i) => {
-        const box = document.querySelector(`#ask-body [data-svc-pick="${i}"]`);
-        if (!box || !box.checked) return;
-        const isWatch = s.kind === 'watch';
-        const urlEl = document.querySelector(`#ask-body [data-svc-url="${i}"]`);
-        const url = urlEl ? urlEl.value.trim() : '';
-        if (!url && !isWatch) return;
-        const start = cmdsOf(i, 'start');
-        const build = cmdsOf(i, 'build');
-        const svc = { id: s.id, name: s.name || s.id };
-        if (isWatch) svc.kind = 'watch';
-        if (url) svc.url = url;
-        if (s.health) svc.health = s.health;
-        if (start) svc.start = start;
-        if (build) svc.build = build;
-        if (s.cwd) svc.cwd = s.cwd;
-        if (s.confidence) svc.confidence = s.confidence;
-        if (s.evidence) svc.evidence = s.evidence;
-        picked.push(svc);
+      it.cmds = {
+        start: { mac: cmd('start', 'mac'), windows: cmd('start', 'windows') },
+        build: { mac: cmd('build', 'mac'), windows: cmd('build', 'windows') },
+      };
+    });
+  };
+
+  /** 全移除后「写回 services」置灰：避免一键把这张卡的 services 清空 */
+  const syncOkState = () => {
+    const ok = $('#ask-ok');
+    if (!ok) return;
+    ok.disabled = items.length === 0;
+    ok.title = items.length ? '' : '没有可写回的服务：先重新收集，或取消';
+  };
+
+  /** 逐条探活：在线 / 离线 / 超时只作参考，不拦截写回；watch 没有端口，直接跳过 */
+  const kickProbes = () => {
+    items.forEach((it) => {
+      if (it.isWatch || it.probe || it.probing) return;
+      it.probing = true;
+      fetch(api('/services/probe'), {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: it.svc.url, health: it.svc.health || '' }),
+      }).then(r => r.json()).then((j) => {
+        it.probing = false;
+        const pr = j && j.probe;
+        it.probe = !pr
+          ? { ok: false, text: '未探活' }
+          : pr.ok
+            ? { ok: true, text: `在线${pr.latencyMs != null ? ' · ' + pr.latencyMs + 'ms' : ''}` }
+            : { ok: false, text: pr.error === 'timeout' ? '超时（可能未启动）' : '离线（可能未启动）' };
+        const el = document.querySelector(`#ask-body [data-svc-probe="${it.uid}"]`);
+        if (!el) return;
+        el.textContent = it.probe.text;
+        el.dataset.ok = it.probe.ok ? '1' : '0';
+      }).catch(() => {
+        it.probing = false;
+        it.probe = { ok: false, text: '探活失败' };
+        const el = document.querySelector(`#ask-body [data-svc-probe="${it.uid}"]`);
+        if (el){ el.textContent = '探活失败'; el.dataset.ok = '0'; }
       });
-      if (!picked.length) return toast('至少勾一条要写回的服务');
-      const old = (p0.card && Array.isArray(p0.card.services)) ? p0.card.services.slice() : [];
-      const merged = old.filter(o => !picked.some(x => x.id === o.id)).concat(picked);
-      putServices(p0, merged);
     });
-  // 逐条探活：在线 / 离线 / 超时只作参考，不拦截写回；watch 没有端口，直接跳过
-  services.forEach((s, i) => {
-    if (s.kind === 'watch') {
-      const el = document.querySelector(`#ask-body [data-svc-probe="${i}"]`);
-      if (el){ el.textContent = '不探活（watch）'; el.dataset.ok = '1'; }
-      return;
+  };
+
+  const render = () => {
+    const body = $('#ask-body');
+    if (body) body.innerHTML = bodyHtml();
+    bind();
+    kickProbes();
+    syncOkState();
+  };
+
+  /** 草稿同步删掉这条；失败不回滚（行已经没了），只提醒可用「丢弃并重新收集」兜底 */
+  const removeRow = (uid) => {
+    const at = items.findIndex(it => it.uid === uid);
+    if (at < 0) return;
+    snapshot();
+    const gone = items.splice(at, 1)[0];
+    render();
+    fetch(api('/services/collect?file=') + encodeURIComponent(p.file) + '&id=' + encodeURIComponent(gone.svc.id), { method: 'DELETE' })
+      .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); })
+      .catch(() => toast('这条已从预览移除，但草稿同步失败：重开弹窗可能恢复它；可用「丢弃并重新收集」'));
+  };
+
+  /** 整份草稿作废，关窗后重新发起 AI 收集 */
+  const discardAndRecollect = async (btn) => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch(api('/services/collect?file=') + encodeURIComponent(p.file), { method: 'DELETE' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+    } catch (error) {
+      btn.disabled = false;
+      return toast('丢弃草稿失败：' + error.message);
     }
-    fetch(api('/services/probe'), {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url: s.url, health: s.health || '' }),
-    }).then(r => r.json()).then(j => {
-      const el = document.querySelector(`#ask-body [data-svc-probe="${i}"]`);
-      if (!el) return;
-      const pr = j && j.probe;
-      if (!pr){ el.textContent = '未探活'; el.dataset.ok = '0'; return; }
-      if (pr.ok){ el.textContent = `在线${pr.latencyMs != null ? ' · ' + pr.latencyMs + 'ms' : ''}`; el.dataset.ok = '1'; }
-      else { el.textContent = pr.error === 'timeout' ? '超时（可能未启动）' : '离线（可能未启动）'; el.dataset.ok = '0'; }
-    }).catch(() => {
-      const el = document.querySelector(`#ask-body [data-svc-probe="${i}"]`);
-      if (el){ el.textContent = '探活失败'; el.dataset.ok = '0'; }
+    hideModal($('#ask'));
+    toast('已丢弃这次收集结果，重新发起收集…');
+    collectServices(p);
+  };
+
+  const bind = () => {
+    document.querySelectorAll('#ask-body [data-svc-remove]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        removeRow(Number(btn.dataset.svcRemove));
+      });
     });
+    const redo = document.querySelector('#ask-body [data-svc-redo]');
+    if (redo) redo.addEventListener('click', () => discardAndRecollect(redo));
+  };
+
+  askConfirm('服务信息收集 · 确认后写回', bodyHtml(), '写回 services', () => {
+    if (!items.length) return toast('没有可写回的服务：先重新收集，或取消');
+    const p0 = PROJECTS.find(x => x.id === p.id);
+    if (!p0) return toast('项目列表已变，刷新后重试');
+    // 某个字段的两条平台命令都空 → 不写这个字段（不生成空对象）
+    const cmdsOf = (uid, kind) => {
+      const pick = (plat) => {
+        const el = document.querySelector(`#ask-body [data-svc-kind="${kind}"][data-svc-cmd="${plat}"][data-svc-cmd-i="${uid}"]`);
+        return el ? el.value.trim() : '';
+      };
+      const out = {};
+      const mac = pick('mac');
+      const win = pick('windows');
+      if (mac) out.mac = mac;
+      if (win) out.windows = win;
+      return Object.keys(out).length ? out : null;
+    };
+    const picked = [];
+    items.forEach((it) => {
+      const box = document.querySelector(`#ask-body [data-svc-pick="${it.uid}"]`);
+      if (!box || !box.checked) return;
+      const s = it.svc;
+      const urlEl = document.querySelector(`#ask-body [data-svc-url="${it.uid}"]`);
+      const url = (urlEl ? urlEl.value : it.url).trim();
+      if (!url && !it.isWatch) return;
+      const start = cmdsOf(it.uid, 'start');
+      const build = cmdsOf(it.uid, 'build');
+      const svc = { id: s.id, name: s.name || s.id };
+      if (it.isWatch) svc.kind = 'watch';
+      if (url) svc.url = url;
+      if (s.health) svc.health = s.health;
+      if (start) svc.start = start;
+      if (build) svc.build = build;
+      if (s.cwd) svc.cwd = s.cwd;
+      if (s.confidence) svc.confidence = s.confidence;
+      if (s.evidence) svc.evidence = s.evidence;
+      picked.push(svc);
+    });
+    if (!picked.length) return toast('至少勾一条要写回的服务');
+    const old = (p0.card && Array.isArray(p0.card.services)) ? p0.card.services.slice() : [];
+    const merged = old.filter(o => !picked.some(x => x.id === o.id)).concat(picked);
+    putServices(p0, merged);
   });
+  bind();
+  kickProbes();
+  syncOkState();
 }
 
 /** 写回 services（只替换这个字段；写前服务端还会再校验一遍） */
@@ -6225,6 +6349,8 @@ function askConfirm(title, bodyHtml, okLabel, onOk){
   $('#ask-title').textContent = title;
   $('#ask-body').innerHTML = bodyHtml;
   $('#ask-ok').textContent = okLabel || '确认';
+  $('#ask-ok').disabled = false;          // 服务收集预览会在条目全删后禁用「写回」，每次开窗都还原
+  $('#ask-ok').removeAttribute('title');
   $('#ask-cancel').style.display = '';    // 候选池空态会临时藏掉「取消」，每次开窗都还原
   askCb = onOk;
   showModal($('#ask'));

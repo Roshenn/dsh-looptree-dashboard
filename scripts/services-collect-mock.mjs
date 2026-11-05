@@ -136,6 +136,10 @@ const sendJson = async (method, path, body) => {
   });
   return { status: res.status, body: await res.json().catch(() => null) };
 };
+const delJson = async (path) => {
+  const res = await fetch(origin + path, { method: 'DELETE' });
+  return { status: res.status, body: await res.json().catch(() => null) };
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const cardOnDisk = async () => JSON.parse(await readFile(join(ws, '.dsh', 'rotation.json'), 'utf8'));
 
@@ -197,6 +201,26 @@ try {
   check('build 归一成平台映射（make build 来自 Makefile，空平台被丢掉）',
     JSON.stringify(draft?.services?.[0]?.build) === JSON.stringify({ mac: 'make build' }),
     JSON.stringify(draft?.services?.[0]?.build));
+
+  /* 2b. 草稿移除：带 id 删一条（同步落盘），不带 id 整份作废；都幂等 */
+  const draftB0 = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
+  const bIds = (d) => (d?.services || []).map(s => s.id);
+  const delB1 = await delJson('/api/services/collect?file=' + encodeURIComponent(FILE_B) + '&id=web');
+  check('移除一条后草稿只剩另外两条', delB1.status === 200 && JSON.stringify(bIds(delB1.body?.draft)) === JSON.stringify(['api', 'weapp']),
+    JSON.stringify(delB1.body));
+  check('移除不动草稿生成时间', delB1.body?.draft?.at === draftB0?.at, `${delB1.body?.draft?.at} vs ${draftB0?.at}`);
+  const delB2 = await delJson('/api/services/collect?file=' + encodeURIComponent(FILE_B) + '&id=web');
+  check('重复移除同一条幂等（不报错也不多删）', delB2.status === 200 && bIds(delB2.body?.draft).length === 2, JSON.stringify(delB2.body));
+  const delUnknown = await delJson('/api/services/collect?file=' + encodeURIComponent(FILE) + '&id=nope');
+  const draftA = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE))).body?.draft;
+  check('删不存在的 id 不误伤别的条目', delUnknown.status === 200 && (draftA?.services || []).length === 3, JSON.stringify(draftA));
+  const delNoFile = await delJson('/api/services/collect');
+  check('移除缺 file 被拒 400', delNoFile.status === 400, JSON.stringify(delNoFile.body));
+  await delJson('/api/services/collect?file=' + encodeURIComponent(FILE_B) + '&id=api');
+  const delLast = await delJson('/api/services/collect?file=' + encodeURIComponent(FILE_B) + '&id=weapp');
+  const draftBEmpty = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
+  check('删掉最后一条时整份草稿作废', delLast.status === 200 && delLast.body?.draft === null && draftBEmpty === null,
+    JSON.stringify(delLast.body));
 
   /* 3. 探活：拿 mock 服务自己的 health 当目标 */
   const probed = await sendJson('POST', '/api/services/probe', { url: origin + '/api/health' });
@@ -264,6 +288,22 @@ try {
   }
   check('模型报错原因原样透传', !!draft3 && /没有 read \/ bash 工具/.test(draft3.error || ''), JSON.stringify(draft3));
   check('报错时同样不动卡片', (await cardOnDisk()).services !== undefined || true);
+
+  /* 7c. 整份作废：面板「丢弃并重新收集」先 DELETE 草稿，再重新发起收集 */
+  replies.push(GOOD);
+  const restarted = await sendJson('POST', '/api/services/collect', { file: FILE_B });
+  check('丢弃后同一项目能重新收集', restarted.status === 200, JSON.stringify(restarted.body));
+  let draftB2 = null;
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(100);
+    draftB2 = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
+    if (draftB2 && (draftB2.services || []).length) break;
+  }
+  check('重新收集落回新草稿', (draftB2?.services || []).length === 3, JSON.stringify(draftB2));
+  const dropped = await delJson('/api/services/collect?file=' + encodeURIComponent(FILE_B));
+  const afterDrop = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
+  check('不带 id 整份作废', dropped.status === 200 && dropped.body?.dropped === true && dropped.body?.draft === null && afterDrop === null,
+    JSON.stringify(dropped.body));
 
   /* 8. 平台缺命令：不拿别的平台的命令硬跑 */
   const runner = createServiceRunner({ logger: { info() {} } });

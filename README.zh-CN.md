@@ -214,6 +214,7 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 | `POST` | `/rotation/api/service/build` | 一键编译：等退出后回退出码与输出尾巴 |
 | `POST` | `/rotation/api/services/probe` · `/rotation/api/services/collect` | 服务探活 / AI 收集（草稿 → 预览 → 写回） |
 | `GET` | `/rotation/api/services/collect?file=` | 某张卡的待确认服务草稿 |
+| `DELETE` | `/rotation/api/services/collect?file=` | 删草稿：带 `&id=` 只删这一条，不带 `id` 整份作废（「丢弃并重新收集」先走这条） |
 | `GET` | `/rotation/api/services/all` | 全部项目的服务、端口与冲突（`?probe=0` 不探活） |
 | `POST` | `/rotation/api/services/start-all` | 拉起全部离线服务；`409` + conflicts 表示一个都没拉 |
 | `GET` | `/rotation/api/session/context?sessionId=` | 会话 → 工作区 → 项目（含服务概览），给 composer 卡片用 |

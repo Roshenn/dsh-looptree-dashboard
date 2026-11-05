@@ -239,6 +239,7 @@ atomically (`tmp` + rename, no `.bak` — git is the history).
 | `POST` | `/rotation/api/service/build` | one-click build; waits for the exit code and returns the output tail |
 | `POST` | `/rotation/api/services/probe` · `/rotation/api/services/collect` | probe a service / AI discovery (draft → preview → write-back) |
 | `GET` | `/rotation/api/services/collect?file=` | the pending service draft for a card |
+| `DELETE` | `/rotation/api/services/collect?file=` | drop the pending draft (`&id=` removes one entry; no `id` discards the whole draft) |
 | `GET` | `/rotation/api/services/all` | every project's services, ports and conflicts (`?probe=0` skips probing) |
 | `POST` | `/rotation/api/services/start-all` | start all offline services; `409` + conflicts means nothing was started |
 | `GET` | `/rotation/api/session/context?sessionId=` | session → workspace → project, plus a service summary for the composer card |
