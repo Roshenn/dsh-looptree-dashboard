@@ -93,10 +93,11 @@ did the work. The panel is the view; DSH is the engine.
   reports per-port failures instead of stopping the batch.
 - **Two buttons in the composer.** Beside the model selector, every session whose workspace is a
   registered project gets a compact card. **Services** starts every offline service of that project
-  (port conflicts still fail closed); **Loop** switches the main area to the project's focus view and
-  scrolls to the current node (running → ready → milestone), and the panel grows a **← Back to chat**
-  button so the round trip is one click each way. The card renders nothing in workspaces that are not
-  registered yet.
+  (port conflicts still fail closed); once anything is already listening it turns into **Open services**,
+  which opens one tab per running service in the right-side embedded browser (never the system browser).
+  **Loop** switches the main area to the project's focus view and scrolls to the current node
+  (running → ready → milestone), and the panel grows a **← Back to chat** button so the round trip is
+  one click each way. The card renders nothing in workspaces that are not registered yet.
 - **Item fields are lists you edit in place.** Important-capability and core-metric editors add and remove
   one item at a time (`+ Add one` / `×`), and renumber on save. There is no drag ordering: the order you
   type is the order that is written back.

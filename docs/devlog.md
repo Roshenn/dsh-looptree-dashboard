@@ -592,3 +592,17 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
   composer 上，因为上了面板 composer 就不在屏幕上了。
 - 验证：`mock:context` / `mock:focus-current` 两个新 mock + `mock:client` 的 composer 断言，
   `npm run preflight` 全绿；真机验证需重启 DSH 让 host 半重载。
+
+## 2026-11-05（晚）· 服务已在线时改「打开服务」
+
+- 反馈：服务已经在跑，同一项目开第二条会话时按钮显示「失败」；期望直接显示「打开服务」，
+  点了在右侧内嵌浏览器打开，而不是弹系统浏览器。
+- 根因：`start-all` 会对「进程还在但端口没听」的服务回「已在运行（pid …）」，卡片把所有 failed 都当失败；
+  卡片也拿不到实况（上下文接口刻意不探活）。
+- 决策：卡片异步查 `GET /services?file=`（>10s 或首次点击才重查）；有在线服务就切「打开服务」，
+  点击给每个在线服务各开一个右栏 tab（用户选的方案）；没有在线才走 start-all。
+  启动后无论成功失败都再探一次，探到在线就按在线处理，不再显示失败；项目没有服务配置时只留「闭环」。
+- 实现：把面板消息通道里的开页逻辑抽成 `openServiceUrl()`，卡片与面板共用；只改 client 半，
+  刷新页面即可，不需要重启 DSH。
+- 验证：`mock:client` 新增 6 条断言（打开服务标签、不调 start-all、每个在线服务一个 tab、
+  「已在运行」不再失败、无服务只留闭环）；`npm run preflight` 全绿。
