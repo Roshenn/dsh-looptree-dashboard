@@ -51,6 +51,7 @@ await writeFile(join(home, 'registry.json'), JSON.stringify([entry('outer', ws),
 await writeFile(join(ws, '.dsh', 'rotation.json'), JSON.stringify({
   schema: 'rotation/v1',
   project: { name: 'outer', workspace: ws },
+  milestone: { id: 'outer-milestone', kind: 'milestone', children: [] },
   services: [
     { id: 'web', name: 'web', url: 'http://127.0.0.1:4100', start: { mac: 'node serve.mjs', windows: 'node serve.mjs' } },
     { id: 'watch', name: 'watch', kind: 'watch', start: 'pnpm dev' },
@@ -59,6 +60,7 @@ await writeFile(join(ws, '.dsh', 'rotation.json'), JSON.stringify({
 await writeFile(join(wsNested, '.dsh', 'rotation.json'), JSON.stringify({
   schema: 'rotation/v1',
   project: { name: 'inner', workspace: wsNested },
+  milestone: { id: 'inner-milestone', kind: 'milestone', children: [] },
   services: [{ id: 'n', name: 'n', url: 'http://127.0.0.1:4200', start: { linux: 'true' } }],
 }), 'utf8');
 
@@ -118,10 +120,12 @@ const mapped = await sessionContext('session-a');
 ok('映射成功：project 指向 outer', mapped.ok === true && mapped.project?.id === 'outer', JSON.stringify(mapped.project));
 ok('映射成功：services 概览带出来', mapped.services.total === 2 && mapped.services.startable === 2, JSON.stringify(mapped.services));
 ok('映射成功：token 反映 tapIndex 可用', mapped.token === true);
+ok('映射成功：panelId 是面板里的项目 key', mapped.panelId === 'card-outer-milestone', mapped.panelId);
 
 const unmapped = await sessionContext('session-unknown');
 ok('未映射：project=null 且 ok=true', unmapped.ok === true && unmapped.project === null, JSON.stringify(unmapped));
 ok('未映射：services 归零', unmapped.services.total === 0 && unmapped.services.startable === 0);
+ok('未映射：panelId 为空', unmapped.panelId === '');
 
 const missing = await sessionContext('');
 ok('缺 sessionId：ok=false', missing.ok === false && /sessionId/.test(missing.error), JSON.stringify(missing));
@@ -135,7 +139,8 @@ ok('工作区存储回退也能映射到嵌套项目', nested.project?.id === 'i
 // 卡片坏掉不该把项目判丢
 await writeFile(join(wsNested, '.dsh', 'rotation.json'), '{ broken', 'utf8');
 const broken = await sessionContext('session-b');
-ok('卡片坏掉仍保留 project，只是服务归零', broken.ok === true && broken.project?.id === 'inner' && broken.services.total === 0, JSON.stringify(broken));
+ok('卡片坏掉仍保留 project，只是服务与 panelId 归零', broken.ok === true && broken.project?.id === 'inner'
+  && broken.services.total === 0 && broken.panelId === '', JSON.stringify(broken));
 
 await rm(home, { recursive: true, force: true }).catch(() => {});
 await rm(dshHome, { recursive: true, force: true }).catch(() => {});

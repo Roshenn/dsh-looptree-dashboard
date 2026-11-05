@@ -319,6 +319,7 @@ window.__ROTATION_TOKEN__ = 'test-token';
 contextPayload = {
   ok: true, sessionId: 'session-1', cwd: '/tmp/proj',
   project: PROJECT, services: { total: 2, startable: 2, hasUrl: true }, token: true,
+  panelId: 'card-proj-milestone',
 };
 const cellProps = { sessionId: 'session-1', usePanelInfo: (select) => select({ activePanelId: null }) };
 const labelOf = (btn) => ((btn.children || [])[1]?.children || []).join('');
