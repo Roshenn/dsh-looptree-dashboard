@@ -606,3 +606,10 @@ node validate-rotation.mjs samples/我的项目.rotation.json   # 先改 id/titl
   刷新页面即可，不需要重启 DSH。
 - 验证：`mock:client` 新增 6 条断言（打开服务标签、不调 start-all、每个在线服务一个 tab、
   「已在运行」不再失败、无服务只留闭环）；`npm run preflight` 全绿。
+
+## 2026-11-06 · composer 卡片图标与状态色收敛
+
+- 反馈：拉起服务和打开服务两个状态的图标一样，只能靠文字分辨；状态色也太抢眼。
+- 改法：拉起 = 电源图标，打开 = 右栏面板图标（形状就不同）；状态色统一走
+  `color-mix(主题色 60%, 次级文字色)` + 6–7% 极浅底色，悬停只加深到 9%，不再用高饱和主色。
+- 验证：mock:client 断言两种图标形状、data-tone 与 CSS 里的低饱和写法；preflight 全绿。
