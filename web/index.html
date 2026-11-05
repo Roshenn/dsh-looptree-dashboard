@@ -209,6 +209,8 @@
   .tnode[data-idle="strong"] .idle-pill,.tnode[data-idle="modest"] .idle-pill{display:inline-flex}
   .tnode[data-idle="strong"]{border-color:color-mix(in srgb,var(--ready) 44%,var(--b1));
     box-shadow:0 0 0 1.5px color-mix(in srgb,var(--ready) 24%,transparent)}
+  .tnode.is-current{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 72%,transparent),0 0 0 7px color-mix(in srgb,var(--brand) 16%,transparent);
+    transition:box-shadow .18s ease}
   .tnode[data-idle="strong"]::before{width:3px;background:var(--ready);opacity:1}
   .tnode[data-idle="modest"]{border-color:color-mix(in srgb,var(--ready) 30%,var(--b1))}
   .tnode[data-idle="modest"]::before{width:2px;background:var(--ready);opacity:.55}
@@ -934,6 +936,7 @@
       <button class="chip" id="hide-closed" aria-pressed="false" title="显示风格：画布上不留已闭环的能力闭环 / 执行记录（已达成里程碑仍显示，数量在卡片 chips 上）">隐藏已闭环</button>
       <span style="width:1px;height:16px;background:var(--b2);margin:0 4px"></span>
       <button class="chip" id="back-to-dsh" hidden title="返回到 DSH">← 返回</button>
+      <button class="chip" id="back-to-session" hidden title="回到 DSH 会话">← 回会话</button>
       <button class="chip" id="add-project">+ 项目</button>
       <button class="chip" id="load-json">载入 JSON</button>
       <input type="file" id="file-input" accept=".json,application/json" hidden>
@@ -1725,6 +1728,22 @@ function idleModelOf(project, isBusy, isBlocked) {
 function isLiveNode(p, n) {
   const r = runFor(p, n);
   return !!(r && (r.status === 'starting' || r.status === 'running'));
+}
+/**
+ * 「当前闭环」：运行中 → 可开工（强高亮分支）→ 里程碑根。
+ * 纯函数、不碰 DOM（scripts/focus-current-mock.mjs 直接抠出来跑断言）。
+ * 执行记录不算分支，跳过——用户定位的是能力闭环，不是某条记录。
+ */
+function currentNodeOf(p){
+  if (!p || !p.root) return '';
+  const open = [];
+  walk(p.root, (n) => { if (n && !n.closed) open.push(n); });
+  const live = open.find((n) => isLiveNode(p, n));
+  if (live) return live.id;
+  const idleIds = (p.idle && p.idle.idleIds) || new Set();
+  const ready = open.find((n) => idleIds.has(n.id) && n.kind !== 'exec');
+  if (ready) return ready.id;
+  return p.root.id;
 }
 function liveRunCount() {
   let n = 0;
@@ -2967,6 +2986,32 @@ function renderFocus(){
     const canvas = wrap.querySelector('.canvas');
     if (canvas) layoutCanvas(p, canvas, focusCols(canvas));
   });
+}
+
+/**
+ * 主区切到「项目聚焦」并滚到当前闭环节点。
+ * 三个入口共用：composer 卡片的「闭环」按钮（postMessage）、?current=1、面板内切换项目。
+ */
+function focusCurrentLoop(){
+  const p = PROJECTS.find(x => x.id === state.focusId) || PROJECTS[0];
+  if (!p) return;
+  state.view = 'focus';
+  state.focusId = p.id;
+  render();
+  const target = currentNodeOf(p);
+  if (!target) return;
+  const escapeId = (id) => (typeof CSS !== 'undefined' && CSS.escape)
+    ? CSS.escape(id)
+    : String(id).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  // 等 renderFocus 的 mountCanvas + layoutCanvas 落位后再滚
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = document.querySelector(`#focus .tnode[data-nid="${escapeId(target)}"]`);
+    if (!el) return;
+    try { el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' }); }
+    catch { el.scrollIntoView(); }
+    el.classList.add('is-current');
+    setTimeout(() => el.classList.remove('is-current'), 2000);
+  }));
 }
 
 function render(){
@@ -6626,6 +6671,17 @@ let EMBEDDED = false;
 try { EMBEDDED = window.self !== window.top; } catch { EMBEDDED = true; }
 if (EMBEDDED) document.documentElement.dataset.embed = '1';
 
+// 嵌在主区时留一条回程：composer 的卡片在对话里，上了面板就只剩这条「← 回会话」
+try {
+  if (EMBEDDED){
+    const back = $('#back-to-session');
+    back.hidden = false;
+    back.addEventListener('click', () => {
+      try { window.parent.postMessage({ type: 'rotation-back-to-conversation' }, '*'); } catch { /* noop */ }
+    });
+  }
+} catch { /* noop */ }
+
 // 「返回」：只要页面是插件提供的（路径含 /rotation/）且不是嵌入模式
 try {
   const servedByPlugin = location.pathname.includes('/rotation/') && !EMBEDDED;
@@ -7243,11 +7299,22 @@ window.addEventListener('scroll', ()=>{ hideCandTip(); }, true);
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
 if (qs.get('theme')) state.theme = qs.get('theme');
-// 被 DSH 主区嵌入时，主题跟随宿主：宿主通过 postMessage 推送
+// 被 DSH 主区嵌入时，主题跟随宿主：宿主通过 postMessage 推送；
+// composer 的「闭环」按钮另发 rotation-focus（项目 + 是否定位当前节点）。
 window.addEventListener('message', (e) => {
   const msg = e.data;
-  if (!msg || msg.type !== 'rotation-theme') return;
-  if (msg.theme && msg.theme !== state.theme){ state.theme = msg.theme; render(); }
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.type === 'rotation-theme') {
+    if (msg.theme && msg.theme !== state.theme){ state.theme = msg.theme; render(); }
+    return;
+  }
+  if (msg.type === 'rotation-focus') {
+    const p = PROJECTS.find(x => x.id === msg.project);
+    if (!p) return;
+    state.focusId = p.id;
+    if (msg.current === false){ state.view = 'focus'; render(); }
+    else focusCurrentLoop();
+  }
 });
 if (qs.get('project')) state.focusId = qs.get('project');
 if (qs.get('filter')) state.filter = qs.get('filter');
@@ -7292,6 +7359,7 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   await loadAllCandidateCounts();   // 先灌候选条数，节点卡首帧就能显示「候选池 n」
   applyAskTrayCollapsed();          // 托盘折叠状态刷新后保持
   render();
+  if (qs.get('current') === '1') focusCurrentLoop();   // composer 的「闭环」按钮：定位到当前节点
   notifyPendingSplits();
   const src = $('#data-src');
   if (src) src.textContent = source === 'server'
