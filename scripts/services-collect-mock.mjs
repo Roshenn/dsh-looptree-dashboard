@@ -141,6 +141,16 @@ const delJson = async (path) => {
   return { status: res.status, body: await res.json().catch(() => null) };
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** 等一个 run 进终态：mock 的收集结果在会话事件回调里落草稿，要等落完再断言 */
+const waitRun = async (key) => {
+  for (let i = 0; i < 60; i += 1) {
+    await sleep(50);
+    const runs = (await getJson('/api/runs')).body?.runs || [];
+    const hit = runs.find(r => r.key === key);
+    if (hit && ['done', 'failed', 'cancelled'].includes(hit.status)) return hit;
+  }
+  return null;
+};
 const cardOnDisk = async () => JSON.parse(await readFile(join(ws, '.dsh', 'rotation.json'), 'utf8'));
 
 try {
@@ -301,10 +311,10 @@ try {
   check('模型报错原因原样透传', !!draft3 && /没有 read \/ bash 工具/.test(draft3.error || ''), JSON.stringify(draft3));
   check('报错时同样不动卡片', (await cardOnDisk()).services !== undefined || true);
 
-  /* 7c. 整份作废：面板「丢弃并重新收集」先 DELETE 草稿，再重新发起收集 */
+  /* 7c. 整份作废：面板「移除所有」走 DELETE（不带 id），作废后能重新发起 */
   replies.push(GOOD);
   const restarted = await sendJson('POST', '/api/services/collect', { file: FILE_B });
-  check('丢弃后同一项目能重新收集', restarted.status === 200, JSON.stringify(restarted.body));
+  check('整份作废后同一项目能重新收集', restarted.status === 200, JSON.stringify(restarted.body));
   let draftB2 = null;
   for (let i = 0; i < 40; i += 1) {
     await sleep(100);
@@ -316,6 +326,25 @@ try {
   const afterDrop = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
   check('不带 id 整份作废', dropped.status === 200 && dropped.body?.dropped === true && dropped.body?.draft === null && afterDrop === null,
     JSON.stringify(dropped.body));
+
+  /* 7d. 「重新收集」不清旧草稿：新结果成功才覆盖，失败时旧结果还能打开 */
+  replies.push(GOOD);
+  const reseedB = await sendJson('POST', '/api/services/collect', { file: FILE_B });
+  check('重新收集已发起', reseedB.status === 200, JSON.stringify(reseedB.body));
+  let draftB3 = null;
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(100);
+    draftB3 = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
+    if (draftB3 && (draftB3.services || []).length === 3) break;
+  }
+  check('重新收集成功覆盖草稿', (draftB3?.services || []).length === 3, JSON.stringify(draftB3 && draftB3.services?.length));
+  replies.push('不是 JSON 的收集结果');
+  const refail = await sendJson('POST', '/api/services/collect', { file: FILE_B });
+  await waitRun(refail.body?.run?.key);
+  await sleep(100);
+  const draftB4 = (await getJson('/api/services/collect?file=' + encodeURIComponent(FILE_B))).body?.draft;
+  check('重新收集失败时保留旧草稿', (draftB4?.services || []).length === 3 && !draftB4.error, JSON.stringify(draftB4));
+  await delJson('/api/services/collect?file=' + encodeURIComponent(FILE_B));
 
   /* 8. 平台缺命令：不拿别的平台的命令硬跑 */
   const runner = createServiceRunner({ logger: { info() {} } });
