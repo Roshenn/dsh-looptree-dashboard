@@ -25,12 +25,96 @@ globalThis.window = {
   },
 };
 
-// 用一份极简 react 替身，只为断言组件能创建出元素
+// 用一份极简 react 替身：createElement 只为断言元素形状，hook 运行时只为
+// 把 composer 卡片（useState/useEffect/useRef）渲染出来并驱动状态变化。
+let activeRuntime = null;
 const reactStub = {
   createElement(type, props, ...children) {
     return { $$type: type, props: props || {}, children };
   },
+  useState(init) {
+    const rt = activeRuntime;
+    const i = rt.index++;
+    if (!rt.slots[i]) rt.slots[i] = { value: typeof init === 'function' ? init() : init };
+    const slot = rt.slots[i];
+    return [slot.value, (next) => {
+      const value = typeof next === 'function' ? next(slot.value) : next;
+      if (Object.is(value, slot.value)) return;
+      slot.value = value;
+      rt.schedule();
+    }];
+  },
+  useEffect(fn, deps) {
+    const rt = activeRuntime;
+    const i = rt.index++;
+    let slot = rt.slots[i];
+    if (!slot) slot = rt.slots[i] = { deps: null, fn, cleanup: null };
+    const changed = !deps || !slot.deps || deps.length !== slot.deps.length
+      || deps.some((dep, j) => !Object.is(dep, slot.deps[j]));
+    slot.fn = fn;
+    if (changed) {
+      slot.deps = deps ? deps.slice() : null;
+      slot.cleanup = null;
+      rt.effects.push(slot);
+    }
+  },
+  useRef(init) {
+    const rt = activeRuntime;
+    const i = rt.index++;
+    if (!rt.slots[i]) rt.slots[i] = { ref: { current: init } };
+    return rt.slots[i].ref;
+  },
+  useCallback(fn) { return fn; },
+  useMemo(fn) { return fn(); },
 };
+
+/** 每渲染一次组件就换一份 hook 现场；setState 走 setTimeout 重绘，和 React 一样异步 */
+function createRuntime(component, props) {
+  const rt = { component, props, slots: [], index: 0, effects: [], scheduled: false };
+  rt.schedule = () => {
+    if (rt.scheduled) return;
+    rt.scheduled = true;
+    setTimeout(() => { rt.scheduled = false; rt.paint(); }, 0);
+  };
+  rt.paint = () => {
+    activeRuntime = rt;
+    rt.index = 0;
+    rt.effects = [];
+    const tree = component(rt.props);
+    for (const slot of rt.effects) {
+      try { if (slot.cleanup) slot.cleanup(); } catch { /* noop */ }
+      const ret = slot.fn();
+      slot.cleanup = typeof ret === 'function' ? ret : null;
+    }
+    activeRuntime = null;
+    return tree;
+  };
+  return rt;
+}
+
+// 面板卡片会注入样式；给一个最小 document 替身，顺带断言样式只注入一次
+const styleNodes = [];
+globalThis.document = {
+  documentElement: { dataset: {} },
+  head: { appendChild: (node) => styleNodes.push(node) },
+  createElement: () => ({ dataset: {}, textContent: '' }),
+  querySelector: () => null,
+};
+
+// fetch 替身：session/context 与 services/start-all 两条链路
+const fetchCalls = [];
+let contextPayload = null;
+globalThis.fetch = async (url, options = {}) => {
+  fetchCalls.push({ url: String(url), options });
+  if (String(url).includes('/session/context')) {
+    return { ok: true, status: 200, json: async () => contextPayload };
+  }
+  if (String(url).includes('/services/start-all')) {
+    return { ok: true, status: 200, json: async () => ({ ok: true, started: [{ id: 'web' }], skipped: [], failed: [] }) };
+  }
+  return { ok: false, status: 404, json: async () => ({ ok: false }) };
+};
+const flush = async (n = 8) => { for (let i = 0; i < n; i += 1) await new Promise((r) => setTimeout(r, 5)); };
 
 const results = [];
 const ok = (label, pass, detail = '') => {
@@ -221,6 +305,80 @@ ok('非 http(s) 地址被拒', replies[0]?.ok === false && openCalls.length === 
 
 replies = dispatch({ type: 'rotation-open-url', url: 'http://127.0.0.1:40100/' }, 'http://evil.example.com');
 ok('跨源消息被忽略', replies.length === 0, JSON.stringify(replies));
+
+// ── composer 卡片：服务拉起 + 展开闭环 ──
+const launcher = registered.find((r) => r.descriptor.name === 'conversation.input.right');
+ok('注册了 composer 卡片', !!launcher && launcher.descriptor.id === 'rotation-launch', launcher?.descriptor?.id);
+ok('卡片样式只注入一次', styleNodes.length === 1
+  && String(styleNodes[0].dataset.pluginCss || '').includes('launcher.css'), String(styleNodes.length));
+
+const PROJECT = { id: 'proj', name: 'proj', file: 'proj.rotation.json', workspace: '/tmp/proj' };
+const panelCalls = [];
+services = { layout: { selectPanel: (key) => panelCalls.push(key) } };
+window.__ROTATION_TOKEN__ = 'test-token';
+contextPayload = {
+  ok: true, sessionId: 'session-1', cwd: '/tmp/proj',
+  project: PROJECT, services: { total: 2, startable: 2, hasUrl: true }, token: true,
+};
+const cellProps = { sessionId: 'session-1', usePanelInfo: (select) => select({ activePanelId: null }) };
+const labelOf = (btn) => ((btn.children || [])[1]?.children || []).join('');
+
+fetchCalls.length = 0;
+const rt = createRuntime(launcher.component, cellProps);
+rt.paint();
+await flush();
+let tree = rt.paint();
+ok('有项目时渲染两个按钮', !!tree && (tree.children || []).length === 2,
+  tree ? String((tree.children || []).length) : 'null');
+ok('先读 session 上下文', fetchCalls.some((c) => c.url.includes('/session/context?sessionId=session-1')),
+  fetchCalls.map((c) => c.url).join(','));
+ok('两颗按钮文案是「服务 / 闭环」', labelOf(tree.children[0]) === '服务' && labelOf(tree.children[1]) === '闭环',
+  labelOf(tree.children[0]) + '/' + labelOf(tree.children[1]));
+
+fetchCalls.length = 0;
+tree.children[0].props.onClick();
+tree = rt.paint();
+ok('点「服务」先进入拉起中', labelOf(tree.children[0]) === '拉起中', labelOf(tree.children[0]));
+await new Promise((resolve) => setTimeout(resolve, 720));
+await flush();
+tree = rt.paint();
+const startCall = fetchCalls.find((c) => c.url.includes('/services/start-all'));
+ok('拉起请求打到 start-all', !!startCall, startCall?.url);
+ok('带写令牌请求头', startCall?.options?.headers?.['x-rotation-token'] === 'test-token',
+  JSON.stringify(startCall?.options?.headers || {}));
+ok('只拉起当前项目的服务', (() => {
+  try { return JSON.parse(startCall.options.body).file === 'proj.rotation.json'; } catch { return false; }
+})(), startCall?.options?.body);
+ok('成功后按钮变「已在线」', labelOf(tree.children[0]) === '已在线', labelOf(tree.children[0]));
+
+panelCalls.length = 0;
+tree.children[1].props.onClick();
+ok('点「闭环」切到面板主区', panelCalls.includes('rotation'), JSON.stringify(panelCalls));
+
+// 未登记成项目：整张卡片不渲染
+contextPayload = { ok: true, sessionId: 'session-2', project: null };
+const rt2 = createRuntime(launcher.component, { sessionId: 'session-2', usePanelInfo: (select) => select({ activePanelId: null }) });
+rt2.paint();
+await flush();
+ok('未登记工作区不渲染卡片', rt2.paint() === null);
+
+// 宿主要无法注入写令牌（旧版 DSH）：服务禁用，闭环仍可用
+contextPayload = {
+  ok: true, sessionId: 'session-3', project: PROJECT,
+  services: { total: 1, startable: 1, hasUrl: true }, token: false,
+};
+const rt3 = createRuntime(launcher.component, { sessionId: 'session-3', usePanelInfo: (select) => select({ activePanelId: null }) });
+rt3.paint();
+await flush();
+const tree3 = rt3.paint();
+ok('没有写令牌时禁用「服务」', tree3?.children?.[0]?.props?.disabled === true);
+ok('没有写令牌时「闭环」仍可用', tree3?.children?.[1]?.props?.disabled !== true);
+
+// 面板里的「← 回会话」
+window.__ROTATION_TOKEN__ = 'test-token';
+panelCalls.length = 0;
+dispatch({ type: 'rotation-back-to-conversation' });
+ok('面板「回会话」切回对话', panelCalls.includes(null), JSON.stringify(panelCalls));
 
 // ── 降级路径：没有 slots ──
 let degraded = false;
