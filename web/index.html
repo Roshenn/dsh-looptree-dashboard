@@ -1228,6 +1228,13 @@
   @media (hover:none){
     .lane-svc .svc-acts{max-height:none;opacity:1;margin-top:4px}
   }
+  /* focus view: the project switcher takes the first row, status hints stay out of the way */
+  html[data-view="focus"] #save-state,html[data-view="focus"] #data-src{display:none}
+  html[data-view="focus"] .toolbar .chipbar:first-child{flex:0 0 auto}
+  @media (max-width:1450px){
+    html[data-view="focus"] #focus-switch{order:10;flex:1 1 100%;min-width:0;overflow-x:auto;padding:2px 0 1px}
+    html[data-view="focus"] #focus-switch .chip{flex:0 0 auto}
+  }
   @media (max-width:1400px){ #data-src{display:none} }
   @media (max-width:1180px){ #save-state{display:none} }
 </style>
@@ -3326,14 +3333,14 @@ function renderFocus(){
         </div>
         <div class="pane-foot">点一条＝切回该会话；独立打开面板时退化为看全文</div>
       </section>
-      <section class="pane" style="grid-column:1/-1">
+      ${(p.trail||[]).length ? `<section class="pane" style="grid-column:1/-1">
         <div class="pane-head"><span class="k">轮转轨迹</span><span class="n mono">自动记录</span></div>
         <div class="timeline">
           ${(p.trail||[]).map(t=>`<div class="tl"><span class="tl-time mono">${t.at}</span>
             <span class="tl-dot" style="--tone:${(STATUS[t.status]||STATUS.plan).tone}"></span>
             <span class="tl-act">${t.act}</span><span class="tl-note">${t.note}</span></div>`).join('')}
         </div>
-      </section>
+      </section>` : ''}
     </div>`;
 
   const fcanvas = wrap.querySelector('.canvas');
@@ -3375,6 +3382,7 @@ function render(){
   closeDetail();
   recomputeIdle();                 // 先算空闲分支，nodeMarkup / laneMarkup 才有 data-idle 可写
   document.documentElement.dataset.theme = state.theme;
+  document.documentElement.dataset.view = state.view;
   setTimeout(applyFrozenStates, 0);
   $('#tab-matrix').setAttribute('aria-pressed', state.view==='matrix');
   $('#tab-focus').setAttribute('aria-pressed', state.view==='focus');
