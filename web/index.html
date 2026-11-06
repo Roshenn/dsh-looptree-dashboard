@@ -1073,7 +1073,7 @@
   /* ── side rail: own scroll, never stretches the lane ── */
   .info{position:absolute;top:0;right:0;bottom:0;width:var(--info-col);min-width:0;overscroll-behavior:contain;
     border-left:1px solid var(--b1);background:color-mix(in srgb,var(--base) 55%,var(--l1));
-    padding:14px 16px 12px;gap:12px;overflow-y:auto;overflow-x:hidden;
+    padding:12px 14px 10px;gap:9px;overflow-y:auto;overflow-x:hidden;
     scrollbar-color:var(--l4) transparent;scrollbar-width:thin}
   .info-sec{gap:5px}
   .info-k{font-size:var(--fs-11);letter-spacing:.02em;text-transform:none;color:var(--tx4);font-weight:500}
@@ -2745,7 +2745,6 @@ function laneStats(p){
       <div class="info-k">节点</div>
       <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>里程碑 / 能力闭环<b>${s0.kind.milestone} / ${s0.kind.capability}</b></div>
       <div class="info-row"><span class="d" style="--tone:var(--green)"></span>执行记录<b>${s0.kind.exec}</b></div>
-      <div class="info-row"><span class="d" style="--tone:var(--tx4)"></span>合计<b>${nodes}</b></div>
       <div class="info-row" style="font-size:var(--fs-11)">进行中 ${s0.stat.doing} · 待确认 ${s0.stat.review} · 规划中 ${s0.stat.plan} · 未开始 ${s0.stat.todo} · 阻塞 ${s0.stat.blocked} · 已关闭 ${s0.stat.closed}</div>
     </div>
   </div>`;
