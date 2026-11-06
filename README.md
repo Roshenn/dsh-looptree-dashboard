@@ -131,7 +131,7 @@ did the work. The panel is the view; DSH is the engine.
 
 </details>
 
-<sub>Screenshots are the real panel at v0.12 (the current panel is three columns), running on the sample cards in `samples/`.</sub>
+<sub>Screenshots are the real panel at v0.22 (three-column matrix, status rail on the right), running on the sample cards in `samples/`.</sub>
 
 ## Installation
 
