@@ -220,6 +220,8 @@
   .tnode[data-idle="strong"]::before{width:3px;background:var(--ready);opacity:1}
   .tnode[data-idle="modest"]{border-color:color-mix(in srgb,var(--ready) 30%,var(--b1))}
   .tnode[data-idle="modest"]::before{width:2px;background:var(--ready);opacity:.55}
+  /* no background wash on "just became idle": the ready pill and the rail carry it */
+  .tnode[data-idle-pulse="1"]{animation:none}
   .tnode[data-idle="strong"]:hover,.tnode[data-idle="modest"]:hover{border-color:color-mix(in srgb,var(--ready) 62%,var(--b3))}
   /* 刚变空闲时闪一次（只在状态翻转那一下，不做常驻呼吸动画） */
   /* 会话完成后「有新内容」：暖色描边 + 右上角「新」；保留到点开该节点 */
@@ -464,7 +466,10 @@
 
   /* ───────── 嵌入 DSH 主区时的紧凑模式 ───────── */
   html[data-embed="1"] .topbar{padding:6px 10px;gap:8px}
-  html[data-embed="1"] .toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:5px;padding-bottom:2px}
+  html[data-embed="1"] .toolbar{flex-wrap:wrap;overflow:visible;gap:5px;padding:8px 12px}
+  html[data-embed="1"] #save-state,html[data-embed="1"] #data-src{display:none}
+  html[data-embed="1"] .topbar{padding:0 12px;gap:12px}
+  html[data-embed="1"] .meta-strip{gap:10px}
   html[data-embed="1"] .toolbar .chip{height:22px;padding:0 7px;font-size:var(--fs-11);flex:0 0 auto}
   html[data-embed="1"] .brand-sub{display:none}
   /* 嵌入时主区本就窄：这条长说明不参与布局，否则会把工具栏撑成 250px 高（竖排文字） */
@@ -909,6 +914,9 @@
      every selection is a 1px line, never a filled pill.
      ═══════════════════════════════════════════════════════════════ */
 
+  /* hidden attribute wins over any component display rule */
+  [hidden]{display:none !important}
+
   /* ── shell ── */
   body{font:var(--fs-13)/1.55 var(--font);background:var(--base)}
   .topbar{height:56px;flex:0 0 56px;padding:0 20px;gap:20px;border-bottom:1px solid var(--b1);background:var(--base)}
@@ -977,7 +985,7 @@
   .stage-head .en{display:none}
 
   /* lane: recessed surface; height follows the canvas, never the side rail */
-  .lane{grid-template-columns:var(--lane-head) 1fr;align-items:start;
+  .lane{grid-template-columns:var(--lane-head) 1fr var(--info-col);align-items:start;
     background:var(--l1);border:1px solid var(--b1);border-radius:var(--radius);box-shadow:none}
   .lane[data-active="true"]{background:var(--l1);box-shadow:inset 2px 0 0 var(--brand)}
   .lane[data-converged="true"]{background:var(--l1);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--green) 60%,transparent)}
@@ -985,10 +993,13 @@
   .lane-head{padding:14px 14px 12px;gap:7px;border-right:1px solid var(--b1);background:transparent;border-radius:var(--radius) 0 0 var(--radius)}
   .lane-name{font-size:var(--fs-15);font-weight:600;letter-spacing:-.01em;color:var(--tx1);gap:8px}
   .lane-name .mono{color:var(--tx3)}
+  .lane-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
+  .lane-name .lane-state{margin-left:auto;flex:0 0 auto}
   .lane-menu{width:22px;height:22px;border-radius:var(--radius-sm);color:var(--tx4)}
   .lane-tag{font-size:var(--fs-11);color:var(--tx4);letter-spacing:.01em}
   .lane-prog{margin-top:0;font-size:var(--fs-11);color:var(--tx3);gap:8px}
   .lane-prog .ibar{flex:1;min-width:60px}
+  .lane-prog .bars{display:none}
   .lane-actions{gap:6px;margin-top:6px}
   .lane-state{height:20px;padding:0 7px;border-radius:var(--radius-sm);font-size:var(--fs-11);font-weight:500}
   .lane-live{font-size:var(--fs-11);color:var(--tx4);gap:8px}
@@ -1060,7 +1071,7 @@
   .issue{font-size:var(--fs-11);border-left:2px solid var(--red);background:transparent;padding:1px 0 1px 7px}
 
   /* ── side rail: own scroll, never stretches the lane ── */
-  .info{position:absolute;top:0;right:0;bottom:0;width:var(--info-col);min-width:0;
+  .info{position:absolute;top:0;right:0;bottom:0;width:var(--info-col);min-width:0;overscroll-behavior:contain;
     border-left:1px solid var(--b1);background:color-mix(in srgb,var(--base) 55%,var(--l1));
     padding:14px 16px 12px;gap:12px;overflow-y:auto;overflow-x:hidden;
     scrollbar-color:var(--l4) transparent;scrollbar-width:thin}
@@ -1076,8 +1087,10 @@
   .trend{height:64px;margin:4px 0 2px}
   .trend .tlab{font-size:var(--fs-11);letter-spacing:0;fill:var(--tx4)}
   .eta{font-size:var(--fs-12);color:var(--tx2);line-height:1.6}
-  .info-acts{gap:6px;margin-top:6px;padding-top:10px;border-top:1px solid var(--b1)}
-  .info-acts .tbtn{flex:1 1 auto;justify-content:center}
+  .info-acts{gap:6px;margin:0;padding:0 0 2px;border-top:0}
+  .info-acts .tbtn{flex:1 1 0;height:24px;padding:0 4px;justify-content:center;font-size:var(--fs-11);
+    color:var(--tx4);border-color:transparent;background:transparent}
+  .info-acts .tbtn:hover{color:var(--tx1);background:var(--l3);border-color:transparent}
   .info-empty{font-size:var(--fs-12)}
   /* experience: one disclosure line instead of a wall of text */
   .info-exp summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;
@@ -1090,14 +1103,17 @@
 
   /* ── first column: services + time, compressed ── */
   .lane-svc{margin-top:10px;padding-top:10px;gap:3px}
-  .lane-svc .svc{margin:0;padding:3px 0;border:0;border-radius:0;background:transparent}
+  .lane-svc .svc{margin:0;padding:3px 0;border:0;border-radius:0;background:transparent;position:relative}
   .lane-svc .svc-top{font-size:var(--fs-12);color:var(--tx2);gap:7px}
-  .lane-svc .svc-url{display:none}
-  .lane-svc .svc-acts{margin:0;max-height:0;opacity:0;overflow:hidden;
-    transition:max-height 180ms var(--ease-out),opacity 160ms var(--ease-out)}
-  .lane-svc .svc:hover .svc-acts,.lane-svc .svc:focus-within .svc-acts{max-height:40px;opacity:1;margin-top:4px}
+  .lane-svc .svc-url,.lane-svc .svc-cmd,.lane-svc .svc-warn{display:none}
+  .lane-svc .svc-acts{position:absolute;right:0;top:1px;width:172px;margin:0;padding:2px;
+    background:var(--l1);border:1px solid var(--b1);border-radius:var(--radius-sm);
+    max-height:none;opacity:0;pointer-events:none;z-index:3;
+    transition:opacity 140ms var(--ease-out)}
+  .lane-svc .svc:hover .svc-acts,.lane-svc .svc:focus-within .svc-acts{opacity:1;pointer-events:auto}
   .lane-svc .pbtn{height:22px;font-size:var(--fs-11)}
-  .lane-time{margin-top:10px;padding-top:10px;gap:5px}
+  .lane-time{margin-top:auto;padding-top:10px;border-top:1px solid var(--b1)}
+  .lane-time .eta{font-size:var(--fs-11);line-height:1.45;color:var(--tx4)}
   .lane-time .info-row{font-size:var(--fs-11)}
   .lane-time .info-row b{font-size:var(--fs-11)}
 
@@ -1155,6 +1171,13 @@
   .editval{font-size:var(--fs-12);line-height:1.6}
   .editval.empty{font-size:var(--fs-11)}
   .detail-close{width:24px;height:24px;border-radius:var(--radius-sm)}
+  .detail-exp summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none}
+  .detail-exp summary::-webkit-details-marker{display:none}
+  .detail-exp summary::before{content:"▸";font-size:10px;color:var(--tx4);transition:transform 140ms var(--ease-out)}
+  .detail-exp[open] summary::before{transform:rotate(90deg)}
+  .detail-exp summary.detail-k{margin-bottom:0}
+  .detail-exp[open] summary.detail-k{margin-bottom:6px}
+  .detail-exp .detail-row dd{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 
   /* ── floating surfaces: menus, modals, toasts ── */
   .modal{background:rgba(8,7,10,.62)}
@@ -1196,6 +1219,11 @@
   html[data-theme="light"] .lane{background:var(--l1);border-color:var(--b1)}
   html[data-theme="light"] .lane[data-active="true"]{box-shadow:inset 2px 0 0 var(--brand)}
   html[data-theme="light"] .detail-title .title-input{background:var(--l1)}
+  @media (hover:none){
+    .lane-svc .svc-acts{max-height:none;opacity:1;margin-top:4px}
+  }
+  @media (max-width:1400px){ #data-src{display:none} }
+  @media (max-width:1180px){ #save-state{display:none} }
 </style>
 </head>
 <body>
@@ -1211,7 +1239,7 @@
       </span>
       <div>
         <h1>轮转里程碑树</h1>
-        <p id="brand-sub">MILESTONE TREE · 愿景驱动</p>
+        <p id="brand-sub">LOOPTREE · 愿景驱动</p>
       </div>
     </div>
     <div class="grow"></div>
@@ -2174,7 +2202,7 @@ window.__rotationLastApiError = '';
 if (window.__ROTATION_VERSION__) {
   const v = 'v' + window.__ROTATION_VERSION__;
   const sub = document.getElementById('brand-sub');
-  if (sub) sub.textContent = 'MILESTONE TREE · ' + v + ' · 愿景驱动';
+  if (sub) sub.textContent = 'LOOPTREE · ' + v + ' · 愿景驱动';
   document.title = '轮转里程碑树 · ' + v;
 }
 
@@ -2730,17 +2758,7 @@ function laneTime(p){
     : s0.etaDays == null
       ? (s0.closedNodes < 2 ? '样本不足：需 ≥2 个已关闭节点' : '关闭集中在 1 小时内，暂不估算')
       : `约 ${fmtDays(s0.etaDays)} 后收敛 <em>置信 ${s0.conf}</em>`;
-  return `<div class="lane-time">
-    <div class="info-k">时间</div>
-    <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
-    <div class="info-row">关闭速率<b>${s0.rate ? s0.rate.toFixed(2) + ' 项/天' : '—'}</b></div>
-    <div class="info-row">在途<b>${s0.inflight.length} 项</b></div>
-    <div class="info-row" title="${s0.inflight[0] ? s0.inflight[0].title : ''}">最长在途<b>${s0.inflight[0] ? fmtDays(s0.inflight[0].days) : '—'}</b></div>
-    <div class="info-row">平均在途<b>${s0.avgInflight == null ? '—' : fmtDays(s0.avgInflight)}</b></div>
-    <div class="info-row">超期 &gt;7 天<b style="color:${s0.overdue?'var(--red)':'var(--tx2)'}">${s0.overdue}</b></div>
-    <div class="info-row">最近关闭<b>${s0.lastClosed ? new Date(s0.lastClosed).toLocaleString('sv-SE').slice(5,16) : '—'}</b></div>
-    <div class="eta">${etaTxt}</div>
-  </div>`;
+  return `<div class="lane-time"><div class="eta">${etaTxt}</div></div>`;
 }
 
 function infoMarkup(p){
@@ -2764,7 +2782,12 @@ function infoMarkup(p){
   return `<div class="info">
     ${laneStats(p)}
 
-    ${trendMarkup(p)}
+    <div class="info-acts">
+      <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
+      <button class="tbtn" data-act="open" data-id="${p.id}">会话 ↗</button>
+      <button class="tbtn" data-act="toggle" data-id="${p.id}">${collapsed.has(p.id) ? '展开' : '收起'}</button>
+      <button class="tbtn" data-export="${p.id}">导出</button>
+    </div>
 
     <div class="info-sec">
       <div class="info-k">下一步</div>
@@ -2776,20 +2799,25 @@ function infoMarkup(p){
       <div class="info-row">阻塞执行项<b style="color:${s0.blockedExec?'var(--red)':'var(--tx2)'}">${s0.blockedExec}</b></div>
       <div class="info-row">未处置反馈<b>${s0.issues}</b></div>
       <div class="info-row">缺验证 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
+      <div class="info-row">超期 &gt;7 天<b style="color:${s0.overdue?'var(--red)':'var(--tx2)'}">${s0.overdue}</b></div>
+      <div class="info-row">最长在途<b>${s0.inflight[0] ? fmtDays(s0.inflight[0].days) : '—'}</b></div>
       <div class="hub-note" style="display:none">${execPct}</div>
     </div>
 
     <div class="info-sec">
-      <div class="info-k">经验积累<span class="psrc">${lessons.length} 条</span></div>
-      ${lessonsHtml}
+      <div class="info-k">时间</div>
+      <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
+      <div class="info-row">关闭速率<b>${s0.rate ? s0.rate.toFixed(2) + ' 项/天' : '—'}</b></div>
+      <div class="info-row">最近关闭<b>${s0.lastClosed ? new Date(s0.lastClosed).toLocaleString('sv-SE').slice(5,16) : '—'}</b></div>
     </div>
 
-    <div class="info-acts">
-      <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
-      <button class="tbtn" data-act="open" data-id="${p.id}">会话 ↗</button>
-      <button class="tbtn" data-act="toggle" data-id="${p.id}">${collapsed.has(p.id) ? '展开' : '收起'}</button>
-      <button class="tbtn" data-export="${p.id}">导出</button>
-    </div>
+    ${trendMarkup(p)}
+
+    <details class="info-exp">
+      <summary>经验积累 <b>${lessons.length}</b> 条</summary>
+      <div class="info-sec">${lessonsHtml}</div>
+    </details>
+
   </div>`;
 }
 
@@ -3126,7 +3154,7 @@ function laneMarkup(p){
   const laneLiveKind = p.idle && p.idle.idle.length ? 'idle' : (p.idle && p.idle.running.length ? 'running' : 'none');
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}" data-live="${laneLiveKind}">
     <div class="lane-head">
-      <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}${stateChip}
+      <div class="lane-name"><span class="dot ${dotCls}"></span><span class="lane-title">${p.name}</span>${stateChip}
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
       <div class="lane-tag mono">${p.tag}</div>
       <div class="lane-live mono" data-lane-live${laneLive ? '' : ' hidden'}>${laneLive}</div>
@@ -3178,7 +3206,7 @@ function renderMatrix(){
   m.innerHTML = `<div class="stage-head corner">项目 / 阶段</div>` +
     STAGES.map((st,i)=>`<div class="stage-head" data-depth="${i}" style="--c:${st.color}">
       <span class="swatch"></span><span class="label">${st.label}</span><span class="en">${st.en}</span></div>`).join('') +
-    `<div class="stage-head" data-depth="info"><span class="swatch" style="--c:var(--tx4)"></span><span class="label">信息 · 操作</span><span class="en">Info</span></div>` +
+    `<div class="stage-head" data-depth="info"><span class="swatch" style="--c:var(--tx4)"></span><span class="label">概览</span><span class="en">Info</span></div>` +
     active.map(laneMarkup).join('');
 
   const lanes = [...m.querySelectorAll('.lane')];
@@ -3258,7 +3286,7 @@ function renderFocus(){
     <div class="focus-lane">
       <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}" data-live="${focusLiveKind}">
         <div class="lane-head">
-          <div class="lane-name"><span class="dot ${dotCls}"></span>${p.name}<span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>
+          <div class="lane-name"><span class="dot ${dotCls}"></span><span class="lane-title">${p.name}</span><span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
           <div class="lane-tag mono">${p.tag}</div>
           <div class="lane-live mono" data-lane-live${focusLive ? '' : ' hidden'}>${focusLive}</div>
@@ -4699,8 +4727,10 @@ function lessonsMarkup(n){
       <div class="mnote">还没有：执行记录完成后会自动提炼，一条一条攒在这里</div></div>`;
   }
   return `<div class="detail-sec">
-    <div class="detail-k">经验积累<span class="psrc">${list.length} 条</span></div>
-    ${list.map((l, i) => `<div class="detail-row"><dt>${i+1}</dt><dd>${esc(l.text)}${l.at ? `<span class="mnote" style="margin-left:6px;border:0;padding:0">${fmtTs(l.at)}</span>` : ''}</dd></div>`).join('')}
+    <details class="detail-exp">
+      <summary class="detail-k">经验积累 <span class="psrc">${list.length} 条</span></summary>
+      ${list.map((l, i) => `<div class="detail-row"><dt>${i+1}</dt><dd>${esc(l.text)}${l.at ? `<span class="mnote" style="margin-left:6px;border:0;padding:0">${fmtTs(l.at)}</span>` : ''}</dd></div>`).join('')}
+    </details>
   </div>`;
 }
 
@@ -7877,6 +7907,20 @@ if (qs.get('filter')) state.filter = qs.get('filter');
   // 便于分享/截图：?open=<nodeId> 载入后直接展开该节点详情
   const openId = qs.get('open');
   if (openId) setTimeout(() => openDetail(openId), 250);
+})();
+</script>
+<script>
+/* toolbar overflow menu: secondary actions stay one level down */
+(() => {
+  const btn = document.getElementById('more-btn');
+  const menu = document.getElementById('more-menu');
+  if (!btn || !menu) return;
+  const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded','false'); };
+  const open  = () => { menu.hidden = false; btn.setAttribute('aria-expanded','true'); };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); menu.hidden ? open() : close(); });
+  menu.addEventListener('click', (e) => { if (e.target.closest('.tmenu-item')) close(); });
+  document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.menu-wrap')) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { close(); btn.focus(); } });
 })();
 </script>
 </body>

@@ -17,3 +17,6 @@ _probe*.html
 
 # 打包产物已停用（安装/更新走 link 或 Git 仓库）；这条只是防止误提交
 *.tgz
+
+# design-skill scratch output
+.taste-skill/
