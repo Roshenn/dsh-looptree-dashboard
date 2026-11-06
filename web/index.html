@@ -924,13 +924,13 @@
   .mark{width:28px;height:28px;border-radius:var(--radius);background:var(--l2);border:1px solid var(--b1)}
   .mark svg{width:15px;height:15px;stroke:var(--brand-2)}
   .brand h1{font-size:var(--fs-15);font-weight:600;letter-spacing:-.01em;color:var(--tx1)}
-  .brand p{font-size:var(--fs-11);letter-spacing:.03em;color:var(--tx4);font-family:var(--mono)}
+  .brand p{font-size:var(--fs-12);letter-spacing:.03em;color:var(--tx4);font-family:var(--mono)}
   .meta-strip{gap:16px;font-size:var(--fs-12);color:var(--tx4)}
   .meta-strip .kpi{gap:6px}
   .meta-strip b{font-size:var(--fs-12);font-family:var(--mono);font-weight:500;color:var(--tx2)}
   .dot{width:6px;height:6px}
   .iconbtn{height:30px;padding:0 10px;border-radius:var(--radius);border:1px solid var(--b1);
-    background:transparent;color:var(--tx3);font-size:var(--fs-12)}
+    background:transparent;color:var(--tx3);font-size:var(--fs-13)}
   .iconbtn:hover{background:var(--l3);border-color:var(--b2);color:var(--tx1)}
   .iconbtn svg{width:14px;height:14px}
 
@@ -947,14 +947,14 @@
     flex-wrap:wrap;overflow:visible}
   .chipbar{gap:4px}
   .chip{height:28px;padding:0 10px;border-radius:var(--radius);border:1px solid transparent;background:transparent;
-    color:var(--tx3);font-size:var(--fs-12);font-weight:450}
+    color:var(--tx3);font-size:var(--fs-13);font-weight:450}
   .chip:hover{color:var(--tx1);background:var(--l3);border-color:transparent}
   .chip[aria-pressed="true"]{color:var(--tx1);background:var(--l3);border-color:var(--b1)}
   .chip:active{transform:none}
   .chip.chip-danger{color:var(--red)}
   .chip.chip-danger:hover{background:color-mix(in srgb,var(--red) 12%,transparent);border-color:transparent}
   .searchbox{width:220px;height:28px;border-radius:var(--radius);border:1px solid var(--b1);background:var(--l1);
-    font-size:var(--fs-12);color:var(--tx1)}
+    font-size:var(--fs-13);color:var(--tx1)}
   .searchbox:focus{border-color:var(--brand);background:var(--l1)}
   .hint{font-size:var(--fs-11);color:var(--tx4)}
   #toolbar-hint{display:none}
@@ -977,32 +977,34 @@
 
   /* ── matrix ── */
   .matrix{row-gap:14px;min-width:1240px}
-  .stage-head{padding:8px 14px 7px;border-bottom:1px solid var(--b1);background:var(--base);
-    font-size:var(--fs-11);color:var(--tx4);gap:7px}
-  .stage-head.corner{font-size:var(--fs-11);letter-spacing:.02em;text-transform:none;color:var(--tx4)}
+  .stage-head{padding:8px 14px 7px 18px;border-bottom:1px solid var(--b1);background:var(--base);
+    font-size:var(--fs-13);color:var(--tx4);gap:7px}
+  .stage-head.corner{font-size:var(--fs-13);letter-spacing:.02em;text-transform:none;color:var(--tx4)}
   .stage-head .swatch{width:5px;height:5px;border-radius:1px;transform:none;opacity:.85}
   .stage-head .label{color:var(--tx4);font-weight:500}
   .stage-head .en{display:none}
 
   /* lane: recessed surface; height follows the canvas, never the side rail */
-  .lane{grid-template-columns:var(--lane-head) 1fr var(--info-col);align-items:start;
+  .lane{grid-template-columns:var(--lane-head) 1fr var(--info-col);align-items:start;min-height:330px;
     background:var(--l1);border:1px solid var(--b1);border-radius:var(--radius);box-shadow:none}
   .lane[data-active="true"]{background:var(--l1);box-shadow:inset 2px 0 0 var(--brand)}
   .lane[data-converged="true"]{background:var(--l1);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--green) 60%,transparent)}
   .lane[data-active="true"][data-converged="true"]{box-shadow:inset 2px 0 0 color-mix(in srgb,var(--green) 60%,transparent)}
-  .lane-head{padding:14px 14px 12px;gap:7px;border-right:1px solid var(--b1);background:transparent;border-radius:var(--radius) 0 0 var(--radius)}
+  .lane-head{padding:14px 14px 12px 18px;gap:7px;border-right:1px solid var(--b1);background:transparent;border-radius:var(--radius) 0 0 var(--radius)}
   .lane-name{font-size:var(--fs-15);font-weight:600;letter-spacing:-.01em;color:var(--tx1);gap:8px}
   .lane-name .mono{color:var(--tx3)}
   .lane-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
-  .lane-name .lane-state{margin-left:auto;flex:0 0 auto}
+  .lane-sub{display:flex;align-items:center;gap:8px;min-width:0}
+  .lane-sub .lane-tag{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lane-sub .lane-state{flex:0 0 auto}
   .lane-menu{width:22px;height:22px;border-radius:var(--radius-sm);color:var(--tx4)}
-  .lane-tag{font-size:var(--fs-11);color:var(--tx4);letter-spacing:.01em}
-  .lane-prog{margin-top:0;font-size:var(--fs-11);color:var(--tx3);gap:8px}
+  .lane-tag{font-size:var(--fs-13);color:var(--tx4);letter-spacing:.01em}
+  .lane-prog{margin-top:0;font-size:var(--fs-13);color:var(--tx3);gap:8px}
   .lane-prog .ibar{flex:1;min-width:60px}
   .lane-prog .bars{display:none}
   .lane-actions{gap:6px;margin-top:6px}
-  .lane-state{height:20px;padding:0 7px;border-radius:var(--radius-sm);font-size:var(--fs-11);font-weight:500}
-  .lane-live{font-size:var(--fs-11);color:var(--tx4);gap:8px}
+  .lane-state{height:20px;padding:0 7px;border-radius:var(--radius-sm);font-size:var(--fs-12);font-weight:500}
+  .lane-live{font-size:var(--fs-13);color:var(--tx4);gap:8px}
   .lane-live .ll{color:var(--tx4)}
   .lane-live .ll-idle{color:var(--ready)}
   .lane-live .ll-maxed{color:var(--amber)}
@@ -1046,14 +1048,14 @@
     background:transparent;border:1px solid color-mix(in srgb,var(--st-tone,var(--tx4)) 30%,var(--b1));
     color:var(--st-tone,var(--tx3))}
   .tnode-title{font-size:var(--fs-15);line-height:1.38;font-weight:500;letter-spacing:-.005em;color:var(--tx1)}
-  .tnode-meta{margin-top:5px;font-size:var(--fs-11);color:var(--tx4);gap:7px}
+  .tnode-meta{margin-top:5px;font-size:var(--fs-13);color:var(--tx4);gap:7px}
   .tnode-chips{gap:5px;margin-top:6px}
-  .tchip{font-size:var(--fs-11);line-height:1;padding:3px 6px;border-radius:var(--radius-sm);color:var(--tx3);
+  .tchip{font-size:var(--fs-13);line-height:1;padding:3px 6px;border-radius:var(--radius-sm);color:var(--tx3);
     background:transparent;border:1px solid var(--b1)}
-  button.tchip{font-size:var(--fs-11)}
+  button.tchip{font-size:var(--fs-13)}
   .tfoot{margin-top:7px;gap:6px}
   .tbtn{height:24px;padding:0 8px;border-radius:var(--radius-sm);border:1px solid var(--b2);background:transparent;
-    color:var(--tx2);font-size:var(--fs-12)}
+    color:var(--tx2);font-size:var(--fs-13)}
   .tbtn:hover{background:var(--l4);color:var(--tx1)}
   .tbtn.primary{background:color-mix(in srgb,var(--amber) 14%,transparent);border-color:color-mix(in srgb,var(--amber) 40%,transparent);color:var(--amber)}
   .tbtn.primary-converge{background:color-mix(in srgb,var(--green) 14%,transparent);border-color:color-mix(in srgb,var(--green) 40%,transparent);color:var(--green)}
@@ -1073,13 +1075,16 @@
   /* ── side rail: own scroll, never stretches the lane ── */
   .info{position:absolute;top:0;right:0;bottom:0;width:var(--info-col);min-width:0;overscroll-behavior:contain;
     border-left:1px solid var(--b1);background:color-mix(in srgb,var(--base) 55%,var(--l1));
-    padding:12px 14px 10px;gap:9px;overflow-y:auto;overflow-x:hidden;
+    padding:12px 18px 10px 16px;gap:9px;overflow-y:auto;overflow-x:hidden;
     scrollbar-color:var(--l4) transparent;scrollbar-width:thin}
   .info-sec{gap:5px}
-  .info-k{font-size:var(--fs-11);letter-spacing:.02em;text-transform:none;color:var(--tx4);font-weight:500}
-  .info-row{font-size:var(--fs-12);color:var(--tx3);gap:7px}
-  .info-row b{font-size:var(--fs-12);font-family:var(--mono);font-weight:500;color:var(--tx1)}
+  .info-k{font-size:var(--fs-13);letter-spacing:.02em;text-transform:none;color:var(--tx4);font-weight:500}
+  .info-row{font-size:var(--fs-13);color:var(--tx3);gap:7px}
+  .info-row b{font-size:var(--fs-13);font-family:var(--mono);font-weight:500;color:var(--tx1)}
   .info-row .d{width:6px;height:6px}
+  .info-facts{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:var(--fs-13);color:var(--tx4);line-height:1.5}
+  .info-facts b{font-family:var(--mono);font-weight:500;color:var(--tx2)}
+  .info-facts.quiet{display:block;color:var(--tx4)}
   .ibar{height:3px;border-radius:1px;background:var(--b1)}
   .health{gap:10px;align-items:flex-end}
   .health .num{font-size:var(--fs-24);font-weight:600;font-family:var(--mono);letter-spacing:-.02em}
@@ -1088,23 +1093,24 @@
   .trend .tlab{font-size:var(--fs-11);letter-spacing:0;fill:var(--tx4)}
   .eta{font-size:var(--fs-12);color:var(--tx2);line-height:1.6}
   .info-acts{gap:6px;margin:0;padding:0 0 2px;border-top:0}
-  .info-acts .tbtn{flex:1 1 0;height:24px;padding:0 4px;justify-content:center;font-size:var(--fs-11);
+  .info-acts .tbtn{flex:1 1 0;height:24px;padding:0 4px;justify-content:center;font-size:var(--fs-13);
     color:var(--tx4);border-color:transparent;background:transparent}
   .info-acts .tbtn:hover{color:var(--tx1);background:var(--l3);border-color:transparent}
   .info-empty{font-size:var(--fs-12)}
   /* experience: one disclosure line instead of a wall of text */
-  .info-exp summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;
-    font-size:var(--fs-11);color:var(--tx4);padding:2px 0}
-  .info-exp summary::-webkit-details-marker{display:none}
-  .info-exp summary::before{content:"▸";font-size:10px;color:var(--tx4);transition:transform 140ms var(--ease-out)}
-  .info-exp[open] summary::before{transform:rotate(90deg)}
-  .info-exp summary b{color:var(--tx2);font-weight:500;font-family:var(--mono)}
-  .info-exp .info-sec{margin-top:5px}
+  .info-exp summary,.info-more summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;
+    font-size:var(--fs-12);color:var(--tx4);padding:2px 0}
+  .info-exp summary::-webkit-details-marker,.info-more summary::-webkit-details-marker{display:none}
+  .info-exp summary::before,.info-more summary::before{content:"▸";font-size:10px;color:var(--tx4);transition:transform 140ms var(--ease-out)}
+  .info-exp[open] summary::before,.info-more[open] summary::before{transform:rotate(90deg)}
+  .info-exp summary b,.info-more summary b{color:var(--tx2);font-weight:500;font-family:var(--mono)}
+  .info-exp .info-sec,.info-more .info-sec{margin-top:6px}
+  .info-more .info-sec:first-of-type{margin-top:4px}
 
   /* ── first column: services + time, compressed ── */
   .lane-svc{margin-top:10px;padding-top:10px;gap:3px}
   .lane-svc .svc{margin:0;padding:3px 0;border:0;border-radius:0;background:transparent;position:relative}
-  .lane-svc .svc-top{font-size:var(--fs-12);color:var(--tx2);gap:7px}
+  .lane-svc .svc-top{font-size:var(--fs-13);color:var(--tx2);gap:7px}
   .lane-svc .svc-url,.lane-svc .svc-cmd,.lane-svc .svc-warn{display:none}
   .lane-svc .svc-acts{position:absolute;right:0;top:1px;width:172px;margin:0;padding:2px;
     background:var(--l1);border:1px solid var(--b1);border-radius:var(--radius-sm);
@@ -1113,7 +1119,7 @@
   .lane-svc .svc:hover .svc-acts,.lane-svc .svc:focus-within .svc-acts{opacity:1;pointer-events:auto}
   .lane-svc .pbtn{height:22px;font-size:var(--fs-11)}
   .lane-time{margin-top:auto;padding-top:10px;border-top:1px solid var(--b1)}
-  .lane-time .eta{font-size:var(--fs-11);line-height:1.45;color:var(--tx4)}
+  .lane-time .eta{font-size:var(--fs-13);line-height:1.45;color:var(--tx4)}
   .lane-time .info-row{font-size:var(--fs-11)}
   .lane-time .info-row b{font-size:var(--fs-11)}
 
@@ -1164,8 +1170,8 @@
   .detail-path{font-size:var(--fs-11);margin-bottom:10px}
   .detail-path button{font-size:var(--fs-11);border-radius:var(--radius-sm)}
   .detail-sec{margin-top:11px;padding-top:11px;border-color:var(--b1)}
-  .detail-k{font-size:var(--fs-11);letter-spacing:.02em;text-transform:none;color:var(--tx4);font-weight:500;margin-bottom:6px}
-  .detail-row{font-size:var(--fs-12);line-height:1.6;gap:9px;margin-bottom:5px}
+  .detail-k{font-size:var(--fs-12);letter-spacing:.02em;text-transform:none;color:var(--tx4);font-weight:500;margin-bottom:6px}
+  .detail-row{font-size:var(--fs-13);line-height:1.6;gap:9px;margin-bottom:5px}
   .detail-row dt{flex:0 0 78px;color:var(--tx4)}
   .detail-row dd.mono{font-size:var(--fs-11);font-family:var(--mono)}
   .editval{font-size:var(--fs-12);line-height:1.6}
@@ -1188,7 +1194,7 @@
   .modal-x,.fp-x{border-radius:var(--radius-sm)}
   .addmenu,#cand-tip{border-radius:var(--radius-lg);background:var(--l3);border:1px solid var(--b2);box-shadow:var(--shadow-pop)}
   .addmenu button{font-size:var(--fs-12);border-radius:var(--radius-sm)}
-  .toast{border-radius:var(--radius);background:var(--l4);border:1px solid var(--b3);box-shadow:var(--shadow-float);font-size:var(--fs-12)}
+  .toast{border-radius:var(--radius);background:var(--l4);border:1px solid var(--b3);box-shadow:var(--shadow-float);font-size:var(--fs-13)}
   .asktray{border-radius:var(--radius-lg);background:var(--l3);border:1px solid color-mix(in srgb,var(--amber) 42%,var(--b2))}
   .askrow{border-radius:var(--radius-sm);background:var(--l2);border-color:var(--b1)}
   .askrow .who{font-size:var(--fs-12)}
@@ -2728,24 +2734,23 @@ const fmtDays = (d) => d == null ? '—' : (d >= 1 ? d.toFixed(1) + ' 天' : (d 
 
 function laneStats(p){
   const s0 = projectStats(p);
-  const nodes = s0.all.length;
+  const st = s0.stat;
   const execPct = s0.execs.length ? Math.round(s0.execDone / s0.execs.length * 100) : 0;
   return `<div class="lane-stats" data-stats="${esc(p.id)}">
     <div class="info-sec">
-      <div class="info-k">收敛健康度</div>
       <div class="health" style="--tone:${s0.health.tone}">
         <span class="num">${s0.score}</span>
-        <span class="cap">${s0.health.label} · 完成 ${execPct}%<br>收口 ${s0.capabilitiesClosed}/${s0.capabilities.length} 能力闭环</span>
+        <span class="cap">收敛健康度 · ${s0.health.label}<br>完成 ${execPct}% · 收口 ${s0.capabilitiesClosed}/${s0.capabilities.length} 能力闭环</span>
       </div>
       <div class="ibar" title="完成度 / 进行中 / 阻塞">
-        <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(s0.stat.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(s0.stat.blocked / (s0.execs.length||1) * 100)}%"></i>
+        <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(st.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(st.blocked / (s0.execs.length||1) * 100)}%"></i>
       </div>
-    </div>
-    <div class="info-sec">
-      <div class="info-k">节点</div>
-      <div class="info-row"><span class="d" style="--tone:var(--brand)"></span>里程碑 / 能力闭环<b>${s0.kind.milestone} / ${s0.kind.capability}</b></div>
-      <div class="info-row"><span class="d" style="--tone:var(--green)"></span>执行记录<b>${s0.kind.exec}</b></div>
-      <div class="info-row" style="font-size:var(--fs-11)">进行中 ${s0.stat.doing} · 待确认 ${s0.stat.review} · 规划中 ${s0.stat.plan} · 未开始 ${s0.stat.todo} · 阻塞 ${s0.stat.blocked} · 已关闭 ${s0.stat.closed}</div>
+      <div class="info-facts">
+        <span>里程碑 <b>${s0.kind.milestone}</b></span>
+        <span>能力闭环 <b>${s0.kind.capability}</b></span>
+        <span>执行记录 <b>${s0.kind.exec}</b></span>
+      </div>
+      <div class="info-facts quiet">进行中 ${st.doing} · 待确认 ${st.review} · 阻塞 ${st.blocked} · 已关闭 ${st.closed}</div>
     </div>
   </div>`;
 }
@@ -2795,28 +2800,31 @@ function infoMarkup(p){
 
     <div class="info-sec">
       <div class="info-k">风险</div>
-      <div class="info-row">阻塞执行项<b style="color:${s0.blockedExec?'var(--red)':'var(--tx2)'}">${s0.blockedExec}</b></div>
-      <div class="info-row">未处置反馈<b>${s0.issues}</b></div>
-      <div class="info-row">缺验证 / 缺证据<b>${s0.noVerify} / ${s0.noProof}</b></div>
-      <div class="info-row">超期 &gt;7 天<b style="color:${s0.overdue?'var(--red)':'var(--tx2)'}">${s0.overdue}</b></div>
-      <div class="info-row">最长在途<b>${s0.inflight[0] ? fmtDays(s0.inflight[0].days) : '—'}</b></div>
+      <div class="info-facts">
+        <span>阻塞 <b style="color:${s0.blockedExec?'var(--red)':'var(--tx2)'}">${s0.blockedExec}</b></span>
+        <span>未处置 <b>${s0.issues}</b></span>
+        <span>缺验证 <b>${s0.noVerify}</b></span>
+        <span>缺证据 <b>${s0.noProof}</b></span>
+        <span>超期 <b style="color:${s0.overdue?'var(--red)':'var(--tx2)'}">${s0.overdue}</b></span>
+      </div>
       <div class="hub-note" style="display:none">${execPct}</div>
     </div>
 
-    <div class="info-sec">
-      <div class="info-k">时间</div>
-      <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
-      <div class="info-row">关闭速率<b>${s0.rate ? s0.rate.toFixed(2) + ' 项/天' : '—'}</b></div>
-      <div class="info-row">最近关闭<b>${s0.lastClosed ? new Date(s0.lastClosed).toLocaleString('sv-SE').slice(5,16) : '—'}</b></div>
-    </div>
-
-    ${trendMarkup(p)}
-
-    <details class="info-exp">
-      <summary>经验积累 <b>${lessons.length}</b> 条</summary>
-      <div class="info-sec">${lessonsHtml}</div>
+    <details class="info-more">
+      <summary>更多指标</summary>
+      <div class="info-sec">
+        <div class="info-k">时间</div>
+        <div class="info-row">关闭跨度<b>${s0.spanDays ? fmtDays(s0.spanDays) : '—'}</b></div>
+        <div class="info-row">关闭速率<b>${s0.rate ? s0.rate.toFixed(2) + ' 项/天' : '—'}</b></div>
+        <div class="info-row">最长在途<b>${s0.inflight[0] ? fmtDays(s0.inflight[0].days) : '—'}</b></div>
+        <div class="info-row">最近关闭<b>${s0.lastClosed ? new Date(s0.lastClosed).toLocaleString('sv-SE').slice(5,16) : '—'}</b></div>
+      </div>
+      ${trendMarkup(p)}
+      <div class="info-sec">
+        <div class="info-k">经验积累</div>
+        ${lessonsHtml}
+      </div>
     </details>
-
   </div>`;
 }
 
@@ -3153,9 +3161,9 @@ function laneMarkup(p){
   const laneLiveKind = p.idle && p.idle.idle.length ? 'idle' : (p.idle && p.idle.running.length ? 'running' : 'none');
   return `<div class="lane" data-project="${p.id}" data-active="${p.id===state.focusId}" data-converged="${closed}" data-live="${laneLiveKind}">
     <div class="lane-head">
-      <div class="lane-name"><span class="dot ${dotCls}"></span><span class="lane-title">${p.name}</span>${stateChip}
+      <div class="lane-name"><span class="dot ${dotCls}"></span><span class="lane-title">${p.name}</span>
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
-      <div class="lane-tag mono">${p.tag}</div>
+      <div class="lane-sub"><span class="lane-tag mono" title="${esc(p.tag)}">${p.tag}</span>${stateChip}</div>
       <div class="lane-live mono" data-lane-live${laneLive ? '' : ' hidden'}>${laneLive}</div>
       <div class="lane-prog mono"><span class="bars">${p.root.children.map(k=>`<i class="${k.closed?'on':''}"></i>`).join('')}</span>${pr.closed}/${pr.kids} 能力闭环${closed ? ' · 已达成' : (canConverge ? ' · 待确认达成' : '关闭')}</div>
       ${headerActs ? `<div class="lane-actions">${headerActs}</div>` : ''}
@@ -3285,9 +3293,9 @@ function renderFocus(){
     <div class="focus-lane">
       <div class="lane" data-project="${p.id}" data-converged="${p.root.closed}" data-live="${focusLiveKind}">
         <div class="lane-head">
-          <div class="lane-name"><span class="dot ${dotCls}"></span><span class="lane-title">${p.name}</span><span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span>
+          <div class="lane-name"><span class="dot ${dotCls}"></span><span class="lane-title">${p.name}</span>
         ${p.file ? `<button class="lane-menu" data-projmenu="${esc(p.id)}" aria-haspopup="menu" aria-expanded="false" aria-label="项目菜单" title="项目菜单：项目信息 / 服务信息收集 / 里程碑历史 / 开新里程碑 / 移除项目">⋯</button>` : ''}</div>
-          <div class="lane-tag mono">${p.tag}</div>
+          <div class="lane-sub"><span class="lane-tag mono" title="${esc(p.tag)}">${p.tag}</span><span class="lane-state" data-state="${rootState.key}" style="--tone:${rootState.tone}">${rootState.label}</span></div>
           <div class="lane-live mono" data-lane-live${focusLive ? '' : ' hidden'}>${focusLive}</div>
           <div class="lane-prog mono">${pr.doneLeaves}/${pr.totalLeaves} 执行项完成</div>
           ${(p.root.closed || canConverge) ? `<div class="lane-actions">
