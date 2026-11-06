@@ -9,6 +9,7 @@
  *   GET    /api/cards                  列出 samples/*.rotation.json
  *   PUT    /api/cards/<file>           校验后原子写回（保护 session 字段不被前端覆盖）
  *   POST   /api/run                    { file, nodeId, prompt, taskId } 发起会话
+ *   GET    /api/prompts?file=&nodeId=  该节点的 prompt 模板（发送预览用）
  *   GET    /api/runs                   所有运行快照
  *   POST   /api/run/cancel             { file, nodeId } 取消
  *
@@ -20,6 +21,7 @@ import { join, extname, resolve, sep } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { validateCard } from './lib/core.mjs';
+import { listTaskPrompts } from './lib/prompt.mjs';
 
 const ROOT = process.cwd();
 const DIR = join(ROOT, 'samples');
@@ -296,6 +298,20 @@ const server = createServer(async (req, res) => {
       catch (e) { cards.push({ file: f, error: e.message }); }
     }
     return send(res, 200, { ok: true, dir: DIR, cards });
+  }
+
+  if (url.pathname === '/api/prompts' && req.method === 'GET') {
+    const file = url.searchParams.get('file') || '';
+    const nodeId = url.searchParams.get('nodeId') || '';
+    try {
+      const card = await loadCard(file);
+      const projectName = card && card.project ? card.project.name : '';
+      const out = listTaskPrompts({ projectName, card, nodeId });
+      return send(res, 200, { ok: true, from: out.from, list: out.list });
+    } catch (e) {
+      const code = e && e.code === 'NODE_NOT_FOUND' ? 404 : 400;
+      return send(res, code, { ok: false, error: e.message });
+    }
   }
 
   if (url.pathname.startsWith('/api/cards/') && req.method === 'PUT') {
