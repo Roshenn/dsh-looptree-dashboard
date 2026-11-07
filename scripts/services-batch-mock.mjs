@@ -10,7 +10,8 @@
  *   · GET /api/services/all：聚合全部项目的服务、status/pid/port、summary
  *   · POST /api/services/start-all：端口冲突整批 409（用 echo 标记确认「一个都没拉」）、
  *     在线 / 缺当前平台命令的服务跳过、file 限定范围、找不到项目 404
- *   · POST /api/services/stop-all：没有配置端口时返回空结果（不碰本机进程）
+ *   · POST /api/services/stop-all：没有配置端口时返回空结果（不碰本机进程）；
+ *     可选 file 只关这一个项目（composer 的项目级动作），不传 file 仍是全局
  *   · 按端口杀进程的解析器（注入假输出）：PowerShell / netstat / lsof / ss / netstat -ltnp
  *   · 杀进程策略：win32 taskkill、darwin 先 SIGTERM 后 SIGKILL、macOS 无 lsof 的降级提示、
  *     linux 回退 ss / netstat、非法端口被拒、不杀当前宿主进程
@@ -466,6 +467,19 @@ try {
     && stopped.body.skipped[0].reason === 'remote-host', JSON.stringify(stopped.body?.skipped));
   check('本机端口清空后没有可杀进程', Array.isArray(stopped.body?.killed) && stopped.body.killed.length === 0, JSON.stringify(stopped.body?.killed));
   check('failed / managedStopped 都是数组', Array.isArray(stopped.body?.failed) && Array.isArray(stopped.body?.managedStopped), JSON.stringify(stopped.body));
+
+  /* 11. stop-all 带 file：只处理这一个项目的服务，别的项目的条目不进结果 */
+  const scopedG = await sendJson('POST', '/api/services/stop-all', { file: 'proj-g' });
+  check('stop-all 带 file → 200', scopedG.status === 200 && scopedG.body?.ok === true, JSON.stringify(scopedG.body));
+  check('stop-all 带 file 只处理该项目的远程条目',
+    (scopedG.body?.skipped || []).length === 1 && scopedG.body.skipped[0].host === 'example.com',
+    JSON.stringify(scopedG.body?.skipped));
+  const scopedC = await sendJson('POST', '/api/services/stop-all', { file: 'proj-c' });
+  check('stop-all 带 file 不碰别的项目',
+    scopedC.status === 200 && (scopedC.body?.skipped || []).length === 0, JSON.stringify(scopedC.body?.skipped));
+  const scopedMissing = await sendJson('POST', '/api/services/stop-all', { file: 'proj-nope' });
+  check('stop-all 带未知 file → 404', scopedMissing.status === 404 && scopedMissing.body?.ok === false,
+    JSON.stringify(scopedMissing.body));
 } catch (error) {
   check('mock 未抛异常', false, error.stack || error.message);
 } finally {

@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## 未发布 — composer 的「打开服务」加下拉：重启 / 按服务打开 / 全部关闭
+
+- **需求**（2026-11-08，用户截图圈出「打开服务」）：右侧要加一个选择三角，点开能选
+  「关闭并重新打开服务 / 打开 XX 服务 / 关闭所有服务」——服务一多，每次都只能「全部打开」不够用。
+- **落点**：`lib/client.js`（`Launcher` 改分裂按钮 + 菜单）、`lib/index.js`（`POST /services/stop-all`
+  支持按项目收窄）、`scripts/dev-client-mock.mjs` 与 `scripts/services-batch-mock.mjs`（断言）、
+  `README*.md`（按钮说明）。
+- **改法**：
+  - 主按钮行为不变（有在线 → 每个各开一个 tab；没有 → `start-all`），右侧新增一颗 16px 小三角，
+    `aria-haspopup="menu"` / `aria-expanded`，配色与禁用口径跟主按钮的 `data-tone` 一致。
+  - 菜单四条：**关闭并重新打开服务** = `stop-all` → 等探活确认端口真的空出来 → `start-all`
+    （409 端口冲突自动重试一次，避免杀完立刻拉起判成自己的冲突）；**每个登记服务一条「打开 XX」**
+    （只开这一个，没在线 / 没有 http(s) 地址的置灰并给出原因）；**关闭所有服务** = 第一次点只翻成
+    「再点一次确认关闭」，菜单收起或重开即作废，防误点杀进程。
+  - 菜单是 `position: fixed` + 打开时 `popover="manual"` 提到 top layer，composer 任何祖先上的
+    overflow / transform 都裁不到它；没有 popover API 的浏览器退回普通 fixed 定位。
+    点外面 / Esc / 窗口 resize 都收菜单。
+  - 宿主：`/services/stop-all` 新增可选 `file`——只杀该项目的端口、只清该项目的 procs 记录；
+    不传 `file` 时不筛，面板「一键关闭」仍是原来的全局语义。
+  - 旧宿主护栏：`/api/health` 增加 `client.servicesScoped`。刷新页面拿到新 client、host 半还没重启时，
+    旧路由会**忽略** `file` 直接全局关停；client 探不到这个能力位就把「重启 / 全部关闭」置灰并说明原因，
+    只留不需要宿主支持的「打开 XX」。
+- **边界**：项目没有服务配置时整张卡只留「闭环」，不出现永远禁用的小三角；没有写令牌时
+  重启 / 全部关闭置灰，「打开 XX」仍可用（开页不需要令牌）；两个项目配了同一端口时项目级关闭
+  无法再细分（端口上只有一个进程）。
+- **验证**：`npm run mock:client` 新增 18 条断言（小三角语义与 aria、菜单项顺序、离线置灰、
+  单个打开只开一个 tab 且不调 start-all、二次确认不点则不请求、确认后 stop-all 带 file、
+  重启顺序 stop→start 且都带 file、Esc 收菜单、宿主能力位探测）；`npm run mock:services-batch` 新增 4 条
+  （stop-all 带 file 只处理该项目 / 不碰别的项目 / 未知 file 404）；
+  `npm run preflight` 全绿；从源码抽出 `LAUNCHER_CSS` 做的浅色预览截图核对了收起态与展开态。
+  **client 半刷新页面即可；新增的 host 路参数要重启 DSH 才生效。**
+
 ## 未发布 — 面板整体 UI/UX 重做：数据终端方向
 
 - **背景**（2026-11-06）：面板能干活，但字号 15 种（最小 9.5px）、圆角 12 种、颜色以硬编码为主；

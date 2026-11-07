@@ -20,6 +20,9 @@ const windowListeners = [];
 globalThis.window = {
   location: { origin: 'http://127.0.0.1:64533', assign() { /* noop */ }, href: '' },
   addEventListener(type, fn) { if (type === 'message') windowListeners.push(fn); },
+  removeEventListener() { /* noop */ },
+  innerWidth: 1280,
+  innerHeight: 800,
   __ModuleLoader__: {
     load(options) { captured = options; },
   },
@@ -92,29 +95,51 @@ function createRuntime(component, props) {
   return rt;
 }
 
-// 面板卡片会注入样式；给一个最小 document 替身，顺带断言样式只注入一次
+// 面板卡片会注入样式；给一个最小 document 替身，顺带断言样式只注入一次。
+// 菜单要挂 document 级监听（点外面 / Esc 收菜单），所以这里也收着 listener。
 const styleNodes = [];
+const docListeners = [];
 globalThis.document = {
   documentElement: { dataset: {} },
   head: { appendChild: (node) => styleNodes.push(node) },
   createElement: () => ({ dataset: {}, textContent: '' }),
   querySelector: () => null,
+  addEventListener(type, fn) { docListeners.push([type, fn]); },
+  removeEventListener(type, fn) {
+    const hit = docListeners.findIndex(([t, f]) => t === type && f === fn);
+    if (hit >= 0) docListeners.splice(hit, 1);
+  },
+};
+const dispatchDoc = (type, event) => {
+  for (const [kind, fn] of docListeners.slice()) if (kind === type) fn(event);
 };
 
 // fetch 替身：session/context 与 services/start-all 两条链路
 const fetchCalls = [];
+const stopAllCalls = [];
 let contextPayload = null;
 let serviceRows = [];            // GET /services?file 的替身：up / down / watch 行
 let statusDeferred = null;       // 挂起状态请求，用来验证「缓存先行」
 let startAllPayload = () => ({ ok: true, started: [{ id: 'web' }], skipped: [], failed: [] });
+let stopAllPayload = () => ({ ok: true, killed: [{ port: 8080, pids: [1] }], failed: [], skipped: [], managedStopped: [] });
 globalThis.fetch = async (url, options = {}) => {
   fetchCalls.push({ url: String(url), options });
   if (String(url).includes('/session/context')) {
     return { ok: true, status: 200, json: async () => contextPayload };
   }
+  if (String(url).includes('/api/health')) {
+    // 宿主能力位：没有它 client 会禁用「重启 / 全部关闭」（旧宿主会全局关停）
+    return { ok: true, status: 200, json: async () => ({ ok: true, client: { servicesScoped: true } }) };
+  }
   if (String(url).includes('/services?file=')) {
     if (statusDeferred) await statusDeferred.promise;
     return { ok: true, status: 200, json: async () => ({ ok: true, services: serviceRows }) };
+  }
+  if (String(url).includes('/services/stop-all')) {
+    stopAllCalls.push(JSON.parse(options.body || '{}'));
+    // 关闭后一律先不在线；重启流程里的 start-all 再把它们拉回来
+    serviceRows = [];
+    return { ok: true, status: 200, json: async () => stopAllPayload() };
   }
   if (String(url).includes('/services/start-all')) {
     return { ok: true, status: 200, json: async () => startAllPayload() };
@@ -344,12 +369,14 @@ const rt = createRuntime(launcher.component, cellProps);
 rt.paint();
 await flush();
 let tree = rt.paint();
-ok('有项目时渲染两个按钮', !!tree && (tree.children || []).length === 2,
+ok('有项目时渲染「服务 + 小三角 + 闭环」三个按钮', !!tree && (tree.children || []).filter(Boolean).length === 3,
   tree ? String((tree.children || []).length) : 'null');
 ok('先读 session 上下文', fetchCalls.some((c) => c.url.includes('/session/context?sessionId=session-1')),
   fetchCalls.map((c) => c.url).join(','));
-ok('两颗按钮文案是「服务 / 闭环」', labelOf(tree.children[0]) === '服务' && labelOf(tree.children[1]) === '闭环',
-  labelOf(tree.children[0]) + '/' + labelOf(tree.children[1]));
+ok('探测宿主能力位（stop-all 是否支持按项目收窄）',
+  fetchCalls.some((c) => c.url.includes('/api/health')), fetchCalls.map((c) => c.url).join(','));
+ok('三颗按钮文案是「服务 / 空 / 闭环」', labelOf(tree.children[0]) === '服务' && labelOf(tree.children[2]) === '闭环',
+  labelOf(tree.children[0]) + '/' + labelOf(tree.children[1]) + '/' + labelOf(tree.children[2]));
 
 fetchCalls.length = 0;
 tree.children[0].props.onClick();
@@ -368,7 +395,7 @@ ok('只拉起当前项目的服务', (() => {
 ok('成功后按钮变「已在线」', labelOf(tree.children[0]) === '已在线', labelOf(tree.children[0]));
 
 panelCalls.length = 0;
-tree.children[1].props.onClick();
+tree.children[2].props.onClick();
 ok('点「闭环」切到面板主区', panelCalls.includes('rotation'), JSON.stringify(panelCalls));
 
 // 未登记成项目：整张卡片不渲染
@@ -388,7 +415,7 @@ rt3.paint();
 await flush();
 const tree3 = rt3.paint();
 ok('没有写令牌时禁用「服务」', tree3?.children?.[0]?.props?.disabled === true);
-ok('没有写令牌时「闭环」仍可用', tree3?.children?.[1]?.props?.disabled !== true);
+ok('没有写令牌时「闭环」仍可用', tree3?.children?.[2]?.props?.disabled !== true);
 
 // ── 已在线服务：按钮变「打开服务」，点击在右栏逐个开 tab ──
 const railCalls = [];
@@ -428,6 +455,114 @@ ok('点「打开服务」不调 start-all', !fetchCalls.some((c) => c.url.includ
   fetchCalls.map((c) => c.url).join(','));
 ok('每个在线服务各开一个右栏 tab', railCalls.length === 2 && railCalls.every(([kind]) => kind === 'browser'),
   JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
+
+// ── 服务菜单：小三角 = 分裂按钮的菜单半（重启 / 每条服务一条打开 / 全部关闭）──
+// 主按钮行为不变；菜单项由 GET /services 的实时结果生成，离线的那条置灰。
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'down', startCommand: 'pnpm dev:h5' },
+];
+startAllPayload = () => {
+  serviceRows = [
+    { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+    { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+  ];
+  return { ok: true, started: [{ id: 'api' }, { id: 'h5' }], skipped: [], failed: [] };
+};
+contextPayload = {
+  ok: true, sessionId: 'session-menu', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+railCalls.length = 0;
+fetchCalls.length = 0;
+const rtMenu = createRuntime(launcher.component, { sessionId: 'session-menu', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtMenu.paint();
+await flush();
+let treeMenu = rtMenu.paint();
+const caret = treeMenu.children[1];
+ok('主按钮右侧是小三角（aria-haspopup=menu）',
+  caret?.props?.['aria-haspopup'] === 'menu' && caret?.props?.['aria-expanded'] === 'false',
+  String(caret?.props?.['aria-haspopup']));
+ok('菜单默认收起', (treeMenu.children || []).filter(Boolean).length === 3);
+caret.props.onClick();
+treeMenu = rtMenu.paint();
+const menuNode = treeMenu.children[3];
+ok('点小三角展开菜单', !!menuNode && menuNode.$$type === 'div' && menuNode.props.role === 'menu',
+  menuNode ? String(menuNode.$$type) : 'null');
+const itemText = (node) => (((node && node.children) || []).filter((c) => typeof c === 'string').join(''));
+const menuKidsOf = (node) => ((node && Array.isArray(node.children[0]) ? node.children[0] : (node && node.children) || [])
+  .filter(Boolean));
+let menuKids = menuKidsOf(menuNode);
+ok('菜单项顺序 = 重启 / 每条服务一条 / 全部关闭',
+  JSON.stringify(menuKids.filter((n) => n.props?.role === 'menuitem').map(itemText))
+    === JSON.stringify(['关闭并重新打开服务', '打开 API 8080', '打开 H5 10086', '关闭所有服务']),
+  JSON.stringify(menuKids.map(itemText)));
+ok('离线的那条服务置灰', menuKids.find((n) => itemText(n) === '打开 H5 10086')?.props?.disabled === true);
+ok('在线的那条服务可点', menuKids.find((n) => itemText(n) === '打开 API 8080')?.props?.disabled !== true);
+
+railCalls.length = 0;
+fetchCalls.length = 0;
+menuKids.find((n) => itemText(n) === '打开 API 8080').props.onClick();
+await flush(90);
+ok('菜单项只打开这一个服务', railCalls.length === 1 && railCalls[0][1]?.params?.url === 'http://127.0.0.1:8080/',
+  JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
+ok('打开单个服务不调 start-all', !fetchCalls.some((c) => c.url.includes('/services/start-all')));
+ok('点完菜单自动收起', (rtMenu.paint().children || []).filter(Boolean).length === 3);
+
+// 「关闭所有服务」：第一次点只翻成确认文案，第二次才真发请求
+rtMenu.paint().children[1].props.onClick();
+treeMenu = rtMenu.paint();
+menuKids = menuKidsOf(treeMenu.children[3]);
+fetchCalls.length = 0;
+menuKids.find((n) => itemText(n) === '关闭所有服务').props.onClick();
+treeMenu = rtMenu.paint();
+menuKids = menuKidsOf(treeMenu.children[3]);
+const confirmItem = menuKids.find((n) => n.props?.role === 'menuitem' && /确认关闭/.test(itemText(n)));
+ok('「关闭所有服务」第一次点击只要求确认',
+  !!confirmItem && !fetchCalls.some((c) => c.url.includes('/services/stop-all')), itemText(confirmItem));
+confirmItem.props.onClick();
+await flush(16);
+const stopCall = fetchCalls.find((c) => c.url.includes('/services/stop-all'));
+ok('确认后发 stop-all', !!stopCall, stopCall?.url);
+ok('stop-all 带本项目 file（不误关别的项目）',
+  (() => { try { return JSON.parse(stopCall.options.body).file === PROJECT.file; } catch { return false; } })(),
+  stopCall?.options?.body);
+
+// 「关闭并重新打开服务」：先 stop-all 再 start-all，两个都限定本项目
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+];
+contextPayload = {
+  ok: true, sessionId: 'session-restart', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtRestart = createRuntime(launcher.component, { sessionId: 'session-restart', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtRestart.paint();
+await flush();
+let treeRestart = rtRestart.paint();
+treeRestart.children[1].props.onClick();
+treeRestart = rtRestart.paint();
+fetchCalls.length = 0;
+stopAllCalls.length = 0;
+menuKidsOf(treeRestart.children[3]).find((n) => itemText(n) === '关闭并重新打开服务').props.onClick();
+await flush(40);
+const restartSeq = fetchCalls
+  .map((c) => c.url)
+  .filter((u) => u.includes('/services/stop-all') || u.includes('/services/start-all'))
+  .map((u) => (u.includes('stop-all') ? 'stop' : 'start'));
+ok('重启 = 先 stop-all 再 start-all', JSON.stringify(restartSeq) === JSON.stringify(['stop', 'start']), JSON.stringify(restartSeq));
+ok('重启的 stop-all 也带本项目 file', stopAllCalls[0]?.file === PROJECT.file, JSON.stringify(stopAllCalls));
+ok('重启后回到「打开服务」', labelOf(rtRestart.paint().children[0]) === '打开服务', labelOf(rtRestart.paint().children[0]));
+
+// Esc 收菜单：菜单挂在 document 监听上，键盘要能关
+treeRestart = rtRestart.paint();
+treeRestart.children[1].props.onClick();
+await flush();
+ok('Esc 前菜单是展开的', !!rtRestart.paint().children[3]);
+dispatchDoc('keydown', { key: 'Escape' });
+await flush();
+ok('Esc 收起菜单', !rtRestart.paint().children[3]);
 
 // ── 启动报「已在运行」但端口已在听：不显示失败，直接变「打开服务」──
 serviceRows = [];
