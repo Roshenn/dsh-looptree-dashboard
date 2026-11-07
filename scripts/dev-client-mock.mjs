@@ -453,11 +453,11 @@ tree4.children[0].props.onClick();
 await flush(12);
 ok('点「打开服务」不调 start-all', !fetchCalls.some((c) => c.url.includes('/services/start-all')),
   fetchCalls.map((c) => c.url).join(','));
-ok('每个在线服务各开一个右栏 tab', railCalls.length === 2 && railCalls.every(([kind]) => kind === 'browser'),
+ok('主按钮只打开选中的那条（默认第一条）', railCalls.length === 1 && /:8080/.test(railCalls[0]?.[1]?.params?.url || ''),
   JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
 
-// ── 服务菜单：小三角 = 分裂按钮的菜单半（重启 / 每条服务一条打开 / 全部关闭）──
-// 主按钮行为不变；菜单项由 GET /services 的实时结果生成，离线的那条置灰。
+// ── 服务菜单：小三角 = 选择器 + 两个动作（重启 / 全部关闭）──
+// 菜单只负责「选哪个」，主按钮消费这个选择；服务行是 menuitemradio，不是点击即打开的动作。
 serviceRows = [
   { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
   { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'down', startCommand: 'pnpm dev:h5' },
@@ -489,37 +489,76 @@ treeMenu = rtMenu.paint();
 const menuNode = treeMenu.children[3];
 ok('点小三角展开菜单', !!menuNode && menuNode.$$type === 'div' && menuNode.props.role === 'menu',
   menuNode ? String(menuNode.$$type) : 'null');
-const itemText = (node) => (((node && node.children) || []).filter((c) => typeof c === 'string').join(''));
+const textOf = (n) => (typeof n === 'string' ? n : ((n && n.children) || []).map(textOf).join(''));
 const menuKidsOf = (node) => ((node && Array.isArray(node.children[0]) ? node.children[0] : (node && node.children) || [])
   .filter(Boolean));
+const pickLabelOf = (node) => {
+  const label = ((node && node.children) || [])
+    .find((c) => c && c.props && c.props.className === 'dsh-rll-pick-label');
+  return label ? textOf(label) : '';
+};
 let menuKids = menuKidsOf(menuNode);
-ok('菜单项顺序 = 重启 / 每条服务一条 / 全部关闭',
-  JSON.stringify(menuKids.filter((n) => n.props?.role === 'menuitem').map(itemText))
-    === JSON.stringify(['关闭并重新打开服务', '打开 API 8080', '打开 H5 10086', '关闭所有服务']),
-  JSON.stringify(menuKids.map(itemText)));
-ok('离线的那条服务置灰', menuKids.find((n) => itemText(n) === '打开 H5 10086')?.props?.disabled === true);
-ok('在线的那条服务可点', menuKids.find((n) => itemText(n) === '打开 API 8080')?.props?.disabled !== true);
+const actionItems = menuKids.filter((n) => n.props?.role === 'menuitem');
+let pickItems = menuKids.filter((n) => n.props?.role === 'menuitemradio');
+ok('动作项仍是点击即执行：重启 / 全部关闭',
+  JSON.stringify(actionItems.map(textOf)) === JSON.stringify(['关闭并重新打开服务', '关闭所有服务']),
+  JSON.stringify(actionItems.map(textOf)));
+ok('服务行是选择项（menuitemradio），顺序跟 GET /services 一致',
+  JSON.stringify(pickItems.map(pickLabelOf)) === JSON.stringify(['API 8080', 'H5 10086']),
+  JSON.stringify(pickItems.map(pickLabelOf)));
+ok('默认选中第一条（没选过就落到服务列表第一项）',
+  pickItems[0]?.props?.['aria-checked'] === 'true' && pickItems[1]?.props?.['aria-checked'] === 'false',
+  pickItems.map((n) => n.props?.['aria-checked']).join(','));
+ok('离线服务也能选，只是标出「未在线」',
+  pickItems[1]?.props?.disabled !== true && textOf(pickItems[1]).includes('未在线'),
+  textOf(pickItems[1]));
 
+// 点服务行 = 只改选中态，不发请求、不开 tab
 railCalls.length = 0;
 fetchCalls.length = 0;
-menuKids.find((n) => itemText(n) === '打开 API 8080').props.onClick();
+pickItems[1].props.onClick();
+await flush();
+ok('点服务行只改选中，不开 tab 也不发请求',
+  railCalls.length === 0 && !fetchCalls.some((c) => /start-all|service\/(start|stop)/.test(c.url)),
+  fetchCalls.map((c) => c.url).join(','));
+ok('选完菜单收起', (rtMenu.paint().children || []).filter(Boolean).length === 3);
+rtMenu.paint().children[1].props.onClick();
+treeMenu = rtMenu.paint();
+pickItems = menuKidsOf(treeMenu.children[3]).filter((n) => n.props?.role === 'menuitemradio');
+ok('选中态落到 H5 并持久到下一次打开菜单',
+  pickItems[1]?.props?.['aria-checked'] === 'true' && pickItems[0]?.props?.['aria-checked'] === 'false',
+  pickItems.map((n) => n.props?.['aria-checked']).join(','));
+
+// 选中的那条没在线：主按钮回落到「把本项目全部拉起」
+fetchCalls.length = 0;
+railCalls.length = 0;
+rtMenu.paint().children[0].props.onClick();
+await flush(150);
+ok('选中的服务未在线时主按钮回落 start-all',
+  fetchCalls.some((c) => c.url.includes('/services/start-all')), fetchCalls.map((c) => c.url).join(','));
+ok('回落拉起时不开 tab', railCalls.length === 0, JSON.stringify(railCalls.length));
+
+// 拉起后选中的 H5 在线了：主按钮只打开 H5，不再开全部
+railCalls.length = 0;
+fetchCalls.length = 0;
+rtMenu.paint().children[0].props.onClick();
 await flush(90);
-ok('菜单项只打开这一个服务', railCalls.length === 1 && railCalls[0][1]?.params?.url === 'http://127.0.0.1:8080/',
+ok('主按钮只打开选中的 H5', railCalls.length === 1 && /:10086/.test(railCalls[0]?.[1]?.params?.url || ''),
   JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
-ok('打开单个服务不调 start-all', !fetchCalls.some((c) => c.url.includes('/services/start-all')));
-ok('点完菜单自动收起', (rtMenu.paint().children || []).filter(Boolean).length === 3);
+ok('打开选中的服务不调 start-all', !fetchCalls.some((c) => c.url.includes('/services/start-all')),
+  fetchCalls.map((c) => c.url).join(','));
 
 // 「关闭所有服务」：第一次点只翻成确认文案，第二次才真发请求
 rtMenu.paint().children[1].props.onClick();
 treeMenu = rtMenu.paint();
 menuKids = menuKidsOf(treeMenu.children[3]);
 fetchCalls.length = 0;
-menuKids.find((n) => itemText(n) === '关闭所有服务').props.onClick();
+menuKids.find((n) => n.props?.role === 'menuitem' && textOf(n) === '关闭所有服务').props.onClick();
 treeMenu = rtMenu.paint();
 menuKids = menuKidsOf(treeMenu.children[3]);
-const confirmItem = menuKids.find((n) => n.props?.role === 'menuitem' && /确认关闭/.test(itemText(n)));
+const confirmItem = menuKids.find((n) => n.props?.role === 'menuitem' && /确认关闭/.test(textOf(n)));
 ok('「关闭所有服务」第一次点击只要求确认',
-  !!confirmItem && !fetchCalls.some((c) => c.url.includes('/services/stop-all')), itemText(confirmItem));
+  !!confirmItem && !fetchCalls.some((c) => c.url.includes('/services/stop-all')), textOf(confirmItem));
 confirmItem.props.onClick();
 await flush(16);
 const stopCall = fetchCalls.find((c) => c.url.includes('/services/stop-all'));
@@ -545,7 +584,7 @@ treeRestart.children[1].props.onClick();
 treeRestart = rtRestart.paint();
 fetchCalls.length = 0;
 stopAllCalls.length = 0;
-menuKidsOf(treeRestart.children[3]).find((n) => itemText(n) === '关闭并重新打开服务').props.onClick();
+menuKidsOf(treeRestart.children[3]).find((n) => textOf(n) === '关闭并重新打开服务').props.onClick();
 await flush(40);
 const restartSeq = fetchCalls
   .map((c) => c.url)

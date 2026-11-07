@@ -95,9 +95,10 @@ did the work. The panel is the view; DSH is the engine.
   registered project gets a compact card. **Services** starts every offline service of that project
   (port conflicts still fail closed); once anything is already listening it turns into **Open services**,
   which opens one tab per running service in the right-side embedded browser (never the system browser).
-  A **caret** beside it opens a per-service menu: **restart services**, open **one** named service
-  (offline entries are disabled), and **stop all services** (two clicks to confirm) — all scoped to the
-  current project only.
+  A **caret** beside it is a **service picker**: whichever service is checked is the one the main button
+  opens (the first row is checked by default). The same menu carries **restart services** and
+  **stop all services** (two clicks to confirm), both scoped to the current project. If the checked
+  service is offline, the main button falls back to starting every service in the project.
   **Loop** switches the main area to the project's focus view and scrolls to the current node
   (running → ready → milestone), and the panel grows a **← Back to chat** button so the round trip is
   one click each way. The card renders nothing in workspaces that are not registered yet.
