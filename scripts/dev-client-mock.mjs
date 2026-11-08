@@ -500,8 +500,9 @@ const pickLabelOf = (node) => {
 let menuKids = menuKidsOf(menuNode);
 const actionItems = menuKids.filter((n) => n.props?.role === 'menuitem');
 let pickItems = menuKids.filter((n) => n.props?.role === 'menuitemradio');
-ok('动作项仍是点击即执行：重启 / 全部关闭',
-  JSON.stringify(actionItems.map(textOf)) === JSON.stringify(['关闭并重新打开服务', '关闭所有服务']),
+ok('动作项仍是点击即执行：拉起全部 / 重启 / 全部关闭',
+  JSON.stringify(actionItems.map(textOf))
+    === JSON.stringify(['拉起全部服务', '关闭并重新打开服务', '关闭所有服务']),
   JSON.stringify(actionItems.map(textOf)));
 ok('服务行是选择项（menuitemradio），顺序跟 GET /services 一致',
   JSON.stringify(pickItems.map(pickLabelOf)) === JSON.stringify(['API 8080', 'H5 10086']),
@@ -602,6 +603,53 @@ ok('Esc 前菜单是展开的', !!rtRestart.paint().children[3]);
 dispatchDoc('keydown', { key: 'Escape' });
 await flush();
 ok('Esc 收起菜单', !rtRestart.paint().children[3]);
+
+// ── 菜单顶部「拉起全部服务」：服务挂了不用进面板，一键把没在线的拉起来 ──
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+];
+contextPayload = {
+  ok: true, sessionId: 'session-all', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtAll = createRuntime(launcher.component, { sessionId: 'session-all', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtAll.paint();
+await flush();
+let treeAll = rtAll.paint();
+treeAll.children[1].props.onClick();
+treeAll = rtAll.paint();
+const startAllItem = menuKidsOf(treeAll.children[3])[0];
+ok('全部在线时「拉起全部服务」置灰', startAllItem?.props?.disabled === true
+  && textOf(startAllItem) === '拉起全部服务', textOf(startAllItem) + '/' + startAllItem?.props?.disabled);
+
+// 掉了一个：菜单顶部那颗就能点，点了走 start-all、不开 tab
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'down', startCommand: 'pnpm dev:h5' },
+];
+contextPayload = {
+  ok: true, sessionId: 'session-all2', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtAll2 = createRuntime(launcher.component, { sessionId: 'session-all2', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtAll2.paint();
+await flush();
+let treeAll2 = rtAll2.paint();
+treeAll2.children[1].props.onClick();
+treeAll2 = rtAll2.paint();
+const startAllLive = menuKidsOf(treeAll2.children[3])[0];
+ok('有一个掉线时「拉起全部服务」可点', startAllLive?.props?.disabled !== true, String(startAllLive?.props?.disabled));
+fetchCalls.length = 0;
+railCalls.length = 0;
+startAllLive.props.onClick();
+await flush(150);
+const allCall = fetchCalls.find((c) => c.url.includes('/services/start-all'));
+ok('「拉起全部服务」发 start-all 且带本项目 file', !!allCall
+  && (() => { try { return JSON.parse(allCall.options.body).file === PROJECT.file; } catch { return false; } })(),
+  allCall?.options?.body);
+ok('「拉起全部服务」不开 tab', railCalls.length === 0, JSON.stringify(railCalls.length));
+ok('拉起后主按钮回到「打开服务」', labelOf(rtAll2.paint().children[0]) === '打开服务', labelOf(rtAll2.paint().children[0]));
 
 // ── 启动报「已在运行」但端口已在听：不显示失败，直接变「打开服务」──
 serviceRows = [];
