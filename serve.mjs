@@ -22,6 +22,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { validateCard } from './lib/core.mjs';
 import { listTaskPrompts } from './lib/prompt.mjs';
+import { normalizeServices } from './lib/services.mjs';
 
 const ROOT = process.cwd();
 const DIR = join(ROOT, 'samples');
@@ -350,6 +351,27 @@ const server = createServer(async (req, res) => {
     catch (e) { return send(res, 404, { ok: false, error: e.message }); }
   }
 
+  // 写回服务配置（只替换 services 字段）——面板里拖拽排序走这条
+  if (url.pathname === '/api/services' && req.method === 'PUT') {
+    if (!authed(req)) return send(res, 403, { ok: false, error: 'forbidden' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); }
+    catch { return send(res, 400, { ok: false, error: 'JSON 解析失败' }); }
+    const file = body && body.file;
+    if (!SAFE_FILE.test(file || '')) return send(res, 400, { ok: false, error: 'file 不合法' });
+    if (!Array.isArray(body.services)) return send(res, 400, { ok: false, error: 'services 必须是数组（清空就传 []）' });
+    const normalized = normalizeServices(body.services);
+    let card;
+    try { card = await loadCard(file); }
+    catch (e) { return send(res, 404, { ok: false, error: e.message }); }
+    if (normalized.length) card.services = normalized;
+    else delete card.services;
+    const { errors, warnings } = validateCard(card);
+    if (errors.length) return send(res, 422, { ok: false, error: '校验未通过', errors, warnings });
+    await writeCard(file, card);
+    return send(res, 200, { ok: true, services: normalized });
+  }
+
   if (url.pathname === '/api/service/start' && req.method === 'POST') {
     if (!authed(req)) return send(res, 403, { ok: false, error: 'forbidden' });
     let body; try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, { ok: false, error: 'bad json' }); }
@@ -468,6 +490,12 @@ const server = createServer(async (req, res) => {
   if (!abs.startsWith(WEB + sep) && abs !== WEB) return send(res, 403, 'forbidden', 'text/plain; charset=utf-8');
   try {
     const buf = await readFile(abs);
+    // index.html 注入写令牌：面板的 fetch 补丁只认 window.__ROTATION_TOKEN__（DSH 宿主也这么注入），
+    // 否则拖拽排序 / 服务写回这类走补丁的写请求会 403
+    if (abs === join(WEB, 'index.html')) {
+      const html = String(buf).replace('</head>', `<script>window.__ROTATION_TOKEN__=${JSON.stringify(RUN_TOKEN)};</script></head>`);
+      return send(res, 200, html, MIME['.html']);
+    }
     return send(res, 200, buf, MIME[extname(abs)] || 'application/octet-stream');
   } catch {
     return send(res, 404, 'not found', 'text/plain; charset=utf-8');

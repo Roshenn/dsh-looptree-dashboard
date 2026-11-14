@@ -530,20 +530,22 @@ ok('选中态落到 H5 并持久到下一次打开菜单',
   pickItems[1]?.props?.['aria-checked'] === 'true' && pickItems[0]?.props?.['aria-checked'] === 'false',
   pickItems.map((n) => n.props?.['aria-checked']).join(','));
 
-// 选中的那条没在线：主按钮回落到「把本项目全部拉起」
+// 选中的那条没在线：主按钮回落到「把本项目全部拉起」，拉起后自动打开默认服务
 fetchCalls.length = 0;
 railCalls.length = 0;
 rtMenu.paint().children[0].props.onClick();
-await flush(150);
+await flush(240);
 ok('选中的服务未在线时主按钮回落 start-all',
   fetchCalls.some((c) => c.url.includes('/services/start-all')), fetchCalls.map((c) => c.url).join(','));
-ok('回落拉起时不开 tab', railCalls.length === 0, JSON.stringify(railCalls.length));
+ok('回落拉起后自动打开默认（选中的 H5）',
+  railCalls.length === 1 && /:10086/.test(railCalls[0]?.[1]?.params?.url || ''),
+  JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
 
 // 拉起后选中的 H5 在线了：主按钮只打开 H5，不再开全部
 railCalls.length = 0;
 fetchCalls.length = 0;
 rtMenu.paint().children[0].props.onClick();
-await flush(90);
+await flush(120);
 ok('主按钮只打开选中的 H5', railCalls.length === 1 && /:10086/.test(railCalls[0]?.[1]?.params?.url || ''),
   JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
 ok('打开选中的服务不调 start-all', !fetchCalls.some((c) => c.url.includes('/services/start-all')),
@@ -586,7 +588,7 @@ treeRestart = rtRestart.paint();
 fetchCalls.length = 0;
 stopAllCalls.length = 0;
 menuKidsOf(treeRestart.children[3]).find((n) => textOf(n) === '关闭并重新打开服务').props.onClick();
-await flush(40);
+await flush(260);
 const restartSeq = fetchCalls
   .map((c) => c.url)
   .filter((u) => u.includes('/services/stop-all') || u.includes('/services/start-all'))
@@ -643,12 +645,14 @@ ok('有一个掉线时「拉起全部服务」可点', startAllLive?.props?.disa
 fetchCalls.length = 0;
 railCalls.length = 0;
 startAllLive.props.onClick();
-await flush(150);
+await flush(260);
 const allCall = fetchCalls.find((c) => c.url.includes('/services/start-all'));
 ok('「拉起全部服务」发 start-all 且带本项目 file', !!allCall
   && (() => { try { return JSON.parse(allCall.options.body).file === PROJECT.file; } catch { return false; } })(),
   allCall?.options?.body);
-ok('「拉起全部服务」不开 tab', railCalls.length === 0, JSON.stringify(railCalls.length));
+ok('「拉起全部服务」完成后自动打开当前选中（顺序没变时选中优先）',
+  railCalls.length === 1 && /:10086/.test(railCalls[0]?.[1]?.params?.url || ''),
+  JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
 ok('拉起后主按钮回到「打开服务」', labelOf(rtAll2.paint().children[0]) === '打开服务', labelOf(rtAll2.paint().children[0]));
 
 // ── 启动报「已在运行」但端口已在听：不显示失败，直接变「打开服务」──
@@ -676,11 +680,99 @@ ok('拉起态用电源图标（两条 path，无 rect）',
   startIcon ? startIcon.children.map((c) => c.$$type).join(',') : 'none');
 ok('拉起态不带状态色', !tree5.children[0].props['data-tone'], String(tree5.children[0].props['data-tone']));
 tree5.children[0].props.onClick();
-await new Promise((resolve) => setTimeout(resolve, 720));
+await new Promise((resolve) => setTimeout(resolve, 1500));
 await flush();
 tree5 = rt5.paint();
 ok('「已在运行」但探到在线时不再显示失败', labelOf(tree5.children[0]) !== '失败', labelOf(tree5.children[0]));
 ok('并且切回「打开服务」', labelOf(tree5.children[0]) === '打开服务', labelOf(tree5.children[0]));
+
+// ── 顺序 = 默认打开谁：面板拖过顺序，旧的手动选中作废 ──
+// serviceSelection 记的是「选中 id + 当时的第一行」；第一行换掉说明顺序变了，
+// 这时回到「第一位就是默认」，否则拖完顺序启动器还会固执地打开旧的那条。
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+];
+startAllPayload = () => ({ ok: true, started: [], skipped: [], failed: [] });
+contextPayload = {
+  ok: true, sessionId: 'session-order-a', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtOrderA = createRuntime(launcher.component, { sessionId: 'session-order-a', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtOrderA.paint();
+await flush();
+let treeOrderA = rtOrderA.paint();
+treeOrderA.children[1].props.onClick();
+treeOrderA = rtOrderA.paint();
+const orderPicksA = menuKidsOf(treeOrderA.children[3]).filter((n) => n.props?.role === 'menuitemradio');
+orderPicksA[0].props.onClick();   // 手动选第一条（API）
+await flush();
+
+serviceRows = [
+  { id: 'h5', name: 'H5 10086', url: 'http://127.0.0.1:10086', status: 'up', startCommand: 'pnpm dev:h5' },
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+];
+contextPayload = {
+  ok: true, sessionId: 'session-order-b', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtOrderB = createRuntime(launcher.component, { sessionId: 'session-order-b', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtOrderB.paint();
+await flush();
+let treeOrderB = rtOrderB.paint();
+treeOrderB.children[1].props.onClick();
+const orderPicksB = menuKidsOf(rtOrderB.paint().children[3]).filter((n) => n.props?.role === 'menuitemradio');
+ok('顺序翻过来后，旧的手动选中作废，默认回到第一位',
+  orderPicksB[0]?.props?.['aria-checked'] === 'true' && pickLabelOf(orderPicksB[0]) === 'H5 10086',
+  orderPicksB.map((n) => pickLabelOf(n) + ':' + n.props?.['aria-checked']).join(','));
+
+// ── 第一位是 watch（没有地址）：严格只认第一位，拉起后不自动打开、也不顺延 ──
+serviceRows = [
+  { id: 'worker', name: '任务 worker', status: 'watch', startCommand: 'pnpm worker' },
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'down', startCommand: 'make api' },
+];
+startAllPayload = () => {
+  serviceRows = [
+    { id: 'worker', name: '任务 worker', status: 'watch', startCommand: 'pnpm worker' },
+    { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'up', startCommand: 'make api' },
+  ];
+  return { ok: true, started: [{ id: 'worker' }, { id: 'api' }], skipped: [], failed: [] };
+};
+contextPayload = {
+  ok: true, sessionId: 'session-watch', project: PROJECT,
+  services: { total: 2, startable: 2, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rtWatch = createRuntime(launcher.component, { sessionId: 'session-watch', usePanelInfo: (select) => select({ activePanelId: null }) });
+rtWatch.paint();
+await flush();
+const treeWatch = rtWatch.paint();
+ok('第一位是 watch 时主按钮仍是「服务」', labelOf(treeWatch.children[0]) === '服务', labelOf(treeWatch.children[0]));
+railCalls.length = 0;
+treeWatch.children[0].props.onClick();
+await flush(100);
+ok('第一位没有地址时不自动打开、也不顺延到第二位',
+  railCalls.length === 0, JSON.stringify(railCalls.map((c) => c[1]?.params?.url)));
+
+// ── start-all 整批失败（409 端口冲突）：不自动打开，错误照旧交代 ──
+serviceRows = [
+  { id: 'api', name: 'API 8080', url: 'http://127.0.0.1:8080', status: 'down', startCommand: 'make api' },
+];
+startAllPayload = () => ({ ok: false, error: '端口冲突，整批未启动：8080 ← proj/API 8080' });
+contextPayload = {
+  ok: true, sessionId: 'session-409', project: PROJECT,
+  services: { total: 1, startable: 1, hasUrl: true }, token: true, panelId: 'card-proj-milestone',
+};
+const rt409 = createRuntime(launcher.component, { sessionId: 'session-409', usePanelInfo: (select) => select({ activePanelId: null }) });
+rt409.paint();
+await flush();
+railCalls.length = 0;
+rt409.paint().children[0].props.onClick();
+await flush(150);
+const tree409 = rt409.paint();
+ok('start-all 整批失败时不自动打开', railCalls.length === 0, JSON.stringify(railCalls.length));
+ok('start-all 整批失败时按钮给失败态并写明原因',
+  labelOf(tree409.children[0]) === '失败' && /端口冲突/.test(String(tree409.children[0].props.title || '')),
+  labelOf(tree409.children[0]) + ' / ' + String(tree409.children[0].props.title || ''));
 
 // ── 项目没有服务配置：只留「闭环」，不给永远禁用的按钮 ──
 serviceRows = [];

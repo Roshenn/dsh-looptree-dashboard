@@ -85,7 +85,8 @@ did the work. The panel is the view; DSH is the engine.
   `windows` / `linux`). A service can also carry a `build` command and run it with one click — a
   one-shot job that reports back its exit code and the tail of its output. An AI pass can read the
   project (including any `Makefile`, root or nested) and propose both commands — as a draft you
-  review and probe before anything is written back.
+  review and probe before anything is written back. Drag the rows in the sidebar to reorder them:
+  the top row is the default target of the composer card's **Open services** button.
 - **Start all / stop all across projects.** The toolbar has two batch buttons. **Start all** runs a
   port-conflict precheck first: when two services point at the same port, nothing is started and the
   panel lists the collision (fail closed); services already up are skipped. **Stop all** kills whatever
@@ -100,7 +101,10 @@ did the work. The panel is the view; DSH is the engine.
   back only the ones that are down (greyed out when everything is up), so a crashed service no longer
   means opening the panel just to restart it. The same menu carries **restart services** and
   **stop all services** (two clicks to confirm), both scoped to the current project. If the checked
-  service is offline, the main button falls back to starting every service in the project.
+  service is offline, the main button falls back to starting every service in the project. When start
+  all / restart finishes, the card opens the default service by itself (the top row, or the one you
+  checked while the order is unchanged). The rule is strict: if the default cannot be opened — a
+  watch service, no URL, or not listening within 15s — nothing opens; it never falls through.
   **Loop** switches the main area to the project's focus view and scrolls to the current node
   (running → ready → milestone), and the panel grows a **← Back to chat** button so the round trip is
   one click each way. The card renders nothing in workspaces that are not registered yet.

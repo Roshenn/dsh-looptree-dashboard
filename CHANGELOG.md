@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## 未发布 — 服务拖拽排序：排第一位的就是默认打开的那个
+
+- **需求**（2026-11-14，用户）：同一个工作区里多个服务要能拖拽排序，用「谁在上面」决定默认打开哪个；
+  服务拉起来之后应该直接打开前端，而不是反复打开后端。
+- **口径**（本轮拍板）：① 拖拽放在面板侧栏的服务列表（截图那一块）；② 拉起 / 重启完成后**自动打开**
+  默认服务；③ 默认规则**严格**——第一位打不开就不打开，不顺延到别的服务。
+- **落点**：`web/index.html`（侧栏行拖拽 + 写回 + 「默认」标记）、`lib/client.js`
+  （`openDefaultAfterStart`、选中记录带「当时的第一行」）、`scripts/dev-client-mock.mjs`（改断言 + 顺序 / watch / 整批失败三条新断言）、
+  `serve.mjs`（样例服务器补 `PUT /api/services`、HTML 注入写令牌）。
+- **改法**：
+  - 侧栏服务行加 `draggable` / `data-svc-id`，第一位带一枚克制的「默认」标记；落点用行的上/下 2px
+    高亮。拖拽期间 `paintServiceBlocks()` 空转——5s 状态轮询重画会换掉节点，drag 会话直接断；松手后
+    清标记、补画一次。
+  - 写回复用 `PUT /api/services`：只发配置字段（status / pid 这些探活结果不落盘），先乐观更新
+    `p.card.services` 与 `serviceMap`，服务端 `normalizeServices` 校验后原子写；失败回滚并 toast。
+  - 启动器 `pickSelectedRow` 的选中记录从 `serviceId` 变成 `{ id, first }`：面板里拖过顺序、第一行变了，
+    旧的手动选中自动作废，回到「第一位 = 默认」。
+  - `startAllServices` / `restartAllServices` 成功后调 `openDefaultAfterStart`：700ms 轮询等第一位
+    「真的能访问」再开（dev server 从 spawn 到监听端口要几秒），预算 15s；第一位是 watch / 没有地址时
+    立刻放弃并在按钮 note 里说明原因。跨项目批量拉起（面板工具栏）不自动开 tab，避免一次开好几个项目。
+- **边界**：排序同时决定 start-all 的 spawn 顺序（数组顺序），但它只是先后，不是依赖编排；默认标记只出现
+  在面板侧栏那份列表（详情列不开拖拽）。
+- **验证**：`npm run mock:client` 全过（含新增「顺序翻过来后旧选中作废」「第一位是 watch 时不自动打开、
+  也不顺延」「start-all 整批失败时不自动打开」）；`npm run preflight` 全绿；独立样例服务器（`node serve.mjs`）上用 Playwright 合成 HTML5
+  拖拽：顺序互换、「默认」标记跟着第一位、刷新后仍是新顺序，截图核对侧栏排版。
+
 ## 未发布 — 菜单顶部加「拉起全部服务」：不用再进面板补拉起
 
 - **需求**（2026-11-08，用户）：有时候某个服务挂掉了，得进闭环面板才能全部拉起；菜单最上方加一颗

@@ -1110,6 +1110,15 @@
   /* ── first column: services + time, compressed ── */
   .lane-svc{margin-top:10px;padding-top:10px;gap:3px}
   .lane-svc .svc{margin:0;padding:3px 0;border:0;border-radius:0;background:transparent;position:relative}
+  /* 拖拽排序：第一行就是启动器「打开服务」的默认对象，拖动等于改默认 */
+  .lane-svc .svc[draggable="true"]{cursor:grab}
+  .lane-svc .svc[draggable="true"]:active{cursor:grabbing}
+  .lane-svc .svc.svc-dragging{opacity:.4}
+  .lane-svc .svc.drop-before{box-shadow:inset 0 2px 0 var(--brand)}
+  .lane-svc .svc.drop-after{box-shadow:inset 0 -2px 0 var(--brand)}
+  .lane-svc .svc-name{min-width:0}
+  .svc-default{flex:0 0 auto;font-size:10px;line-height:14px;padding:0 4px;border:1px solid var(--b1);
+    border-radius:4px;color:var(--tx4);font-weight:400}
   .lane-svc .svc-top{font-size:var(--fs-13);color:var(--tx2);gap:7px}
   .lane-svc .svc-url,.lane-svc .svc-cmd,.lane-svc .svc-warn{display:none}
   .lane-svc .svc-acts{position:absolute;right:0;top:1px;width:172px;margin:0;padding:2px;
@@ -1945,6 +1954,8 @@ const runMap = new Map();           // `${file}::${nodeId}` -> run
 const runKey = (p, n) => `${p.file || ''}::${n.id}`;
 const serviceMap = new Map();      // file -> [{ id, name, url, status, latencyMs, ... }]
 let servicePlatform = { id: '', label: '当前平台' };   // 当前宿主平台（host 用 process.platform 解析 start）
+/* 服务拖拽排序中：{ project, id }。非空时服务块暂停重画——节点被换掉，拖拽会话会直接断。 */
+let svcDrag = null;
 const SVC_LABEL = { up:'运行中', down:'未启动', starting:'启动中', failed:'启动失败', watch:'不探活' };
 const SVC_TONE = { up:'var(--green)', down:'var(--tx4)', starting:'var(--amber)', failed:'var(--red)', watch:'var(--tx3)' };
 
@@ -2438,7 +2449,11 @@ function progressOf(node){
 }
 function hasBlocked(p){ return anyBlocked(p.root); }
 
-function svcRows(p){
+/**
+ * 服务块。sortable=true 的是泳道侧栏那一份：行可拖拽，松手后按 DOM 顺序写回
+ * rotation.json 的 services 数组——数组第一位就是启动器默认打开的服务。
+ */
+function svcRows(p, sortable){
   if (!p.file) return '';
   const busy = collecting.get(p.file);
   if (busy && busy.status === 'running'){
@@ -2449,7 +2464,7 @@ function svcRows(p){
   if (!list.length) return `<div class="info-empty">这张卡没配 services：点项目名右侧 <b>⋯</b> →「服务信息收集」自动补</div>`;
   const failed = busy && busy.status === 'failed'
     ? `<div class="svc-warn">上次收集失败：${esc(busy.error || '未知原因')}（可再点一次）</div>` : '';
-  return failed + list.map(svc => {
+  return failed + list.map((svc, i) => {
     const tone = SVC_TONE[svc.status] || 'var(--tx4)';
     const st = SVC_LABEL[svc.status] || svc.status;
     const lat = svc.status === 'up' && svc.latencyMs != null ? ` · ${svc.latencyMs}ms` : '';
@@ -2481,10 +2496,15 @@ function svcRows(p){
     const urlLine = hasUrl
       ? `<button class="svc-url mono" data-svc-open="${svc.id}" data-file="${esc(p.file)}" title="打开 ${esc(svc.url)}">${esc(svc.url.replace(/^https?:\/\//, ''))}</button>`
       : `<div class="svc-url mono" title="watch 服务没有地址；用「启动 / 编译」按钮">watch · 无地址（不探活）</div>`;
-    return `<div class="svc">
+    const dragAttrs = sortable ? ` draggable="true" data-svc-id="${esc(svc.id)}"` : '';
+    // 第一位 = 默认打开的候选：给个克制的小标记，否则「顺序决定默认」这条规则不可见
+    const defaultChip = sortable && i === 0
+      ? '<span class="svc-default" title="排在第一位的服务就是启动器「打开服务」的默认对象">默认</span>' : '';
+    return `<div class="svc"${dragAttrs}>
       <div class="svc-top">
         <i class="svc-dot" style="--tone:${tone}"></i>
         <span class="svc-name">${esc(svc.name)}</span>
+        ${defaultChip}
         <span class="svc-st" style="color:${tone}">${st}${lat}</span>
       </div>
       ${urlLine}
@@ -2602,9 +2622,115 @@ function showBuildResult(svc, j){
 function laneServices(p){
   if (!p.file) return '';
   return `<div class="lane-svc" data-svc="${esc(p.id)}">
-    <div class="info-k" style="margin-bottom:4px">服务</div>
-    ${svcRows(p)}
+    <div class="info-k" style="margin-bottom:4px" title="拖动服务行排序；排在第一位的服务就是启动器「打开服务」的默认对象">服务</div>
+    ${svcRows(p, true)}
   </div>`;
+}
+
+/* ─────────── 服务拖拽排序 ───────────
+   顺序写在 rotation.json 的 services 数组里，启动器（lib/client.js）默认打开第一行，
+   所以这里拖的是「默认打开谁」。规则是严格的：第一位打不开就不自动打开，不顺延。 */
+const SVC_DROP_MARKS = ['drop-before', 'drop-after'];
+
+function svcRowFromEvent(e){
+  const t = e && e.target;
+  return t && t.closest ? t.closest('.lane-svc .svc[data-svc-id]') : null;
+}
+function svcBoxOf(el){
+  return el && el.closest ? el.closest('.lane-svc[data-svc]') : null;
+}
+function clearSvcDropMarks(root){
+  (root || document).querySelectorAll('.svc.drop-before,.svc.drop-after')
+    .forEach(el => el.classList.remove(...SVC_DROP_MARKS));
+}
+/** 收尾：清标记 + 补一次被压住的重画（拖拽期间 paintServiceBlocks 是空转的） */
+function endSvcDrag(repaint = true){
+  if (!svcDrag) return;
+  svcDrag = null;
+  clearSvcDropMarks(document);
+  document.querySelectorAll('.svc.svc-dragging').forEach(el => el.classList.remove('svc-dragging'));
+  if (repaint) paintServiceBlocks();
+}
+
+document.addEventListener('dragstart', (e) => {
+  const row = svcRowFromEvent(e);
+  if (!row) return;
+  const box = svcBoxOf(row);
+  const p = box && PROJECTS.find(x => x.id === box.dataset.svc);
+  if (!p || !p.card || !Array.isArray(p.card.services)) { e.preventDefault(); return; }
+  svcDrag = { project: p, id: row.dataset.svcId, row };
+  row.classList.add('svc-dragging');
+  try {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', row.dataset.svcId);
+  } catch {}
+});
+
+document.addEventListener('dragover', (e) => {
+  if (!svcDrag) return;
+  const row = svcRowFromEvent(e);
+  if (!row) return;
+  const box = svcBoxOf(row);
+  if (!box || box.dataset.svc !== svcDrag.project.id) return;
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch {}
+  const rect = row.getBoundingClientRect();
+  const mark = (e.clientY > rect.top + rect.height / 2) ? 'drop-after' : 'drop-before';
+  if (row.classList.contains(mark)) return;
+  clearSvcDropMarks(box);
+  row.classList.add(mark);
+});
+
+document.addEventListener('drop', (e) => {
+  if (!svcDrag) return;
+  const row = svcRowFromEvent(e);
+  if (!row) return;
+  const box = svcBoxOf(row);
+  if (!box || box.dataset.svc !== svcDrag.project.id) return;
+  e.preventDefault();
+  const p = svcDrag.project;
+  const dragId = svcDrag.id;
+  const rect = row.getBoundingClientRect();
+  const after = e.clientY > rect.top + rect.height / 2;
+  const before = [...box.querySelectorAll('.svc[data-svc-id]')].map(el => el.dataset.svcId);
+  endSvcDrag(false);   // 先不重画：紧接着 reorderServices 会按新顺序画一次，避免闪回旧顺序
+  if (row.dataset.svcId === dragId) return;   // 落在自己身上 = 没挪动，别把行吸到末尾
+  // 先把拖拽项摘出来，再按落点算插入位置（落点下标要在摘除之后重算）
+  const rest = before.filter(id => id !== dragId);
+  let at = rest.indexOf(row.dataset.svcId);
+  if (at < 0) at = rest.length;
+  else if (after) at += 1;
+  const next = rest.slice(0, at).concat(dragId, rest.slice(at));
+  if (next.join('\u0000') === before.join('\u0000')) return;   // 没挪动
+  reorderServices(p, next);
+});
+
+document.addEventListener('dragend', () => { endSvcDrag(); });
+// 窗口失焦（拖到别的应用上松手）时 dragend 不一定派发：兜底把状态收干净
+window.addEventListener('blur', () => { endSvcDrag(); });
+
+/**
+ * 把新顺序写回卡片：先乐观更新内存里的卡片与 serviceMap（拖完立刻看到结果），
+ * 再 PUT /services 落盘；服务端会按 normalizeServices 校验，失败就回滚 toast。
+ * 只发配置字段（id/name/url/start/…），行上的 status/pid 这些是探活结果，不写回。
+ */
+async function reorderServices(p, ids){
+  const raw = p && p.card && Array.isArray(p.card.services) ? p.card.services : null;
+  if (!raw) return;
+  const byId = new Map(raw.map(s => [s && s.id, s]));
+  const next = ids.map(id => byId.get(id)).filter(Boolean);
+  for (const s of raw) if (s && !ids.includes(s.id)) next.push(s);
+  if (next.length !== raw.length) return;   // id 对不上：宁可不写，也不丢服务
+  p.card.services = next;
+  const rows = serviceMap.get(p.file);
+  if (Array.isArray(rows)){
+    const byRow = new Map(rows.map(r => [r.id, r]));
+    const ordered = ids.map(id => byRow.get(id)).filter(Boolean);
+    for (const r of rows) if (!ids.includes(r.id)) ordered.push(r);
+    serviceMap.set(p.file, ordered);
+  }
+  paintServiceBlocks();
+  await putServices(p, next, '已保存服务顺序 · 第一位就是默认打开的服务');
 }
 
 /* ─────────── 项目统计 ─────────── */
@@ -4230,8 +4356,14 @@ function openServicesPreview(p, services, draft){
   syncOkState();
 }
 
-/** 写回 services（只替换这个字段；写前服务端还会再校验一遍） */
-async function putServices(p, list){
+/**
+ * 写回 services（只替换这个字段；写前服务端还会再校验一遍）。
+ * okMsg 让调用方说清楚这次写的是什么——拖拽排序与「收集写回」共用同一条通路。
+ * 失败时把卡片里的 services 还原成写之前的样子，别让乐观更新留在内存里。
+ */
+async function putServices(p, list, okMsg){
+  const prev = p && p.card ? p.card.services : undefined;
+  const snapshot = Array.isArray(prev) ? prev.slice() : prev;
   try {
     const res = await fetch(api('/services'), {
       method: 'PUT', headers: { 'content-type': 'application/json' },
@@ -4244,8 +4376,12 @@ async function putServices(p, list){
       else delete p.card.services;
     }
     await refreshServices();
-    toast(`已写回 ${(j.services || []).length} 个服务到 rotation.json`);
+    toast(okMsg || `已写回 ${(j.services || []).length} 个服务到 rotation.json`);
   } catch (error) {
+    if (p && p.card){
+      if (snapshot === undefined) delete p.card.services;
+      else p.card.services = snapshot;
+    }
     toast('写回失败：' + error.message);
   }
 }
@@ -6556,10 +6692,18 @@ async function refreshServices(){
 }
 /** 只重画服务块（矩阵与聚焦视图各一块），不动整棵树 */
 function paintServiceBlocks(){
+  if (svcDrag){
+    // 拖拽中不换节点：drag 会话绑在行元素上，innerHTML 一换就断。
+    // 但如果行已经被别的重画换掉了，dragend 也不会再来——在这里兜底收尾，别让重画永远停摆。
+    if (svcDrag.row && svcDrag.row.isConnected) return;
+    endSvcDrag(false);
+  }
   document.querySelectorAll('[data-svc]').forEach(el => {
     const p0 = PROJECTS.find(x => x.id === el.dataset.svc);
     if (!p0) return;
-    el.innerHTML = '<div class="info-k">服务</div>' + svcRows(p0);
+    const sortable = el.classList.contains('lane-svc');
+    const hint = sortable ? ' title="拖动服务行排序；排在第一位的服务就是启动器「打开服务」的默认对象"' : '';
+    el.innerHTML = `<div class="info-k"${hint}>服务</div>` + svcRows(p0, sortable);
   });
 }
 function svcFor(btn){
