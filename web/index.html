@@ -5091,6 +5091,7 @@ async function addAttachments(p, n, files){
     if (detailNode === n.id) openDetail(n.id, true);
   }
   const saved = await persist(p);
+  if (detailNode === n.id) openDetail(n.id, true);
   if (!saved.ok) toast('图已存到磁盘，但卡片没写回：' + saved.error);
   else toast(fresh.length ? `已加 ${fresh.length} 张图${failed ? `（${failed} 张失败）` : ''}` : '这张图已经在这个节点上了');
 }
@@ -5104,6 +5105,7 @@ function removeAttachment(p, n, sha){
     render();
     if (detailNode === n.id) openDetail(n.id, true);
     const res = await persist(p);
+    if (detailNode === n.id) openDetail(n.id, true);
     if (!res.ok) toast('保存失败：' + res.error);
     else toast('已移除');
   });
@@ -5146,8 +5148,8 @@ async function saveImgAlt(){
   const input = $('#imgview-alt');
   const value = String((input && input.value) || '').trim().slice(0, 200);
   if (value) att.alt = value; else delete att.alt;
-  if (detailNode === n.id) openDetail(n.id, true);
   const res = await persist(p);
+  if (detailNode === n.id) openDetail(n.id, true);
   toast(res.ok ? (value ? '说明已保存（会进 prompt）' : '说明已清空') : '保存失败：' + res.error);
 }
 function downloadAttachment(p, att){
