@@ -1194,6 +1194,43 @@
   .detail-exp[open] summary.detail-k{margin-bottom:6px}
   .detail-exp .detail-row dd{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 
+  /* ── 附件（能力闭环 / 执行记录的截图）── */
+  .att-sec .detail-k{display:flex;align-items:center;gap:6px}
+  .att-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:2px}
+  .att-tile{position:relative;aspect-ratio:1;border:1px solid var(--b1);border-radius:var(--radius);overflow:hidden;background:var(--l1)}
+  .att-open{display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in}
+  .att-open img{width:100%;height:100%;object-fit:cover;display:block}
+  .att-fallback{display:none;position:absolute;inset:0;place-items:center;font-size:var(--fs-11);color:var(--tx4);background:var(--l1)}
+  .att-tile.att-missing .att-open img{opacity:0}
+  .att-tile.att-missing .att-fallback{display:grid}
+  .att-del{position:absolute;top:3px;right:3px;width:19px;height:19px;border-radius:50%;border:1px solid var(--b2);
+    background:var(--l2);color:var(--tx3);font-size:var(--fs-11);line-height:1;opacity:0;transition:opacity 120ms var(--ease-out)}
+  .att-tile:hover .att-del,.att-tile:focus-within .att-del{opacity:1}
+  .att-del:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--b2))}
+  .att-add{aspect-ratio:1;border:1px dashed var(--b2);border-radius:var(--radius);background:transparent;color:var(--tx4);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:var(--fs-11)}
+  .att-add span{font-size:11px}
+  .att-add:hover,.att-add:focus-visible{color:var(--tx1);border-color:var(--brand)}
+  .att-hint{font-size:var(--fs-11);color:var(--tx4);margin-top:5px}
+  .att-drop{outline:2px dashed var(--brand);outline-offset:-4px}
+  .att-chip{font-variant-numeric:tabular-nums}
+  /* 灯箱：比 .modal 高一档，图片按容器缩放 */
+  .imgview{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(8,7,10,.72);padding:18px}
+  .imgview[hidden]{display:none}
+  .imgview-card{width:min(980px,94vw);max-height:92vh;display:flex;flex-direction:column;border:1px solid var(--b2);
+    border-radius:var(--radius-lg);background:var(--l2);box-shadow:var(--shadow-pop);overflow:hidden}
+  .imgview-head{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--b1);
+    font-size:var(--fs-12);color:var(--tx2);min-width:0}
+  .imgview-head #imgview-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .imgview-head .mono{color:var(--tx4);margin-left:auto;font-size:var(--fs-11)}
+  .imgview-body{flex:1;min-height:0;background:color-mix(in srgb,#000 78%,var(--l2));display:grid;place-items:center;overflow:auto}
+  .imgview-body img{max-width:100%;max-height:68vh;object-fit:contain;display:block}
+  .imgview-foot{padding:10px 13px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:8px}
+  .imgview-alt{width:100%;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--radius-sm);
+    background:var(--l1);color:var(--tx1);font:inherit;font-size:var(--fs-12)}
+  .imgview-alt:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:transparent}
+  .imgview-acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+
   /* ── floating surfaces: menus, modals, toasts ── */
   .modal{background:rgba(8,7,10,.62)}
   .modal-card{border-radius:var(--radius-lg);border:1px solid var(--b2);background:var(--l2);box-shadow:var(--shadow-pop)}
@@ -1382,6 +1419,26 @@
     <div class="modal-foot">
       <button class="tbtn" id="ask-cancel">取消</button>
       <button class="tbtn primary-converge" id="ask-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="imgview" id="imgview" hidden>
+  <div class="imgview-card" role="dialog" aria-modal="true" aria-labelledby="imgview-title">
+    <div class="imgview-head">
+      <span id="imgview-title">附件</span>
+      <span class="mono" id="imgview-meta"></span>
+      <button class="modal-x" id="imgview-x" aria-label="关闭附件预览">✕</button>
+    </div>
+    <div class="imgview-body"><img id="imgview-img" alt=""></div>
+    <div class="imgview-foot">
+      <input class="imgview-alt" id="imgview-alt" maxlength="200"
+        placeholder="一句说明（会进 prompt，纯文本模型也能读到；可留空）">
+      <div class="imgview-acts">
+        <button class="tbtn" id="imgview-copy">复制路径</button>
+        <button class="tbtn" id="imgview-dl">下载</button>
+        <button class="tbtn primary" id="imgview-save">保存说明</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1900,6 +1957,10 @@ function compactMilestoneSnapshot(node){
   if (Array.isArray(node.issues) && node.issues.length){
     out.issues = node.issues.map((i) => ({ text: String((i && (i.text || i)) || ''), at: i && i.at, resolved_at: i && i.resolved_at }))
       .filter((i) => i.text);
+  }
+  // 附件引用要跟着快照走（文件本体留在 workspace，历史回看仍能显示）
+  if (Array.isArray(node.attachments) && node.attachments.length){
+    out.attachments = node.attachments.map((a) => ({ ...a })).filter((a) => a && a.sha);
   }
   const kids = node.children || [];
   if (kids.length) out.children = kids.map(compactMilestoneSnapshot).filter(Boolean);
@@ -3011,6 +3072,8 @@ function sessionIdOf(p, n){
  */
 function cardChips(n){
   const out = (n.chips || []).slice();
+  const attCount = n.raw && Array.isArray(n.raw.attachments) ? n.raw.attachments.length : 0;
+  if (attCount) out.push(`附件 ${attCount}`);
   if (!state.hideClosed) return out;
   const src = n.src || n;
   const closed = (src.children || []).filter(k => k.closed && !isRecord(k)).length;
@@ -3327,6 +3390,7 @@ function searchTextOf(n){
     n.title, n.id, raw.verify, raw.proof, raw.metric, raw.approach, raw.capability,
     raw.necessity, raw.causal, raw.gap, raw.module, raw.collaboration,
     (raw.issues || []).map(i => i.text).join(' '),
+    (raw.attachments || []).map(a => `${a.name || ''} ${a.alt || ''}`).join(' '),
   ].filter(Boolean).join('\n').toLowerCase();
 }
 function searchHit(n){
@@ -3737,7 +3801,10 @@ function doClose(id){
   n.closed = true;
   if (n.raw){
     n.raw.closed_at = now;
-    if (n.raw.kind === 'exec' && !n.raw.proof) n.raw.proof = '（面板关闭，未附证据）';
+    if (n.raw.kind === 'exec' && !n.raw.proof) {
+      const atts = Array.isArray(n.raw.attachments) ? n.raw.attachments : [];
+      n.raw.proof = atts.length ? attachmentProof(atts) : '（面板关闭，未附证据）';
+    }
   }
   // 只补能力闭环（执行记录全闭环自动收口）；里程碑不再级联，由人确认达成
   autoCloseTree(p.root);
@@ -4627,7 +4694,8 @@ function promptWarnings(text){
   if (!lines[0] || !lines[0].includes(' · ')) out.push('首行应为「动作 · 对象」');
   else if (lines.length > 1 && lines[1].trim() !== '') out.push('首行后面要空一行');
   lines.forEach((line, i) => {
-    if ([...line].length > 72) out.push(`第 ${i + 1} 行超过 72 字`);
+    // 附件字面路径不折行（拆开就复制不出来），也不报超长
+    if (!/^\s*path:\s/.test(line) && [...line].length > 72) out.push(`第 ${i + 1} 行超过 72 字`);
     if (/\*\*/.test(line)) out.push(`第 ${i + 1} 行有 markdown 粗体（气泡不渲染）`);
   });
   return [...new Set(out)].slice(0, 3);
@@ -4885,6 +4953,212 @@ function lessonsMarkup(n){
   </div>`;
 }
 
+/* ─────────── 附件（能力闭环 / 执行记录的截图） ───────────
+ * 文件按内容哈希存 <workspace>/.dsh/rotation-assets/，卡片只存元数据。
+ * 上传顺序：先落图（POST /api/assets），再写卡（PUT /api/cards）。
+ * 图存失败不污染卡片；卡写失败会留孤儿文件，由 npm run assets:gc 兜底。
+ */
+const ATT_MAX = 12;
+const ATT_MAX_RAW = 12 * 1024 * 1024;
+const ATT_MAX_EDGE = 1920;
+const ATT_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+function supportsAttachments(n){
+  return !!n && (n.kind === 'capability' || n.kind === 'exec');
+}
+function attachmentList(n){
+  return n && n.raw && Array.isArray(n.raw.attachments) ? n.raw.attachments : [];
+}
+function attachmentUrl(p, att){
+  if (!API_BASE || !p || !p.file || !att || !att.sha) return '';
+  return api(`/assets?file=${encodeURIComponent(p.file)}&sha=${encodeURIComponent(att.sha)}`);
+}
+const fmtBytes = (bytes) => {
+  const v = Number(bytes) || 0;
+  if (v >= 1024 * 1024) return (v / 1024 / 1024).toFixed(1) + 'MB';
+  return Math.max(1, Math.round(v / 1024)) + 'KB';
+};
+/** 关闭执行记录时的证据行：有图就不写「未附证据」 */
+function attachmentProof(atts){
+  const list = Array.isArray(atts) ? atts : [];
+  const names = list.slice(0, 3).map((a) => a.name).filter(Boolean).join('、');
+  return `附图 ${list.length} 张${names ? '：' + names : ''}${list.length > 3 ? '…' : ''}`;
+}
+function attachmentsMarkup(p, n){
+  if (!supportsAttachments(n)) return '';
+  const list = attachmentList(n);
+  const canEdit = !!API_BASE && !!(p && p.card && p.card.project && p.card.project.workspace) && !!p.file;
+  if (!list.length && !canEdit) return '';
+  const tiles = list.map((att) => {
+    const url = attachmentUrl(p, att);
+    return `<div class="att-tile">
+      <button type="button" class="att-open" data-att-view="${esc(att.sha)}"
+        aria-label="查看附件 ${esc(att.name || att.sha)}"
+        title="${esc(att.name || att.sha)}${att.alt ? ' · ' + esc(att.alt) : ''}">
+        <img src="${esc(url)}" alt="${esc(att.alt || att.name || '附件')}" loading="lazy" decoding="async">
+      </button>
+      <span class="att-fallback">附件缺失</span>
+      ${canEdit ? `<button type="button" class="att-del" data-att-del="${esc(att.sha)}"
+        aria-label="移除附件 ${esc(att.name || att.sha)}" title="移除这张图（只删卡片引用）">×</button>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="detail-sec att-sec">
+    <div class="detail-k">附件${list.length ? `<span class="psrc">${list.length} 张</span>` : ''}</div>
+    <div class="att-grid">${tiles}${canEdit ? `<button type="button" class="att-add" data-att-add="1"
+      title="粘贴 / 拖入 / 选择图片">＋<span>加图</span></button>` : ''}</div>
+    ${canEdit ? `<input type="file" data-att-input="1" accept="image/png,image/jpeg,image/webp" multiple hidden>
+      <div class="att-hint">拖入截图或 ⌘V 粘贴；单张 ≤ 8MB，每个节点最多 ${ATT_MAX} 张</div>` : ''}
+  </div>`;
+}
+function readAsDataUrl(blob){
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ''));
+    fr.onerror = () => reject(new Error('读图失败'));
+    fr.readAsDataURL(blob);
+  });
+}
+/** 客户端压缩：长边 ≤ 1920、WebP 0.92；仍 >2MB 退到 1600 / 0.82。顺带清掉 EXIF。 */
+async function encodeForUpload(file){
+  if (!ATT_MIME[file.type]) throw new Error('只支持 png / jpeg / webp');
+  if (!file.size) throw new Error('空文件');
+  if (file.size > ATT_MAX_RAW) throw new Error('原图超过 12MB，先裁剪或压缩');
+  let bmp;
+  try { bmp = await createImageBitmap(file); }
+  catch { throw new Error('这张图读不出来（可能损坏或格式不支持）'); }
+  const draw = async (maxEdge, quality) => {
+    const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const g = canvas.getContext('2d');
+    if (!g) throw new Error('画布不可用');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bmp, 0, 0, w, h);
+    let blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+    if (!blob || blob.type !== 'image/webp') blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('图片编码失败');
+    return { blob, w, h };
+  };
+  let out = await draw(ATT_MAX_EDGE, 0.92);
+  if (out.blob.size > 2 * 1024 * 1024) out = await draw(1600, 0.82);
+  bmp.close?.();
+  const dataUrl = await readAsDataUrl(out.blob);
+  const ext = out.blob.type === 'image/webp' ? 'webp' : 'png';
+  const base = String(file.name || 'screenshot').replace(/\.[A-Za-z0-9]{1,5}$/, '');
+  return { dataUrl, w: out.w, h: out.h, name: `${base || 'screenshot'}.${ext}` };
+}
+async function addAttachments(p, n, files){
+  if (!p || !n || !supportsAttachments(n)) return;
+  if (!API_BASE) return toast('只读模式：没连宿主，传不了图');
+  const ws = p.card && p.card.project && p.card.project.workspace;
+  if (!ws) return toast('这张卡缺 project.workspace，找不到附件目录');
+  const list = [...(files || [])].filter(Boolean);
+  if (!list.length) return;
+  const room = ATT_MAX - attachmentList(n).length;
+  if (room <= 0) return toast(`每个节点最多 ${ATT_MAX} 张，先移除几张`);
+  if (list.length > room) toast(`最多 ${ATT_MAX} 张，这次只传前 ${room} 张`);
+  const uploaded = [];
+  let failed = 0;
+  for (const file of list.slice(0, room)) {
+    try {
+      const payload = await encodeForUpload(file);
+      const res = await fetch(api('/assets'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ file: p.file, nodeId: n.id, name: payload.name, dataUrl: payload.dataUrl }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.ok) throw new Error(body.error || ('HTTP ' + res.status));
+      uploaded.push({ ...body.attachment, w: payload.w, h: payload.h });
+    } catch (error) {
+      failed += 1;
+      toast(`${file.name || '图片'} 没传上：${error.message}`);
+    }
+  }
+  if (!uploaded.length) return;
+  const seen = new Set(attachmentList(n).map((a) => a.sha));
+  const fresh = uploaded.filter((a) => a && a.sha && !seen.has(a.sha));
+  if (fresh.length){
+    n.raw = n.raw || {};
+    n.raw.attachments = [...attachmentList(n), ...fresh];
+    // 已关闭、但当时只有占位证据的记录：补图后把证据行换成附图
+    if (n.raw.kind === 'exec' && n.raw.closed_at && /未附证据/.test(String(n.raw.proof || ''))) {
+      n.raw.proof = attachmentProof(n.raw.attachments);
+    }
+    render();
+    if (detailNode === n.id) openDetail(n.id, true);
+  }
+  const saved = await persist(p);
+  if (!saved.ok) toast('图已存到磁盘，但卡片没写回：' + saved.error);
+  else toast(fresh.length ? `已加 ${fresh.length} 张图${failed ? `（${failed} 张失败）` : ''}` : '这张图已经在这个节点上了');
+}
+function removeAttachment(p, n, sha){
+  const att = attachmentList(n).find((a) => a.sha === sha);
+  if (!att) return;
+  askConfirm('移除附件？', `<div class="mrow"><span>文件</span><b>${esc(att.name || sha)}</b></div>
+    <div class="mnote">只移除卡片引用；图片文件仍在 .dsh/rotation-assets/，需要时跑 npm run assets:gc 清理。</div>`, '移除', async () => {
+    n.raw.attachments = attachmentList(n).filter((a) => a.sha !== sha);
+    if (!n.raw.attachments.length) delete n.raw.attachments;
+    render();
+    if (detailNode === n.id) openDetail(n.id, true);
+    const res = await persist(p);
+    if (!res.ok) toast('保存失败：' + res.error);
+    else toast('已移除');
+  });
+}
+let imgViewCtx = null;
+function openImgView(p, n, sha){
+  const att = attachmentList(n).find((a) => a.sha === sha);
+  if (!att) return;
+  const view = $('#imgview'), img = $('#imgview-img'), title = $('#imgview-title');
+  const meta = $('#imgview-meta'), alt = $('#imgview-alt');
+  if (!view || !img || !title || !meta || !alt) return;
+  imgViewCtx = { p, n, sha };
+  img.src = attachmentUrl(p, att);
+  img.alt = att.alt || att.name || '附件';
+  title.textContent = att.name || sha;
+  meta.textContent = `${att.w && att.h ? att.w + '×' + att.h + ' · ' : ''}${fmtBytes(att.bytes)}`;
+  alt.value = att.alt || '';
+  view.hidden = false;
+  view.dataset.show = 'true';
+  setTimeout(() => alt.focus(), 30);
+}
+function closeImgView(){
+  const view = $('#imgview');
+  if (!view || view.hidden) return;
+  view.hidden = true;
+  view.dataset.show = 'false';
+  imgViewCtx = null;
+}
+function attachmentAbsPath(p, att){
+  const ws = p && p.card && p.card.project && p.card.project.workspace;
+  if (!ws || !att || !att.path) return '';
+  return `${String(ws).replace(/\\/g, '/').replace(/\/+$/, '')}/${att.path}`;
+}
+async function saveImgAlt(){
+  if (!imgViewCtx) return;
+  const { p, n, sha } = imgViewCtx;
+  if (!API_BASE || !p.file) return toast('只读模式：说明不能保存');
+  const att = attachmentList(n).find((a) => a.sha === sha);
+  if (!att) return;
+  const input = $('#imgview-alt');
+  const value = String((input && input.value) || '').trim().slice(0, 200);
+  if (value) att.alt = value; else delete att.alt;
+  if (detailNode === n.id) openDetail(n.id, true);
+  const res = await persist(p);
+  toast(res.ok ? (value ? '说明已保存（会进 prompt）' : '说明已清空') : '保存失败：' + res.error);
+}
+function downloadAttachment(p, att){
+  const url = attachmentUrl(p, att);
+  if (!url || !att) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = att.name || `${att.sha}.${ATT_MIME[att.mime] || 'png'}`;
+  a.click();
+}
+
 function detailMarkup(p, n){
   const r = n.raw || {};
   const st = stateOf(n);
@@ -4999,8 +5273,10 @@ function detailMarkup(p, n){
       ${editable}
       ${rows}
     </dl>
+    ${n.kind === 'exec' ? '' : attachmentsMarkup(p, n)}
     ${planMarkup(p, n)}
     ${recordMarkup(p, n)}
+    ${n.kind === 'exec' ? attachmentsMarkup(p, n) : ''}
     ${issues ? `<div class="detail-sec"><div class="detail-k">问题反馈</div>${issues}</div>` : ''}
     ${kidsHtml}
     ${lessonsMarkup(n)}
@@ -6489,6 +6765,8 @@ function openConfirm(id){
     rows.push(`<div class="mrow warn"><span>${label}</span><b>${n.meta.replace(/^验证：/, '')}</b></div>`);
   }
   if ((n.issues||[]).length) rows.push(`<div class="mrow warn"><span>未处置</span><b>${n.issues.length} 条问题反馈</b></div>`);
+  const attCount = n.raw && Array.isArray(n.raw.attachments) ? n.raw.attachments.length : 0;
+  if (attCount) rows.push(`<div class="mrow"><span>附件</span><b>${attCount} 张</b></div>`);
   rows.push(`<div class="mnote">${isMilestone
     ? '确认后里程碑进入「已达成」，项目仍留在主泳道；可从项目菜单查看「里程碑历史」、开新里程碑或重开。'
     : isCapability
@@ -6536,6 +6814,7 @@ $('#projinfo-close').addEventListener('click', closeProjInfo);
 $('#projinfo').addEventListener('click', (e) => { if (e.target.id === 'projinfo') closeProjInfo(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (!$('#imgview').hidden) { closeImgView(); return; }
   if (!$('#prjmenu').hidden) { closeProjMenu(); return; }
   if (!$('#projinfo').hidden) closeProjInfo();
   else if (!$('#history').hidden) closeHistory();
@@ -7556,12 +7835,32 @@ document.addEventListener('click', (e)=>{
   if (e.target.closest('#fp-mask') || e.target.closest('#field-pop')) return;
   // 点详情卡外面 → 关闭；点到别的节点则交给下面的节点逻辑切换
   const dEl = $('#detail');
-  if (dEl && !dEl.hidden && !e.target.closest('.detail-card') && !e.target.closest('#ask')){
+  if (dEl && !dEl.hidden && !e.target.closest('.detail-card') && !e.target.closest('#ask') && !e.target.closest('#imgview')){
     const inOtherNode = e.target.closest('.tnode');
     if (!inOtherNode || e.target.closest('button')) closeDetail();
   }
   // 详情卡内部交互
   if (e.target.closest('#detail-x')){ closeDetail(); return; }
+  const attView = e.target.closest('[data-att-view]');
+  if (attView){
+    const p0 = detailNode ? findProjectByNode(detailNode) : null;
+    const n0 = p0 && findNode(p0.root, detailNode);
+    if (p0 && n0) openImgView(p0, n0, attView.dataset.attView);
+    return;
+  }
+  const attAdd = e.target.closest('[data-att-add]');
+  if (attAdd){
+    const input = attAdd.closest('.att-sec')?.querySelector('[data-att-input]');
+    if (input) input.click();
+    return;
+  }
+  const attDel = e.target.closest('[data-att-del]');
+  if (attDel){
+    const p0 = detailNode ? findProjectByNode(detailNode) : null;
+    const n0 = p0 && findNode(p0.root, detailNode);
+    if (p0 && n0) removeAttachment(p0, n0, attDel.dataset.attDel);
+    return;
+  }
   const sessList = e.target.closest('[data-sess-list]');
   if (sessList){
     // 聚焦视图里没有打开的详情卡，项目要从 state.focusId 取；详情卡底部则沿用「当前详情项目」
@@ -8063,6 +8362,82 @@ if (qs.get('filter')) state.filter = qs.get('filter');
       window.addEventListener('focus', () => { if (PENDING_FLASH.size) flushCardRefresh(); });
     }
   }
+  /* ─────────── 附件交互：选文件 / 拖入 / 粘贴 / 灯箱 ─────────── */
+  document.addEventListener('change', (e) => {
+    const input = e.target.closest && e.target.closest('[data-att-input]');
+    if (!input) return;
+    const files = [...(input.files || [])];
+    input.value = '';   // 选了同一张图也要能再触发 change
+    const p0 = detailNode ? findProjectByNode(detailNode) : null;
+    const n0 = p0 && findNode(p0.root, detailNode);
+    if (p0 && n0) addAttachments(p0, n0, files);
+  });
+  document.addEventListener('paste', (e) => {
+    if (!detailNode) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const p0 = findProjectByNode(detailNode);
+    const n0 = p0 && findNode(p0.root, detailNode);
+    if (!p0 || !n0 || !supportsAttachments(n0)) return;
+    const files = [...((e.clipboardData && e.clipboardData.items) || [])]
+      .filter((it) => it.kind === 'file' && /^image\//.test(it.type))
+      .map((it) => it.getAsFile())
+      .filter(Boolean);
+    if (!files.length) return;
+    e.preventDefault();
+    addAttachments(p0, n0, files);
+  });
+  document.addEventListener('dragover', (e) => {
+    if (!detailNode) return;
+    const card = e.target.closest && e.target.closest('.detail-card');
+    if (!card) return;
+    const types = e.dataTransfer && e.dataTransfer.types;
+    if (!types || ![...types].includes('Files')) return;
+    e.preventDefault();
+    card.classList.add('att-drop');
+  });
+  document.addEventListener('dragleave', (e) => {
+    const card = e.target.closest && e.target.closest('.detail-card');
+    if (card && !card.contains(e.relatedTarget)) card.classList.remove('att-drop');
+  });
+  document.addEventListener('drop', (e) => {
+    const card = e.target.closest && e.target.closest('.detail-card');
+    if (!card) return;
+    const types = e.dataTransfer && e.dataTransfer.types;
+    if (!types || ![...types].includes('Files')) return;
+    e.preventDefault();
+    card.classList.remove('att-drop');
+    if (!detailNode) return;
+    const p0 = findProjectByNode(detailNode);
+    const n0 = p0 && findNode(p0.root, detailNode);
+    if (p0 && n0) addAttachments(p0, n0, [...((e.dataTransfer && e.dataTransfer.files) || [])]);
+  });
+  // 图片 404 / 跨机器缺文件：把格子标成「附件缺失」，不弹控制台错误
+  document.addEventListener('error', (e) => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && img.closest && img.closest('.att-tile')) {
+      img.closest('.att-tile').classList.add('att-missing');
+    }
+  }, true);
+  $('#imgview-x')?.addEventListener('click', closeImgView);
+  $('#imgview')?.addEventListener('click', (e) => { if (e.target.id === 'imgview') closeImgView(); });
+  $('#imgview-copy')?.addEventListener('click', () => {
+    if (!imgViewCtx) return;
+    const att = attachmentList(imgViewCtx.n).find((a) => a.sha === imgViewCtx.sha);
+    const path = attachmentAbsPath(imgViewCtx.p, att);
+    if (!path) return toast('找不到 workspace，复制不了路径');
+    copyText(path).then((ok) => toast(ok ? '已复制绝对路径' : '复制失败'));
+  });
+  $('#imgview-dl')?.addEventListener('click', () => {
+    if (!imgViewCtx) return;
+    const att = attachmentList(imgViewCtx.n).find((a) => a.sha === imgViewCtx.sha);
+    downloadAttachment(imgViewCtx.p, att);
+  });
+  $('#imgview-save')?.addEventListener('click', saveImgAlt);
+  $('#imgview-alt')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter'){ e.preventDefault(); saveImgAlt(); }
+  });
+
   // 便于分享/截图：?open=<nodeId> 载入后直接展开该节点详情
   const openId = qs.get('open');
   if (openId) setTimeout(() => openDetail(openId), 250);

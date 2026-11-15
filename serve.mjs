@@ -23,10 +23,14 @@ import { randomBytes } from 'node:crypto';
 import { validateCard } from './lib/core.mjs';
 import { listTaskPrompts } from './lib/prompt.mjs';
 import { normalizeServices } from './lib/services.mjs';
+import { decodeImageDataUrl, findAssetFile, isSafeSha, safeImageName, saveAsset } from './lib/assets.mjs';
 
 const ROOT = process.cwd();
 const DIR = join(ROOT, 'samples');
 const WEB = join(ROOT, 'web');
+// 样例服务器的附件目录：只写仓库内的开发目录，不碰 samples 里指向的真实工作区。
+// 卡片里的 path 仍是 host 口径（.dsh/rotation-assets/…）；dev 读图只按 sha 找。
+const DEV_WS = join(ROOT, '.rotation-dev');
 const PORT = Number(process.env.PORT || 4173);
 const RUN_TOKEN = randomBytes(12).toString('hex');
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT || 3);
@@ -99,9 +103,16 @@ const send = (res, code, body, type = 'application/json; charset=utf-8') => {
   res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
-const readBody = (req) => new Promise((ok, fail) => {
+const readBody = (req, limit = 4e6) => new Promise((ok, fail) => {
   let buf = '';
-  req.on('data', (c) => { buf += c; if (buf.length > 4e6) req.destroy(); });
+  req.on('data', (c) => {
+    buf += c;
+    if (buf.length > limit) {
+      const e = new Error('body too large');
+      e.status = 413;
+      fail(e);
+    }
+  });
   req.on('end', () => ok(buf));
   req.on('error', fail);
 });
@@ -336,6 +347,36 @@ const server = createServer(async (req, res) => {
     if (errors.length) return send(res, 422, { ok: false, error: '校验未通过', errors, warnings });
     await writeCard(file, card);
     return send(res, 200, { ok: true, file, updated: card.updated, warnings, stats });
+  }
+
+  // ── 附件（样例服务器：只写 .rotation-dev/，不碰真实工作区）──
+  if (url.pathname === '/api/assets' && req.method === 'POST') {
+    if (!authed(req)) return send(res, 403, { ok: false, error: 'forbidden' });
+    let body;
+    try { body = JSON.parse(await readBody(req, 12e6)); }
+    catch (e) { return send(res, e.status || 400, { ok: false, error: e.status === 413 ? '上传内容超过 12MB' : 'JSON 解析失败: ' + e.message }); }
+    try {
+      const { buf, mime } = decodeImageDataUrl(body && body.dataUrl);
+      const att = await saveAsset(DEV_WS, buf, mime);
+      return send(res, 200, { ok: true, attachment: { ...att, name: safeImageName(body && body.name, mime) } });
+    } catch (e) {
+      return send(res, e.status || 500, { ok: false, error: e.message });
+    }
+  }
+  if (url.pathname === '/api/assets' && req.method === 'GET') {
+    const sha = url.searchParams.get('sha') || '';
+    if (!isSafeSha(sha)) return send(res, 400, { ok: false, error: 'sha 不合法' });
+    const found = await findAssetFile(DEV_WS, sha);
+    if (!found) return send(res, 404, { ok: false, error: '附件不存在' });
+    const buf = await readFile(found.abs).catch(() => null);
+    if (!buf) return send(res, 404, { ok: false, error: '附件读不出来' });
+    res.writeHead(200, {
+      'content-type': found.mime,
+      'content-length': buf.length,
+      'cache-control': 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+    });
+    return res.end(buf);
   }
 
   // ── 会话执行 ──

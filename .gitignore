@@ -12,6 +12,9 @@
 # 会话运行快照（本地生成）
 runs.json
 
+# 样例服务器的附件目录（node serve.mjs 的本地开发数据）
+.rotation-dev/
+
 # 临时探针（调试用，不入库）
 _probe*.html
 

@@ -57,6 +57,7 @@
   - `collaboration`：协同面（≤200 字，只读）——和哪些组件协同、通过什么接口 / 事件 / 数据；
   - `metric`：能力闭环核心指标（≤300 字，可写）——**到什么程度算这条支撑撑住了里程碑**；
   - `approach`：实现思路（≤300 字，可写）——核心思路，通俗简短；
+  - `attachments[]`：**参考图**（设计稿 / 目标 UI / 现状截图），见「附件」节；
   - `plan`：计划书（生成计划后由服务写入）；
   - `children[]`：只放 `exec` 执行记录。
   「只读六项 + 可写两项」的分工：`capability` / `necessity` / `causal` / `gap` / `module` /
@@ -65,9 +66,12 @@
 - **核心指标只在能力闭环上**（2026-10-31 从里程碑下移）：`capability.metric` 衡量**这条支撑**——它做到什么程度算把里程碑撑住了。
   里程碑层不再有指标：里程碑是否达成由「主要能力闭环全部闭环」表达。核心指标不写测试命令；执行层面的验证命令归 `exec.verify`。
 - **执行记录字段**：`exec` 不变——`action`（plan / exec / reflect）、`verify`（怎么验，一条可运行命令优先）、
-  `proof`（关闭时必填的证据）、`issues[]`（问题反馈，`resolved_at` 非空才算处置）、`session`。
+  `proof`（关闭时必填的证据）、`issues[]`（问题反馈，`resolved_at` 非空才算处置）、`attachments[]`（证据截图）、`session`。
   只有能力闭环能「生成计划 / 执行计划」：plan 前置核心指标 + 实现思路（`409 FILL_REQUIRED`）、
   exec 前置 `capability.plan`（`409 PLAN_MISSING`）；执行完自动反馈提炼，把经验写进 `milestone.lessons`。
+- **附件（图片）**：能力闭环放**参考图**（设计稿 / 目标 UI / 现状截图，进「生成计划」的 prompt），
+  执行记录放**证据图**（完成 / 失败现场，关闭时生成 `proof`）。文件按内容哈希存
+  `<workspace>/.dsh/rotation-assets/`，卡片只存元数据；prompt 里带绝对路径与 `alt` 说明。里程碑不承载证据。
 - **退役字段**：`scenario` / `constraints` / `acceptance` / `milestone.metrics` 已退役（2026-10-31 按愿景驱动收敛，
   核心指标只留能力闭环 `metric`）。它们**允许留在 JSON 里**——校验器只给警告、面板不显示、不校验、不进 prompt。`goal` / `idea` 两种 kind 同样退役，旧卡读入即折叠成 `capability`。
 - **候选池**：`~/.dsh/rotation/candidates/<卡片文件>__<节点 id>.json`（运行时数据，不进项目 git）。
@@ -158,6 +162,7 @@
 | `metric` | capability | ➖ | **能力闭环核心指标**：到什么程度算这条支撑撑住里程碑，≤300 字，可写 |
 | `approach` | capability | ➖ | **实现思路**：核心思路，通俗简短，≤300 字，可写 |
 | `plan` | capability | ➖ | 计划书 `{ goal, verify[], steps[], doc, at, session }`，生成计划后由服务写入 |
+| `attachments[]` | capability / exec | ➖ | **附件（图片）**：`{ sha, path, name, mime, bytes, w, h, at, alt? }`；能力闭环放参考图，执行记录放证据图，见「附件」节 |
 | `lessons` | milestone | ➖ | 经验积累 `[{ text, from?, at? }]`，执行完自动反馈提炼写入 |
 | `verify` | exec | ✅ | 怎么验，一条可运行命令优先；`action: plan/reflect` 的记录例外，可不填 |
 | `proof` | exec | 关闭时必填 | 证据字符串（命令输出摘要 / 路径 / commit） |
@@ -175,6 +180,48 @@
 | `blockers` / `blocker` | 已退役 | ➖ | 读入即改名：`blockers → capabilities`、`blocker → capability`（见迁移） |
 | `goal` / `idea` / `support`（kind） | 已退役 | ➖ | 读入即折叠成 `capability`（见迁移） |
 | `blockers` / `supports`（字段） | 已退役 | ➖ | 读入即改名为 `capabilities` |
+
+### 附件（attachments，2026-11-15）
+
+**放哪**：能力闭环挂**参考图**（设计稿 / 目标 UI / 现状截图，进「生成计划」的 prompt），
+执行记录挂**证据图**（完成 / 失败现场，关闭时生成 `proof`）。里程碑不承载证据，挂上去只警告、不显示。
+面板目前也不给 `issues[]` 挂图——它没有「新增问题」入口，先做问题编辑器再说（见 `docs/backlog.md`）。
+
+```json
+"attachments": [
+  {
+    "sha": "<64 位小写 hex>",
+    "path": ".dsh/rotation-assets/<sha>.webp",
+    "name": "before-web.png",
+    "mime": "image/webp",
+    "bytes": 184320,
+    "w": 1512,
+    "h": 982,
+    "at": "2026-11-15T23:40:00+08:00",
+    "alt": "改造前的空状态：右下角多出一块空白"
+  }
+]
+```
+
+- `sha` 是图片字节的 sha256；同一工作区里同图只落一份（内容寻址，重复上传幂等）。
+- `path` 必须严格等于 `.dsh/rotation-assets/<sha>.<ext>`，`ext` 由 `mime` 推出（`png` / `jpg` / `webp`）；
+  **卡片不写绝对路径**，workspace 换位置不失效。
+- `name` 只做展示（≤120 字）；`alt` 是一句说明（≤200 字），会进 prompt，纯文本模型也能读到。
+- 每节点 ≤ 12 张；单张 ≤ 8MB；只收 png / jpeg / webp，服务端做 magic bytes 复核（不认扩展名与客户端声明）。
+- 执行记录关闭时，若 `proof` 为空且有附件，面板写「附图 N 张：name1、name2…」；没有附件仍是「（面板关闭，未附证据）」。
+- 已关闭但当时只有占位证据的记录，补图后会把证据行换成附图（只改这一句占位文案）。
+
+**文件布局与接口**：
+
+```
+<workspace>/.dsh/rotation-assets/<sha>.png|jpg|webp
+```
+
+- 上传先落图、再写卡：`POST /api/assets`（`{ file, nodeId?, name, dataUrl }` → 校验 → `tmp + rename` 原子写），
+  面板拿到 attachment 后再 `PUT /api/cards`。图存失败不污染卡片；卡写失败会留孤儿文件（GC 兜底）。
+- 读图：`GET /api/assets?file=<卡文件>&sha=<sha>`；只认 sha，不接收路径参数。
+- 删图只删卡片引用；文件由 `npm run assets:gc`（默认 dry-run，`--write` 才删）清理**未被任何注册卡片引用且 mtime > 24h** 的文件。
+- 旧卡没有这个字段，读入行为不变；`closed_milestones` 快照保留附件引用（文件本体仍在 workspace）。
 
 ### 旧卡兼容与迁移
 
@@ -379,6 +426,7 @@ DSH 崩溃或强制重启后，卡片不会再卡在 `session "…" already exis
 | `capability` / `capability.necessity` / `capability.causal` | 上下文 | 当前能力闭环 / 必要性 / 与闭环的关系 |
 | `capability.gap` / `capability.module` / `capability.collaboration` | 上下文 | 缺失影响 / 功能模块（含改造或新增）/ 协同面 |
 | `capability.metric` / `capability.approach` | 上下文 | 能力闭环核心指标 / 实现思路 |
+| `capability.attachments` / `node.attachments` | 上下文 / 当前节点 | 附件图片：绝对路径（会话用 `read` 打开）+ 文件名 / `alt` 说明；路径行不折行、不参与 72 列 lint |
 | `siblings` | 上下文 | 同级兄弟节点（条数由 `siblings` 控制，默认 0） |
 | `node` | 当前节点 | 类型 / id / 标题 / 状态 |
 | `node.metric` / `node.approach` / `node.necessity` / `node.causal` | 当前节点 | 当前能力闭环的核心指标 / 实现思路 / 必要性 / 因果 |
@@ -389,6 +437,8 @@ DSH 崩溃或强制重启后，卡片不会再卡在 `session "…" already exis
 - 旧键 `loop` / `loop.intent` / `loop.blockers` / `goal` / `goal.acceptance` / `goal.scenario` / `idea` /
   `idea.approach` / `node.acceptance` 读入即映射成 `milestone.*` / `capability.*` / `node.metric`，不会报未知字段。
 - `fields` 是**有序列表**，顺序即输出顺序；未知键只警告、直接跳过。
+- 老卡的自定义 `fields` 里没有 `capability.attachments` / `node.attachments` 时自动补上（2026-11-15）——
+  图片是证据，不该因为旧配置在升级后悄悄进不了 prompt。
 - `refs` 是节点 id 数组；写了 refs 但 fields 没列 `refs` 时，会自动补在上下文末尾。
 - `refs` 里出现不存在的 id → validator 报错。
 
@@ -416,6 +466,9 @@ DSH 崩溃或强制重启后，卡片不会再卡在 `session "…" already exis
 14. `prompt_context.fields` 必须是已知键数组（未知键只警告）；`siblings` 需为 0–10 的整数。
 15. `prompt_context.refs` 必须是节点 id 数组，且每个 id 都要能在同一张卡里找到。
 16. `session.status` 必须是枚举之一；`started_at` / `ended_at` 必须是 ISO；`exit_code` 必须是整数。
+17. `attachments` 只允许出现在 `capability` / `exec`（挂到别的节点只警告并忽略）：`sha` 为 64 位小写 hex，
+    `path` 必须由 `(sha, mime)` 推出，`mime` 只认 `image/png` / `image/jpeg` / `image/webp`，`bytes` 为 1–8388608
+    的整数，`name` 1–120 字，每节点 ≤ 12 张；`w` / `h` / `alt` 不合法只警告。
 
 ## 最短实现遇到的问题与增量改进（Problems & Incremental Changes）
 
@@ -436,6 +489,7 @@ DSH 崩溃或强制重启后，卡片不会再卡在 `session "…" already exis
 | `capability.module` / `capability.module_mode` / `capability.gap` / `capability.collaboration` | 详情卡只读行：功能模块（`改造现有 · src/plot` 一行）/ 缺失影响 / 协同面；迁移过来的空值由「生成 N 项」补 |
 | `capability.children[]` | 第 3 列「执行验证反馈」，动作记录按 `action` 渲染成计划 / 执行 / 反馈 |
 | `exec` / `issues` | 第 3 列记录卡；`issues` 渲染成卡片内红色条目 |
+| `attachments[]` | 详情卡「附件」段：粘贴 / 拖入 / 选文件上传，缩略图 + 灯箱（说明 / 复制路径 / 下载）+ 移除；卡片 chips 显示「附件 N」；执行记录关闭时生成「附图 N 张」证据行 |
 | 深度 ≥ 4 | 第 3 列卡片内的缩进折叠行 |
 | `closed_at` 非空 | 卡片变灰 + 「重开」按钮；同级的已闭环能力闭环默认折叠成「▸ 已闭环 N」；显示风格打开「隐藏已闭环」后**整颗不渲染、折叠行也不再出现**，被藏掉的数量上提成卡片 chips「已闭环 N ▸」（已达成里程碑仍留主管）。**这颗 chip 可点**：展开这一颗已闭环节点（复用 `foldedClosed`），按钮变成「▾ 收起已闭环 N」，再点收回。跳转过去的那一颗临时放行（`revealedClosed`） |
 | 可关闭 | 能力闭环：记录全闭环**且没有失败/取消/放弃记录**才自动收口；没有记录、或失败已处理完时卡上有「完成」。里程碑：「确认达成」固定在卡片 footer **左端**，与右侧「生成候选 / 候选池」同屏但分开；**都不会自动关闭** |

@@ -90,6 +90,8 @@
     "mock:refresh": "node scripts/refresh-mock.mjs",
     "mock:awaiting": "node scripts/awaiting-mock.mjs",
     "mock:stamp": "node scripts/stamp-mock.mjs",
-    "mock:crash": "node scripts/crash-recovery-mock.mjs"
+    "mock:crash": "node scripts/crash-recovery-mock.mjs",
+    "assets:gc": "node scripts/gc-assets.mjs",
+    "mock:assets": "node scripts/assets-mock.mjs"
   }
 }
