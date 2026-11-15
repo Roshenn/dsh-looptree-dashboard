@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## 未发布 — 闭环卡片支持图片：能力闭环挂参考图、执行记录挂证据图
+
+- **需求**（2026-11-15，用户）：闭环卡片里没法加图片，但开发闭环经常要贴产品截图、UI 修复前后对照；
+  截图进不来，证据只能靠文字，UI 类任务尤其吃亏。
+- **口径**（本轮拍板）：① 只挂 `capability` / `exec`——能力闭环放「改前 / 设计稿 / 目标 UI」参考图，
+  执行记录放「改后 / 失败现场」证据图；里程碑只承载愿景，不加；`issues` 没有新增入口，先不挂。
+  ② 图片存项目内 `<workspace>/.dsh/rotation-assets/`，按 sha256 内容寻址，卡片只存元数据
+  （不写 base64、不写绝对路径）。③ 图片路径 + `alt` 说明进 prompt 背景；执行记录关闭时附图可生成
+  「附图 N 张」证据行。
+- **落点**：`lib/assets.mjs`（新增）、`lib/index.js`（`POST/GET /api/assets`）、`lib/core.mjs`
+  （附件校验 + 上下文键）、`lib/prompt.mjs`（附件行 / goal 提示）、`web/index.html`（附件段、
+  粘贴 / 拖入 / 选文件、灯箱、说明、移除、关闭证据行、卡片 chip、快照）、`serve.mjs`（样例服务器镜像）、
+  `scripts/assets-mock.mjs`（10 条断言）、`scripts/gc-assets.mjs`（孤儿清理）、`scripts/preflight.mjs`、
+  `package.json`、`rotation-card-spec.md` 与两份 README。
+- **改法**：
+  - 上传先落图再写卡：`POST /api/assets` 收 dataUrl → magic bytes / 大小校验 → sha256 → `tmp + rename`
+    原子写；同 sha 直接复用。面板拿到 attachment 后追加到节点再 `PUT /api/cards`。
+  - 卡片字段 `attachments[]`：`{ sha, path, name, mime, bytes, w, h, at, alt? }`，`path` 必须由
+    `(sha, mime)` 推出；每节点 ≤12 张、单张 ≤8MB、只收 png / jpeg / webp。
+  - 客户端压缩：长边 ≤1920、WebP q=0.92，超 2MB 退 1600 / 0.82；`createImageBitmap` + canvas 顺带清 EXIF。
+  - prompt：`path: <绝对路径>（name：alt）`，路径行不折行、不参与 72 列 lint；`prompt_context.fields`
+    自动补 `capability.attachments` / `node.attachments`；`/goal` 指针加「与 attachments 里的参考图」。
+  - 关闭：`proof` 为空且有附件 → 「附图 N 张：…」；没有附件保持「（面板关闭，未附证据）」。
+  - 删除只删引用；`npm run assets:gc`（默认 dry-run）清理未引用且 >24h 的文件；任一张卡读不出来就整体不删。
+- **边界**：图片是否进项目 git 由项目 `.gitignore` 决定；导出 JSON 不含图片字节；文件缺失显示
+  「附件缺失」占位；纯文本模型只能读到文件名与 `alt`；读接口不鉴权（与卡片读同口径，只监听回环）。
+- **验证**：`npm run mock:assets` 10 条全过；`npm run preflight` 全绿；`node serve.mjs` + agent-browser
+  走通拖入 / 选文件 / 灯箱 / 说明 / 删除 / 关闭生成证据行；临时工作区验 `assets:gc` dry-run 与 `--write`；
+  样例卡片测试后已恢复。
+
 ## 未发布 — 服务拖拽排序：排第一位的就是默认打开的那个
 
 - **需求**（2026-11-14，用户）：同一个工作区里多个服务要能拖拽排序，用「谁在上面」决定默认打开哪个；

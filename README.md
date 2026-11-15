@@ -216,7 +216,9 @@ milestone (one per card)
 │   ├── metric        this capability's core metric: how far it must go to hold the milestone up
 │   ├── approach      the implementation approach
 │   ├── plan          plan book, written by Generate plan
+│   ├── attachments[] reference screenshots: design mock / target UI / current state (≤ 12; files under `.dsh/rotation-assets/`)
 │   └── children[]    execution records (kind: exec, depth 3+): one DSH session each
+│       └── attachments[] proof screenshots: after / failure (closing writes "附图 N 张")
 └── closed_milestones[]    ≤ 10 snapshots, written on 确认达成
 ```
 
@@ -242,6 +244,7 @@ atomically (`tmp` + rename, no `.bak` — git is the history).
 | `GET` `POST` | `/rotation/api/projects` | list / register a project (`{name, workspace, provider?, model?}`) |
 | `DELETE` | `/rotation/api/projects/<id>` | unregister (the project's card file is kept) |
 | `GET` `PUT` | `/rotation/api/cards` · `/rotation/api/cards/<id>` | read / validated write of card files |
+| `POST` `GET` | `/rotation/api/assets` | upload an attachment (dataUrl → content-addressed file) / read one by sha |
 | `GET` | `/rotation/api/prompts?file=&nodeId=` | composed prompt + summary + lint warnings |
 | `POST` | `/rotation/api/action/plan` · `exec` · `reflect` | run a node action in a DSH session |
 | `POST` `GET` | `/rotation/api/run` · `/rotation/api/runs` · `/rotation/api/run/cancel` · `/rotation/api/run-config` | node sessions and the concurrency cap |
@@ -318,6 +321,11 @@ Nothing leaves the machine except the model calls that DSH already routes.
 - The listener is loopback-only and unauthenticated by design (see above).
 - UI copy is Chinese-only for now; the data model and API are language-neutral.
 - Markdown in prompts is plain text on purpose — DSH chat bubbles do not render it.
+- Images live in `<workspace>/.dsh/rotation-assets/`; whether they enter project git is the project's
+  `.gitignore` decision. Exported JSON does not contain image bytes. Deleting an attachment removes the
+  card reference only; `npm run assets:gc` prunes unreferenced files.
+- Attachments are png / jpeg / webp only, ≤ 8MB each and ≤ 12 per node. A text-only model sees only the
+  file name and the `alt` caption; a multimodal model can `read` the file at the path in the prompt.
 - Candidate pools are runtime data under `~/.dsh/rotation/candidates/` and are not synced through the
   project's git: candidates do not follow you to another machine, only adopted capability items do.
 - Stop all locates listeners by port: on Windows it uses `Get-NetTCPConnection` then `netstat` /

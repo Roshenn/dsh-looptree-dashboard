@@ -190,7 +190,9 @@ milestone（一张卡一个）
 │   ├── metric        核心指标：到什么程度算撑住里程碑（≤300 字）
 │   ├── approach      实现思路：核心思路（≤300 字）
 │   ├── plan          计划书：生成计划后写入
+│   ├── attachments[] 参考图：设计稿 / 目标 UI / 现状截图（≤12 张，文件存项目里的 .dsh/rotation-assets/）
 │   └── children[]    执行记录（kind: exec，深度 3+）：一次会话一条
+│       └── attachments[] 证据图：完成 / 失败截图（关闭时生成「附图 N 张」）
 └── closed_milestones[]    ≤ 10 条快照，点「确认达成」时写入
 ```
 
@@ -213,6 +215,7 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 | `GET` `POST` | `/rotation/api/projects` | 列出 / 注册项目（`{name, workspace, provider?, model?}`） |
 | `DELETE` | `/rotation/api/projects/<id>` | 取消登记（保留项目里的卡片文件） |
 | `GET` `PUT` | `/rotation/api/cards` · `/rotation/api/cards/<id>` | 读 / 校验后写卡片 |
+| `POST` `GET` | `/rotation/api/assets` | 上传附件（dataUrl → 内容寻址落盘）/ 读附件（只认 sha） |
 | `GET` | `/rotation/api/prompts?file=&nodeId=` | 合成 prompt + 摘要 + lint 警告 |
 | `POST` | `/rotation/api/action/plan` · `exec` · `reflect` | 在 DSH 会话里跑节点动作 |
 | `POST` `GET` | `/rotation/api/run` · `/rotation/api/run/cancel` · `/rotation/api/runs` · `/rotation/api/run-config` | 节点会话与并发上限 |
@@ -283,6 +286,11 @@ host 半与 client 半都挂在 `/rotation` 下（可用 `basePath` 改）。全
 - 只监听回环、读接口不鉴权，这是设计取舍（见上）；写接口要令牌。
 - UI 文案目前只有中文；数据模型与接口是中性的。
 - prompt 里的 Markdown 是纯文本，这是故意的——DSH 聊天气泡不渲染 markdown。
+- 图片存在 `<workspace>/.dsh/rotation-assets/`，是否进项目 git 由该项目的 `.gitignore` 决定；
+  导出的 JSON 不含图片字节，换机器要连这个目录一起拷。删图只删卡片引用，
+  `npm run assets:gc`（默认 dry-run）清理未引用的文件。
+- 附件只收 png / jpeg / webp，单张 ≤ 8MB、每个节点 ≤ 12 张；纯文本模型只能读到文件名与
+  `alt` 说明，看不到像素——多模态模型才会真正看图。
 - 候选池是运行时数据，存在 `~/.dsh/rotation/candidates/`，不随项目 git 同步：换机器候选带不过去，
   采纳后写进卡片的能力闭环才会跟项目走。
 - 「关闭全部」按端口找监听进程：Windows 先走 `Get-NetTCPConnection`，再回退 `netstat` + `taskkill`；

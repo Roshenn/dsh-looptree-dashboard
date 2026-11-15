@@ -136,6 +136,7 @@
 | `capability.collaboration`（协同面） | `背景`（只读） | 和哪些组件协同、通过什么接口 / 事件 / 数据 |
 | `capability.metric`（能力闭环核心指标） | `背景` + 计划/执行的判据 | 到什么程度算这条支撑撑住里程碑；生成计划的前置条件（`409 FILL_REQUIRED`） |
 | `capability.approach`（实现思路） | `背景` + 计划的思路骨架 | 核心思路，通俗简短；生成计划的前置条件（`409 FILL_REQUIRED`） |
+| `attachments[]`（附件） | 动作 `背景` + 详情模板的 `当前节点` | 能力闭环的参考图进 `背景`，执行记录的证据图进 `当前节点`；每张一行 `path: <绝对路径>（name：alt）`，路径行不折行、不参与 72 列 lint；`alt` 是纯文本模型唯一能读到的内容 |
 | `capability.plan`（计划书） | 执行计划时读 `plan.goal / verify / steps` | 由「生成计划」写回；缺失时执行被拒（`409 PLAN_MISSING`） |
 | `exec.verify` / `proof` / `issues[]` | 记录卡的 `当前节点` | 验证命令 / 证据 / 未处置反馈；执行完自动反馈提炼写 `milestone.lessons` |
 | `milestone.lessons`（经验积累） | 动作 `背景` 的「已有经验」 | 先取 `from` 前缀 = 本能力闭环 id 的（相关性高），其余按 `at` 倒序补齐；默认 3 条，`reflect` 看满 5 条做去重边界；单条裁剪 70 字 |
@@ -322,6 +323,8 @@ codes：`missing-title` `bad-title` `missing-blank` `line-too-long` `markdown-bo
 - 上下文取舍：`prompt_context.fields` 有序列表、`siblings` 条数、`refs` 引用节点、
   `reflux` 经验注入条数（`0` 关闭）；处理逻辑见 `CTX_FIELDS` 与 `refluxLines()`
   （旧键 `loop.*` / `goal.*` / `idea.*` 读入即映射成 `milestone.*` / `capability.*`）。
+- 附件：`capability.attachments` / `node.attachments` 会自动补进任何自定义 `fields` 列表（2026-11-15），
+  旧卡不会因为没列这两个键而在升级后把图片挡在 prompt 外面。
 
 ## 八、验证
 

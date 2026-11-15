@@ -14,6 +14,7 @@ DSH 进程
 │   ├─ /rotation/api/health         自检
 │   ├─ /rotation/api/projects       注册表读写
 │   ├─ /rotation/api/cards          卡片读写（PUT 走 validate → tmp+rename 原子写）
+│   ├─ /rotation/api/assets         附件上传 / 读取（内容寻址，存 <workspace>/.dsh/rotation-assets/）
 │   ├─ /rotation/api/run*           节点会话（lib/runner.mjs → ctx.agents）
 │   ├─ /rotation/api/prompts        prompt 合成（lib/prompt.mjs，只读）
 │   ├─ /rotation/api/service*       单个服务拉起 / 停止（lib/services.mjs）
@@ -51,6 +52,7 @@ DSH 进程
 |---|---|---|
 | 项目注册表 | `~/.dsh/rotation/registry.json` | host（POST /api/projects、迁移脚本） |
 | 卡片真身 | `<workspace>/.dsh/rotation.json` | host（PUT /api/cards）、可手改 |
+| 附件文件 | `<workspace>/.dsh/rotation-assets/<sha>.<ext>` | host（POST /api/assets，内容寻址）；卡片只存元数据，`npm run assets:gc` 清理未引用文件 |
 | 卡片 mtime 戳 | 由 `GET /api/cards/stamp` 现算（`stat`，不解析卡片） | 面板每 10s 比对，发现别处改动 |
 
 | 候选池 | `~/.dsh/rotation/candidates/<卡片文件>__<节点 id>.json` | host（`/api/candidates/generate` 写、`/adopt`/`/delete` 删）；按 `importance` 降序 |
@@ -114,6 +116,7 @@ POST /api/run
 
 ```
 lib/index.js      宿主插件入口（路由 + 装配）
+lib/assets.mjs    附件存取（内容寻址 / dataUrl 解码 / 路径守卫，零依赖）
 lib/prompt.mjs    prompt 唯一实现（结构规范 / 合成 / lint，host 与测试共用）
 lib/store.mjs     注册表 / 卡片读写
 lib/runner.mjs    会话执行器
@@ -133,6 +136,8 @@ samples/          5 张样例卡（也是校验样例）
 | host 半路由 | `npm run dev` → `/rotation/api/health` |
 | 面板 + 发起会话联调 | `MOCK_AGENTS=1 npm run dev`（假 agent，状态会走 运行中→完成） |
 | 会话状态机 | `npm run mock:session`（done / failed / cancelled） |
+| 附件上传 / 去重 / 越界 / 校验 | `npm run mock:assets` |
+| 附件孤儿清理（默认 dry-run） | `npm run assets:gc` |
 | 全部服务批量控制（端口冲突 / 按端口杀进程） | `npm run mock:services-batch` |
 | client 半契约 | `npm run mock:client` |
 | 装进 DSH 后 | `npm run check`（health / panel / registry） |
