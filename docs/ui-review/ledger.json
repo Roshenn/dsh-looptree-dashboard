@@ -203,16 +203,16 @@
       "fact": "render() 重建详情：已补 scrollTop/焦点恢复（720 下 scrollTop=120 跨主题 render 保留、详情不再关闭），并加 clampDetailCard；仍未修：筛选/搜索把锚点节点过滤掉时 _openDetail 找不到 anchor 直接 return，详情静默关闭且不恢复。",
       "harm": "读详情时切主题/缩放/搜索，详情被拆建：焦点回文档、编辑器状态丢失；搜索不命中当前节点时详情直接消失且无提示，回来要从头打开。",
       "fix": "render 不销毁详情：按 detailNode 原地局部更新（或至少保存/恢复 scrollTop、activeElement、pgenOpen）；锚点被过滤时保留卡片并提示「节点已被筛选隐藏」，不要静默关闭。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "web/index.html:3579-3582",
         "web/index.html:3612-3614",
         "code-excerpt.md"
       ],
       "recheck": {
-        "round": "2026-11-24 R8 修复轮",
-        "result": "open",
-        "evidence": "720×450@2x 实测：主题切换后 visible=true、scrollTop 120→120；筛选隐藏锚点路径未修"
+        "round": "2026-11-24 R9 修复轮",
+        "result": "resolved",
+        "evidence": "实测：筛选 zzqqxx 隐藏锚点→详情关闭；清空搜索后详情自动恢复（visible=true，标题为 ck-e1）；pendingDetailId + setTimeout 兜底，不依赖 rAF"
       }
     },
     {
@@ -314,7 +314,12 @@
       "evidence": [
         "shots/desktop-list.png",
         "inventory.json"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R9 修复轮",
+        "result": "open",
+        "evidence": "概览「下一步」改按钮，点击打开对应节点详情（实测 detailVisible=true，标题为推荐节点）；页脚 #next-jump 已 ≥24；仍开：顶部「拉起全部服务」仍在 ⋯ 菜单里"
+      }
     },
     {
       "id": "ui-20261124-013",
@@ -334,7 +339,12 @@
       "evidence": [
         "shots/desktop-list.png",
         "inventory.json"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R9 修复轮",
+        "result": "open",
+        "evidence": "阶段头加 title 定义（里程碑/能力闭环/执行记录）；「聚焦」重名改为「单看」；仍开：定义只在 hover title，首屏无可见图例"
+      }
     },
     {
       "id": "ui-20261124-014",
@@ -354,7 +364,12 @@
       "evidence": [
         "shots/desktop-list.png",
         "inventory.json"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R9 修复轮",
+        "result": "open",
+        "evidence": "RUN_LABEL.done 完成→已结束（状态与动作词分开）；可见「收口」改「关闭」；仍开：琥珀同时用于 review 状态与主操作按钮（配色语言，属设计变更）"
+      }
     },
     {
       "id": "ui-20261124-015",
@@ -390,10 +405,15 @@
       "fact": "减少动效用全局 *{transition-duration:1ms;animation-duration:1ms} 兜底；idle 就绪闪烁直接消失且无静态替代。",
       "harm": "开启减少动效后信息少一层；以后新增的带含义过渡都会无声消失。",
       "fix": "改写显式分支：保留 ≤150ms 的颜色/透明度，关掉 transform；idle 就地补静态标记。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "code-excerpt.md"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R9 修复轮",
+        "result": "resolved",
+        "evidence": "set media reduced-motion 实测：matchMedia=true、.tnode transitionDuration=0.08s、.modal-card transform=none；idle 脉冲改静态 box-shadow"
+      }
     },
     {
       "id": "ui-20261124-017",
@@ -434,11 +454,16 @@
       "fact": "顶栏「阻塞 4」是 b 标签不可点；「数据 —」无时间戳。",
       "harm": "按用户预期点数字无反馈，要多花 5–10 秒去工具栏找「仅看阻塞」，也判断不了数字是否过期。",
       "fix": "KPI 数字做成可点过滤器；数据时间戳缺失时给上次成功时间。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "inventory.json",
         "shots/desktop-list.png"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R9 修复轮",
+        "result": "resolved",
+        "evidence": "#kpi-blocked 改 button，点击后「仅看阻塞」chip aria-pressed false→true；#stamp 加 title（宿主时间/未提供说明）"
+      }
     },
     {
       "id": "ui-20261124-019",

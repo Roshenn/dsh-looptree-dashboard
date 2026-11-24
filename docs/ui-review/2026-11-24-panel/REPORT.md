@@ -189,3 +189,18 @@
 **仍未闭环（8 条）**：003（窄屏/200% 断点重排，design-change：需 3 套方案 + 用户选定）、008（筛选隐藏锚点）、012（下一步/服务入口可点）、013（术语）、014（关闭语义）、015（Tab 顺序）、016（reduced-motion 显式分支）、018（KPI 可点 + 时间戳）。
 
 **环境说明**：本机 headless 下整包 `evidence:ui` 连续调用会偶发挂起，本轮验收改用短生命周期 session + 定点 eval；320/720 的确定性测量已拿到（1440 small=0、720@2x small=0、720 overflow=false）。003 的 320 溢出（621）本轮未动。
+
+## 12. 修复轮 R9：交互与语义收口
+
+| 台账 id | 状态 | 修复 / 证据 |
+| --- | --- | --- |
+| 008 筛选静默关详情 | **fixed** | 记住 pendingDetailId，节点重新可见时自动恢复（实测：筛选 zzqqxx → 详情关闭；清空搜索 → 详情恢复且标题为 ck-e1）。rAF + setTimeout 双保险 |
+| 016 reduced-motion | **fixed** | 去掉全局 1ms 兜底，改显式分支：颜色/透明度 80ms、位移与装饰动画关闭、idle 脉冲改静态环。`set media` 实测 transition=0.08s、modal transform=none |
+| 018 KPI / 时间戳 | **fixed** | 「阻塞 4」改 button，点击切到「仅看阻塞」（实测 aria-pressed false→true）；`#stamp` 加 title（数据时间 / 宿主未提供说明） |
+| 012 下一步可点 | 部分 | 概览「下一步」条目改按钮，点击打开对应节点详情（实测打开的是推荐节点）；页脚已 ≥24；服务入口仍在 ⋯ |
+| 013 术语 | 部分 | 阶段头加 title 定义；「聚焦」重名改「单看」；仍缺首屏可见图例 |
+| 014 语义 | 部分 | 运行状态 完成→已结束（状态/动作分开）；可见「收口」→「关闭」；琥珀同时表示状态与动作属配色语言，留设计门禁 |
+| 015 Tab 顺序 | open | 需要 roving tabindex 或渲染顺序重构，下一轮处理 |
+| 003 窄屏/200% | open | design-change：下一轮出 3 套 ≤900px 方案，等用户选定 |
+
+**验证**：`npm run preflight` 全绿；guide 按钮/`单看`/3 个阶段头 title/阻塞 KPI/reduced-motion/008 恢复均为定点实测。截图本轮因 headless 会话再次挂起未产出，证据以 eval 断言记录（README 已注明该环境限制）。
