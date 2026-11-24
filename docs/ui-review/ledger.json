@@ -1,0 +1,488 @@
+{
+  "version": 1,
+  "findings": [
+    {
+      "id": "ui-20261124-001",
+      "key": "06d2e62a77bea53b",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": ".tnode",
+      "severity": "blocker",
+      "seats": [
+        "A2B1",
+        "A3B1"
+      ],
+      "implies": "D9_shorten_paths",
+      "fact": "节点卡是 div，无 role/tabindex；键盘无法把焦点放到卡片，也无法打开详情。",
+      "harm": "纯键盘用户打不开详情，看不到 prompt、验证命令与「发起会话」，核心任务直接失败。",
+      "fix": "卡片加 role=button/tabindex=0/aria-label，Enter/Space 打开详情，焦点进对话框，Esc 关闭后回焦原卡。",
+      "status": "fixed",
+      "evidence": [
+        "shots/before-focus.png",
+        "shots/after-focus.png",
+        "shots/after-keyboard-detail.png"
+      ],
+      "recheck": {
+        "round": "2026-11-24 R5→R6",
+        "result": "resolved",
+        "evidence": "R5 发现 2 resolved / 4 open（证据没拍到 focus-visible）；R6 改为标题真按钮后，shots/final-focus.png（真 Tab，2px 焦点环）+ shots/final-keyboard-detail.png（Enter 后焦点在对话框）+ 真键盘实测 Esc 回焦按钮"
+      }
+    },
+    {
+      "id": "ui-20261124-002",
+      "key": "c0edc9c3a78339df",
+      "firstSeen": "2026-11-24",
+      "region": "empty-error",
+      "locus": "#stage",
+      "severity": "blocker",
+      "seats": [
+        "A1B2",
+        "A2B1",
+        "A3B1",
+        "A3B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "搜索零命中时矩阵区整块空白，没有「无匹配」文案、结果计数或清除入口。",
+      "harm": "用户读成数据断了或页面挂了，只能删掉关键词回退；无法判断是筛选还是故障。",
+      "fix": "新增 #no-match 空态（说明 + 命中 0 + 清空搜索），矩阵同步隐藏。",
+      "status": "fixed",
+      "evidence": [
+        "shots/before-no-match.png",
+        "shots/after-no-match.png"
+      ],
+      "recheck": {
+        "round": "2026-11-24 R5→R6",
+        "result": "resolved",
+        "evidence": "R5 判 1 resolved / 3 open / 2 regressed（清空按钮绑定在 isEmpty 分支里是死键）；R6 移出分支后实测 bound=1、点击后 search 清空、#no-match 隐藏、29 卡恢复；shots/final-no-match.png"
+      }
+    },
+    {
+      "id": "ui-20261124-003",
+      "key": "fc897c75d78f2471",
+      "firstSeen": "2026-11-24",
+      "region": "topbar",
+      "locus": "html > body > div:nth-of-type(1) > header",
+      "severity": "blocker",
+      "seats": [
+        "A3B1",
+        "A3B2"
+      ],
+      "implies": "D12_simplify_structure",
+      "fact": "320px 视口下 scrollWidth 621，顶栏统计被压成竖列并与标题重叠，后三列全在视口外。",
+      "harm": "窄屏或放大到等效宽度时读不出统计、看不到后三列，主任务失败。",
+      "fix": "≤480px 断点改单列堆叠，统计折行/折叠，禁止靠文字重叠缩。",
+      "status": "open",
+      "evidence": [
+        "narrow.json",
+        "shots/narrow-list.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-004",
+      "key": "efda3fcd41199847",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": "a,button,[role=button]",
+      "severity": "impact",
+      "seats": [
+        "A2B1",
+        "A3B1",
+        "A3B2"
+      ],
+      "implies": "D3_enlarge_targets",
+      "fact": "28 个可点控件小于 24×24（⋯ 22×22、完成 18–24 高、foldchip 66×22、#next-jump 324×22、summary 23 高）。",
+      "harm": "放大或手抖时点空；低视力用户更难命中。",
+      "fix": "只扩命中区（padding / 伪元素外扩至 ≥24×24），不改视觉占位与行高。",
+      "status": "open",
+      "evidence": [
+        "metrics-summary.json#smallTargets",
+        "shots/desktop-list.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-005",
+      "key": "9325d7146a397d6a",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": ".tnode.is-active",
+      "severity": "impact",
+      "seats": [
+        "A2B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "打开详情时锚点的 2px 品牌环被后面同名规则覆盖成 border-color:b2 + box-shadow:none；阻断卡红边同时丢失。",
+      "harm": "回到画布认不出哪张卡开着详情，阻断颜色线索也在阅读期间消失。",
+      "fix": "覆盖规则改为只补 2px 品牌环，保留状态色边框。",
+      "status": "fixed",
+      "evidence": [
+        "shots/before-anchor.png",
+        "shots/after-anchor.png"
+      ],
+      "recheck": {
+        "round": "2026-11-24 R5→R6",
+        "result": "resolved",
+        "evidence": "R5 判 2 resolved / 4 open（idle 卡的环仍被 data-idle 规则覆盖）；R6 给 data-idle/ask 规则加 :not(.is-active) 后，idle=strong 锚点实测 boxShadow=2px brand；shots/final-anchor-idle.png"
+      }
+    },
+    {
+      "id": "ui-20261124-006",
+      "key": "2cefe1e80dc58ca2",
+      "firstSeen": "2026-11-24",
+      "region": "detail",
+      "locus": "#detail",
+      "severity": "impact",
+      "seats": [
+        "A1B1",
+        "A1B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "Prompt 模板段显示原始英文「生成失败: Failed to fetch」，无重试；上方说明却让用户点不存在的「发起」。",
+      "harm": "唯一一条「按面板指引去开工」的路径断在开发者报错上，用户不知道是网络还是面板坏了。",
+      "fix": "失败态给中文原因 + 重试；说明与失败态一致，无 prompt 行时不写「在下面点发起」。",
+      "status": "open",
+      "evidence": [
+        "shots/desktop-detail.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-007",
+      "key": "679a451601e99138",
+      "firstSeen": "2026-11-24",
+      "region": "detail",
+      "locus": "#detail",
+      "severity": "impact",
+      "seats": [
+        "A2B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "详情打开后 0.2–0.6s 卡片仍在长高/重排，异步 Prompt 段与候选池回填改变布局。",
+      "harm": "用户刚准备读/点时内容位移，连续扫卡时每张都重复一次。",
+      "fix": "异步段固定高度占位，到达后只填内容不改布局。",
+      "status": "open",
+      "evidence": [
+        "motion/open-detail.webm",
+        "motion/frames/open-detail-03.png",
+        "code-excerpt.md"
+      ]
+    },
+    {
+      "id": "ui-20261124-008",
+      "key": "69e714e197299820",
+      "firstSeen": "2026-11-24",
+      "region": "detail",
+      "locus": "#detail",
+      "severity": "impact",
+      "seats": [
+        "A2B2"
+      ],
+      "implies": "D6_speed_up_motion",
+      "fact": "任何 render() 都先 closeDetail() 再重建详情 innerHTML，滚动位置归零并重放开关过渡。",
+      "harm": "边读详情边搜索/筛选时每 120ms 被重置一次，只能先关详情再操作。",
+      "fix": "render() 原地刷新详情并保留 scrollTop，不播放关→开过渡。",
+      "status": "open",
+      "evidence": [
+        "web/index.html:3579-3582",
+        "web/index.html:3612-3614",
+        "code-excerpt.md"
+      ]
+    },
+    {
+      "id": "ui-20261124-009",
+      "key": "e7cf35484e3677f2",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": "#toast",
+      "severity": "impact",
+      "seats": [
+        "A2B1"
+      ],
+      "implies": "D9_shorten_paths",
+      "fact": "关闭卡片的提示没有可点「撤销」，Ctrl+Z 无效；恢复要展开已闭环再重开。",
+      "harm": "误关一条记录恢复约 130 次按键，且中途会误开别的记录确认框。",
+      "fix": "关闭提示加撤销并复用现有 toast 动作；Cmd/Ctrl+Z 绑同一动作。",
+      "status": "open",
+      "evidence": [
+        "metrics-summary.json",
+        "code-excerpt.md"
+      ]
+    },
+    {
+      "id": "ui-20261124-010",
+      "key": "4fffa87bd4c38f4b",
+      "firstSeen": "2026-11-24",
+      "region": "modal-menu",
+      "locus": ".modal",
+      "severity": "impact",
+      "seats": [
+        "A2B1"
+      ],
+      "implies": "D9_shorten_paths",
+      "fact": "弹窗内按一次 Tab 焦点就逃到背景；Esc 关闭后焦点回 BODY 而非触发按钮。",
+      "harm": "键盘用户在弹窗里继续 Enter 会切走背景视图，倒计时/确认对象丢失。",
+      "fix": "焦点锁在 .modal-card 内循环；关闭后回焦触发元素。",
+      "status": "open",
+      "evidence": [
+        "shots/modal-add-project.png",
+        "code-excerpt.md"
+      ]
+    },
+    {
+      "id": "ui-20261124-011",
+      "key": "92669fcfa0cad647",
+      "firstSeen": "2026-11-24",
+      "region": "topbar",
+      "locus": "#save-state",
+      "severity": "impact",
+      "seats": [
+        "A3B1",
+        "A1B1"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "「未连接保存服务 · 点击这里看诊断」是 span，不可聚焦，文案在 1440 下已被省略号截断。",
+      "harm": "提示让用户点，但键盘到不了、Enter 无效，诊断永远打不开。",
+      "fix": "改成 button（或 role=button + tabindex + Enter/Space），允许两行显示完整文案。",
+      "status": "open",
+      "evidence": [
+        "inventory.json",
+        "shots/desktop-list.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-012",
+      "key": "f5d7f003474a0cff",
+      "firstSeen": "2026-11-24",
+      "region": "other",
+      "locus": "#next-jump",
+      "severity": "impact",
+      "seats": [
+        "A1B1",
+        "A1B2"
+      ],
+      "implies": "D9_shorten_paths",
+      "fact": "概览「下一步」是文本不可点；页脚 #next-jump 仅 22px 高；服务入口藏在 ⋯ 菜单。",
+      "harm": "新手 30 秒内找不到可点的「现在开始做」，误点文本两次。",
+      "fix": "把「下一步」做成动作按钮；页脚建议提为主按钮；泳道服务旁给直接入口。",
+      "status": "open",
+      "evidence": [
+        "shots/desktop-list.png",
+        "inventory.json"
+      ]
+    },
+    {
+      "id": "ui-20261124-013",
+      "key": "48f877d1d089d6b5",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": "#matrix",
+      "severity": "impact",
+      "seats": [
+        "A1B1"
+      ],
+      "implies": "D2_remove_explanation",
+      "fact": "能力闭环/收口/在途/收敛健康度/候选池等术语首屏无可见定义；「聚焦」在顶栏与泳道行同名。",
+      "harm": "新用户把 30 秒花在猜词上，且不敢点「聚焦」怕切走视图。",
+      "fix": "术语换白话动作名（要做的能力 / 已做完 / 现在做）；不删解释文本；「聚焦」改一个名。",
+      "status": "open",
+      "evidence": [
+        "shots/desktop-list.png",
+        "inventory.json"
+      ]
+    },
+    {
+      "id": "ui-20261124-014",
+      "key": "386504d7e99c7588",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": "关闭语义",
+      "severity": "polish",
+      "seats": [
+        "A1B2"
+      ],
+      "implies": "D8_restyle",
+      "fact": "「完成/已闭环/关闭/收口」四种写法并存；「完成」既是按钮也是状态；琥珀同时表示状态与动作。",
+      "harm": "扫一行时判断不出该点哪个、也判断不出点完是否连带关闭父级。",
+      "fix": "状态词统一「已关闭」，按钮统一动词；琥珀只给动作、绿色只给已达成；收口/关闭/已闭环收敛成一个词。",
+      "status": "open",
+      "evidence": [
+        "shots/desktop-list.png",
+        "inventory.json"
+      ]
+    },
+    {
+      "id": "ui-20261124-015",
+      "key": "ff0138c0932bb9cc",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": "#matrix",
+      "severity": "polish",
+      "seats": [
+        "A2B1"
+      ],
+      "implies": "D9_shorten_paths",
+      "fact": "Tab 顺序按 DOM 树序（执行卡→能力闭环→执行卡→里程碑），与视觉列序相反。",
+      "harm": "焦点先跳最右列再回中间，跨卡扫描无法建立预期。",
+      "fix": "按视觉列序调整渲染顺序或按列做 roving tabindex。",
+      "status": "open",
+      "evidence": [
+        "snapshot/a11y.json",
+        "shots/desktop-list.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-016",
+      "key": "5d015971959d7286",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": "prefers-reduced-motion",
+      "severity": "polish",
+      "seats": [
+        "A3B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "减少动效用全局 *{transition-duration:1ms;animation-duration:1ms} 兜底；idle 就绪闪烁直接消失且无静态替代。",
+      "harm": "开启减少动效后信息少一层；以后新增的带含义过渡都会无声消失。",
+      "fix": "改写显式分支：保留 ≤150ms 的颜色/透明度，关掉 transform；idle 就地补静态标记。",
+      "status": "open",
+      "evidence": [
+        "code-excerpt.md"
+      ]
+    },
+    {
+      "id": "ui-20261124-017",
+      "key": "bf6b60a899cdc32e",
+      "firstSeen": "2026-11-24",
+      "region": "topbar",
+      "locus": "#btn-theme",
+      "severity": "polish",
+      "seats": [
+        "A2B2"
+      ],
+      "implies": "D6_speed_up_motion",
+      "fact": "切主题整页一帧硬切（hardcuts=2），同时 34 条控件颜色过渡 160ms，双时基并存。",
+      "harm": "切换的一两帧选中态与背景不同步，那 34 条过渡几乎不可见。",
+      "fix": "统一：要么全瞬时，要么表面层也给同样的 160ms。",
+      "status": "open",
+      "evidence": [
+        "motion/theme-toggle.webm",
+        "motion/anims.json"
+      ]
+    },
+    {
+      "id": "ui-20261124-018",
+      "key": "310df959f3f5201f",
+      "firstSeen": "2026-11-24",
+      "region": "topbar",
+      "locus": "#k-blocked",
+      "severity": "polish",
+      "seats": [
+        "A1B1"
+      ],
+      "implies": "D9_shorten_paths",
+      "fact": "顶栏「阻塞 4」是 b 标签不可点；「数据 —」无时间戳。",
+      "harm": "按用户预期点数字无反馈，要多花 5–10 秒去工具栏找「仅看阻塞」，也判断不了数字是否过期。",
+      "fix": "KPI 数字做成可点过滤器；数据时间戳缺失时给上次成功时间。",
+      "status": "open",
+      "evidence": [
+        "inventory.json",
+        "shots/desktop-list.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-019",
+      "key": "3da1037d1db86825",
+      "firstSeen": "2026-11-24",
+      "region": "tabs-filters",
+      "locus": "#toolbar-hint",
+      "severity": "polish",
+      "seats": [
+        "A1B2"
+      ],
+      "implies": "D1_onboard_more",
+      "fact": "规则文案（里程碑→能力闭环→执行记录、自动流转、确认达成）已计算进 #toolbar-hint，但该元素 display:none。",
+      "harm": "用户不知道「完成」会不会连带关闭父级、里程碑靠什么收尾，影响点不点。",
+      "fix": "让规则在矩阵视图可见（或首屏一次性提示），确认达成旁标出触发条件。",
+      "status": "open",
+      "evidence": [
+        "code-excerpt.md",
+        "shots/desktop-list.png"
+      ]
+    },
+    {
+      "id": "ui-20261124-020",
+      "key": "0eeb2e85846b9c4f",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": ".tnode[role=button]",
+      "severity": "impact",
+      "seats": [
+        "A1B1",
+        "A1B2",
+        "A2B1",
+        "A3B2"
+      ],
+      "implies": "D12_simplify_structure",
+      "fact": "为让卡片可聚焦给整卡加 role=button，但卡内本来就有 2–3 个真按钮，形成 button 套 button（29 卡 / 85–114 个内部按钮）。",
+      "harm": "读屏把整卡当按钮、卡内动作被折叠或重复播报；键盘每张卡多一个停靠点，与「减少 Tab 摩擦」相反。",
+      "fix": "不再给整卡 role=button；改为标题是真正的「打开详情」按钮（native button，Enter/Space 原生可用）。",
+      "status": "fixed",
+      "evidence": [
+        "snapshot/a11y.json",
+        "shots/final-focus.png"
+      ],
+      "recheck": {
+        "round": "2026-11-24 R6",
+        "result": "resolved",
+        "evidence": "实测 .tnode 不再有 role/tabindex；标题按钮 aria-label「打开详情：…」、嵌套按钮 0 个；shots/final-focus.png"
+      }
+    },
+    {
+      "id": "ui-20261124-021",
+      "key": "a564d2d7f95d9629",
+      "firstSeen": "2026-11-24",
+      "region": "empty-error",
+      "locus": "#no-match-clear",
+      "severity": "impact",
+      "seats": [
+        "A1B1",
+        "A1B2",
+        "A2B1",
+        "A2B2",
+        "A3B1",
+        "A3B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "首版空态的「清空搜索」按钮绑定被写在 if (isEmpty) 分支里，有项目时永不绑定，是死按钮。",
+      "harm": "零命中后用户按唯一的恢复入口无反应，重新触发「页面挂了」的误判。",
+      "fix": "绑定移出 isEmpty 分支并幂等保护；清除后把焦点还给搜索框；空态可见时 Esc 也能清空。",
+      "status": "fixed",
+      "evidence": [
+        "shots/final-no-match.png"
+      ],
+      "recheck": {
+        "round": "2026-11-24 R6",
+        "result": "resolved",
+        "evidence": "实测 dataset.bound=1；点击后 search 空、#no-match 隐藏、29 卡恢复"
+      }
+    },
+    {
+      "id": "ui-20261124-022",
+      "key": "a199cec3434b438e",
+      "firstSeen": "2026-11-24",
+      "region": "swimlane",
+      "locus": ".tnode[data-hit=\"1\"][.is-active]",
+      "severity": "polish",
+      "seats": [
+        "A2B2"
+      ],
+      "implies": "D11_expose_states",
+      "fact": "搜索命中琥珀 outline 与锚点品牌 box-shadow 画在同一条卡边，命中卡被点开时两环重叠，锚点环只剩约 1px。",
+      "harm": "「搜索 → 打开命中卡」时「匹配」与「当前打开」两个状态叠成一条双色边，锚点读不出来。",
+      "fix": "让两个状态用不同几何（如命中环内缩 outline-offset:-2px，或锚点环改 inset shadow），或在 is-active 时暂时撤掉命中环。",
+      "status": "open",
+      "evidence": [
+        "web/index.html:94",
+        "web/index.html:1051"
+      ]
+    }
+  ]
+}

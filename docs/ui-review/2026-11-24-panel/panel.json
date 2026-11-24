@@ -1,0 +1,292 @@
+{
+  "version": 1,
+  "round": "2026-11-24 R1",
+  "target": "轮转里程碑树面板（dsh-looptree-dashboard web/）",
+  "evidence": {
+    "before": "~/.dsh/outbox/gate/2026-11-24-panel",
+    "after": "~/.dsh/outbox/gate/2026-11-24-panel-after"
+  },
+  "mechanism": "~/.dsh/skills/ui-user-panel/",
+  "findingsSource": "逐条原文见 docs/ui-review/ledger.json 与 REPORT.md（本文件存六席摘要与机械审计）",
+  "audit": {
+    "clusterCount": 24,
+    "pairwise": [
+      {
+        "a": "A1B1",
+        "b": "A1B2",
+        "overlap": 0.11
+      },
+      {
+        "a": "A1B1",
+        "b": "A2B1",
+        "overlap": 0
+      },
+      {
+        "a": "A1B1",
+        "b": "A2B2",
+        "overlap": 0.13
+      },
+      {
+        "a": "A1B1",
+        "b": "A3B1",
+        "overlap": 0
+      },
+      {
+        "a": "A1B1",
+        "b": "A3B2",
+        "overlap": 0
+      },
+      {
+        "a": "A1B2",
+        "b": "A2B1",
+        "overlap": 0
+      },
+      {
+        "a": "A1B2",
+        "b": "A2B2",
+        "overlap": 0.13
+      },
+      {
+        "a": "A1B2",
+        "b": "A3B1",
+        "overlap": 0
+      },
+      {
+        "a": "A1B2",
+        "b": "A3B2",
+        "overlap": 0.11
+      },
+      {
+        "a": "A2B1",
+        "b": "A2B2",
+        "overlap": 0
+      },
+      {
+        "a": "A2B1",
+        "b": "A3B1",
+        "overlap": 0.25
+      },
+      {
+        "a": "A2B1",
+        "b": "A3B2",
+        "overlap": 0
+      },
+      {
+        "a": "A2B2",
+        "b": "A3B1",
+        "overlap": 0
+      },
+      {
+        "a": "A2B2",
+        "b": "A3B2",
+        "overlap": 0
+      },
+      {
+        "a": "A3B1",
+        "b": "A3B2",
+        "overlap": 0
+      }
+    ],
+    "flagged": [],
+    "noBite": [
+      "A2B1"
+    ],
+    "vetoCollisions": [
+      {
+        "seat": "A1B1",
+        "rejects": [
+          "D1_onboard_more",
+          "D10_add_confirmation"
+        ],
+        "collisions": 1
+      },
+      {
+        "seat": "A1B2",
+        "rejects": [
+          "D7_add_motion",
+          "D2_remove_explanation"
+        ],
+        "collisions": 1
+      },
+      {
+        "seat": "A2B1",
+        "rejects": [
+          "D10_add_confirmation",
+          "D7_add_motion"
+        ],
+        "collisions": 0
+      },
+      {
+        "seat": "A2B2",
+        "rejects": [
+          "D3_enlarge_targets",
+          "D5_loosen"
+        ],
+        "collisions": 4
+      },
+      {
+        "seat": "A3B1",
+        "rejects": [
+          "D2_remove_explanation",
+          "D12_simplify_structure"
+        ],
+        "collisions": 2
+      },
+      {
+        "seat": "A3B2",
+        "rejects": [
+          "D2_remove_explanation",
+          "D4_densify"
+        ],
+        "collisions": 1
+      }
+    ],
+    "demandMatrix": {
+      "D1_onboard_more": {
+        "proposed": [
+          "A1B2"
+        ],
+        "rejected": [
+          "A1B1"
+        ]
+      },
+      "D2_remove_explanation": {
+        "proposed": [
+          "A1B1"
+        ],
+        "rejected": [
+          "A1B2",
+          "A3B1",
+          "A3B2"
+        ]
+      },
+      "D3_enlarge_targets": {
+        "proposed": [
+          "A1B2",
+          "A3B1",
+          "A3B2"
+        ],
+        "rejected": [
+          "A2B2"
+        ]
+      },
+      "D4_densify": {
+        "proposed": [],
+        "rejected": [
+          "A3B2"
+        ]
+      },
+      "D5_loosen": {
+        "proposed": [
+          "A3B1"
+        ],
+        "rejected": [
+          "A2B2"
+        ]
+      },
+      "D6_speed_up_motion": {
+        "proposed": [
+          "A2B2"
+        ],
+        "rejected": []
+      },
+      "D7_add_motion": {
+        "proposed": [],
+        "rejected": [
+          "A1B2",
+          "A2B1"
+        ]
+      },
+      "D8_restyle": {
+        "proposed": [
+          "A1B2"
+        ],
+        "rejected": []
+      },
+      "D9_shorten_paths": {
+        "proposed": [
+          "A1B1",
+          "A2B1",
+          "A3B1"
+        ],
+        "rejected": []
+      },
+      "D10_add_confirmation": {
+        "proposed": [],
+        "rejected": [
+          "A1B1",
+          "A2B1"
+        ]
+      },
+      "D11_expose_states": {
+        "proposed": [
+          "A1B1",
+          "A1B2",
+          "A2B1",
+          "A2B2",
+          "A3B1",
+          "A3B2"
+        ],
+        "rejected": []
+      },
+      "D12_simplify_structure": {
+        "proposed": [
+          "A3B2"
+        ],
+        "rejected": [
+          "A3B1"
+        ]
+      }
+    },
+    "seatSummary": [
+      {
+        "seat": "A1B1",
+        "count": 5,
+        "blocker": 1,
+        "impact": 4,
+        "polish": 0
+      },
+      {
+        "seat": "A1B2",
+        "count": 5,
+        "blocker": 0,
+        "impact": 4,
+        "polish": 1
+      },
+      {
+        "seat": "A2B1",
+        "count": 5,
+        "blocker": 1,
+        "impact": 3,
+        "polish": 1
+      },
+      {
+        "seat": "A2B2",
+        "count": 4,
+        "blocker": 0,
+        "impact": 3,
+        "polish": 1
+      },
+      {
+        "seat": "A3B1",
+        "count": 5,
+        "blocker": 2,
+        "impact": 3,
+        "polish": 0
+      },
+      {
+        "seat": "A3B2",
+        "count": 5,
+        "blocker": 1,
+        "impact": 3,
+        "polish": 1
+      }
+    ],
+    "failedSeats": [],
+    "singleProvider": true,
+    "notes": [
+      "contrast 低对比读数在首轮被误报（color-mix → color(srgb) 解析 bug），复测后 0 条，已从台账剔除并修正 scripts/ui-evidence.mjs",
+      "错误态证据缺失：接口中断后回退静态 cards.js，state/error.png 与默认首屏 sha256 相同，记 no-evidence"
+    ]
+  }
+}
