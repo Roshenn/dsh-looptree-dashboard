@@ -1375,6 +1375,7 @@
     <div id="focus-switch" class="chipbar" hidden></div>
     <span class="hint" id="toolbar-hint" hidden></span>
     <button type="button" class="hint linkbtn" id="save-state"></button>
+    <button type="button" class="chip" id="glossary-btn" title="术语说明：里程碑 / 能力闭环 / 执行记录 / 待确认 / 在途 / 收敛健康度">术语</button>
     <span class="hint" id="data-src"></span>
     <button class="chip chip-danger" id="last-error" hidden title="最近一次失败；点开看完整原因">⚠ 最近一次失败</button>
     <button class="chip chip-primary" id="add-project">+ 项目</button>
@@ -3315,6 +3316,17 @@ function layoutCanvas(project, canvas, cols){
     el.style.top  = n.y + 'px';
   }
   canvas.style.height = (rows * pitch + 18) + 'px';
+
+  // Tab/读屏顺序跟随视觉列序：卡片是绝对定位，按 (x,y) 重挂 DOM 不改变画面；
+  // 仅当顺序真的不同才重排，避免每次 resize 都搬动正在聚焦的元素。
+  const wantOrder = nodes.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y)).map(n => n.id).join('|');
+  const haveOrder = [...canvas.querySelectorAll('.tnode[data-nid]')].map(el => el.dataset.nid).join('|');
+  if (wantOrder !== haveOrder){
+    nodes.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y)).forEach(n => {
+      const el = canvas.querySelector(`[data-nid="${n.id}"]`);
+      if (el) canvas.appendChild(el);
+    });
+  }
 
   const svg = canvas.querySelector('.edges');
   if (!svg) return;
@@ -7697,7 +7709,19 @@ $('#tab-matrix').addEventListener('click', ()=>{ stopActionPolls(); state.view='
 $('#tab-focus').addEventListener('click', ()=>{ stopActionPolls(); state.view='focus'; render(); });
 $('#next-jump').addEventListener('click', jumpToNextTarget);
 const kpiBlocked = $('#kpi-blocked');
-if (kpiBlocked) kpiBlocked.addEventListener('click', () => { const chip = document.querySelector('.chip[data-filter="blocked"]'); if (chip) chip.click(); });   // 页脚「空闲分支 →」：滚到那条分支
+if (kpiBlocked) kpiBlocked.addEventListener('click', () => { const chip = document.querySelector('.chip[data-filter="blocked"]'); if (chip) chip.click(); });
+const glossaryBtn = $('#glossary-btn');
+if (glossaryBtn) glossaryBtn.addEventListener('click', () => askInfo('术语说明', [
+  ['里程碑', '一个可验收的阶段目标；能力闭环全部关闭后点「确认达成」收尾'],
+  ['能力闭环', '一条可验证的能力；执行记录全闭环后自动完成，没有记录时手动「完成」'],
+  ['执行记录', '一次可复核的执行：带验证命令与证据；关错了可撤销（toast 撤销 / Ctrl+Z）'],
+  ['待确认', '子项已经关完，等人拍板后才写终态'],
+  ['已闭环 / 已达成', '人工确认过的终态（能力闭环与执行记录叫已闭环，里程碑叫已达成）'],
+  ['在途', '从开始到现在的经过天数；超过 30 天会在卡片上标蓝'],
+  ['收敛健康度', '已完成能力占比与趋势；只统计能力闭环，不统计执行记录'],
+  ['候选池', 'AI 生成、等待你挑选后才写入卡片的候选项'],
+  ['收口', '旧文案，现统一叫「关闭」'],
+].map(([k, v]) => `<div class="mrow"><span>${k}</span><b>${v}</b></div>`).join('')));   // 页脚「空闲分支 →」：滚到那条分支
 const freshJump = $('#fresh-jump');
 if (freshJump) freshJump.addEventListener('click', jumpToNextUpdated);   // 页脚「已更新 N →」：跳到下一个有新内容的节点
 window.addEventListener('pagehide', stopActionPolls);
