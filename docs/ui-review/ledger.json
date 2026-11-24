@@ -102,15 +102,15 @@
       "fact": "1440 下实测 57 个可点控件 <24×24（31 个 18px 高的节点标题按钮、20 个 22×22、6 个 23 高 summary）；200% 缩放等效下 54 个（同脚本未截断计数）。台账此前写的 40 是采集脚本 slice(0,40) 的上限，不是真值。低视力/触屏下打开详情的主入口只有 18px 高，「⋯」菜单 22×22 是唯一入口。",
       "harm": "打开详情、项目菜单、恢复折叠节点这些小目标都低于 24×24；放大到 200% 也不会变大（CSS px 不变），误触后还要走 009 的多步恢复。",
       "fix": "只扩命中区不改视觉占位：用透明伪元素/热区外扩把 ⋯、foldchip、完成、#next-jump、标题按钮的有效区域做到 ≥24×24（不覆盖相邻按钮），保持 20/21/22px 视觉高度与 1440 布局不变；采集脚本去掉 slice 上限并同时报 total 与明细。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "metrics-summary.json#smallTargets",
         "shots/desktop-list.png"
       ],
       "recheck": {
-        "round": "2026-11-24 R7",
-        "result": "open",
-        "evidence": "metrics-summary.json 40（上限）、zoom200.json 54、本轮无上限实测 57（31×18 / 20×22 / 6×23）"
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "无上限实测 1440 smallTargets=0、720×450@2x smallTargets=0；⋯ 24×24、foldchip 24、summary 24、#next-jump 24、标题按钮 24 · 负 margin 抵消视觉占位不变"
       }
     },
     {
@@ -153,10 +153,15 @@
       "fact": "Prompt 模板段显示原始英文「生成失败: Failed to fetch」，无重试；上方说明却让用户点不存在的「发起」。",
       "harm": "唯一一条「按面板指引去开工」的路径断在开发者报错上，用户不知道是网络还是面板坏了。",
       "fix": "失败态给中文原因 + 重试；说明与失败态一致，无 prompt 行时不写「在下面点发起」。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "shots/desktop-detail.png"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "强制 /prompts 失败后 #prompt-sec 出现「重试」按钮并显示「生成失败：network down」；说明文案改指向重试 · 重试清缓存并重拉"
+      }
     },
     {
       "id": "ui-20261124-007",
@@ -172,16 +177,16 @@
       "fact": "详情打开后 0.2–0.6s 卡片仍在长高/重排，异步 Prompt 段与候选池回填改变布局。",
       "harm": "用户刚准备读/点时内容位移，连续扫卡时每张都重复一次。",
       "fix": "异步段固定高度占位，到达后只填内容不改布局。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "motion/open-detail.webm",
         "motion/frames/open-detail-03.png",
         "code-excerpt.md"
       ],
       "recheck": {
-        "round": "2026-11-24 R7",
-        "result": "open",
-        "evidence": "实测首次打开内容多的节点：24ms bottom=984、470ms bottom=1001（视口 900，溢出 101px），卡底动作 发起/候选/复制 JSON 全部不可命中；prompt 命中缓存后第二次打开 top=35/bottom=888 正常。"
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "clampDetailCard 在异步 Prompt 段回填后重新夹紧；720 下打开详情 bottom=565 ≤ vh-11 · 另在入场 520ms 后再夹一次"
       }
     },
     {
@@ -195,7 +200,7 @@
         "A2B2"
       ],
       "implies": "D6_speed_up_motion",
-      "fact": "render() 先 closeDetail() 再在 rAF/60ms 后 openDetail(keepDetail)，_openDetail 每次 card.innerHTML 全量重建详情。实测校正：节点仍可见（切主题/密度）时卡内 scrollTop 会保留（60→60），但焦点回 BODY、卡片内展开的 prompt 编辑器状态丢失；搜索/筛选把锚点节点过滤掉时，_openDetail 找不到 anchor 直接 return，详情被静默关闭、下次 render 也不会自己回来。窗口 resize、切主题、外部 pollStamps 都走 render()。",
+      "fact": "render() 重建详情：已补 scrollTop/焦点恢复（720 下 scrollTop=120 跨主题 render 保留、详情不再关闭），并加 clampDetailCard；仍未修：筛选/搜索把锚点节点过滤掉时 _openDetail 找不到 anchor 直接 return，详情静默关闭且不恢复。",
       "harm": "读详情时切主题/缩放/搜索，详情被拆建：焦点回文档、编辑器状态丢失；搜索不命中当前节点时详情直接消失且无提示，回来要从头打开。",
       "fix": "render 不销毁详情：按 detailNode 原地局部更新（或至少保存/恢复 scrollTop、activeElement、pgenOpen）；锚点被过滤时保留卡片并提示「节点已被筛选隐藏」，不要静默关闭。",
       "status": "open",
@@ -205,9 +210,9 @@
         "code-excerpt.md"
       ],
       "recheck": {
-        "round": "2026-11-24 R7",
+        "round": "2026-11-24 R8 修复轮",
         "result": "open",
-        "evidence": "实测：childReplaced=true、focus→BODY、scrollTop 60→60；筛选命中 0 时 hidden=true、scrollTop=0；六席确认"
+        "evidence": "720×450@2x 实测：主题切换后 visible=true、scrollTop 120→120；筛选隐藏锚点路径未修"
       }
     },
     {
@@ -228,15 +233,15 @@
       "fact": "关闭后没有可点撤销：doClose 的 toast 不带 action（toast 本身支持 action，仅 prompt 行删除在用），全页无 Ctrl/Cmd+Z；确认弹窗写「关错了可点『重开』恢复」，但恢复入口在折叠的「▸ 已闭环 N」里，执行记录以外的节点关闭后卡片从画布消失；开启「隐藏已闭环」时连折叠 chip 都不渲染。另外确认弹窗默认焦点落在「确认关闭」上，回车路径上没有任何缓冲。",
       "harm": "误关一条能力闭环后，承诺的一步恢复要「展开 chip → 找到节点 → 重开」共 3 步且入口不可发现；连续关闭时手快回车会直接误关；320/200% 下折叠 chip 与小目标问题叠加。",
       "fix": "doClose 的 toast 传 {label:'撤销', onClick: reopen+滚回原节点}（6s 停留）；加 Cmd/Ctrl+Z 撤销最近一次关闭；确认弹窗默认焦点改「取消」；按 kind 写清恢复位置，并让「隐藏已闭环」开着时仍可从 toast 恢复。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "metrics-summary.json",
         "code-excerpt.md"
       ],
       "recheck": {
-        "round": "2026-11-24 R7",
-        "result": "open",
-        "evidence": "state/confirm-modal.png；代码：doClose 无 action、无 Z 键、modal-ok 默认聚焦；五席确认"
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "toast 出现「撤销」按钮，点击后 toast 变「已重开，上级回到未关闭状态」；Ctrl+Z 同效 · 使用 toast 既有 action 机制，撤销栈只留最近 1 次"
       }
     },
     {
@@ -253,11 +258,16 @@
       "fact": "弹窗内按一次 Tab 焦点就逃到背景；Esc 关闭后焦点回 BODY 而非触发按钮。",
       "harm": "键盘用户在弹窗里继续 Enter 会切走背景视图，倒计时/确认对象丢失。",
       "fix": "焦点锁在 .modal-card 内循环；关闭后回焦触发元素。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "shots/modal-add-project.png",
         "code-excerpt.md"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "弹窗内 Tab/Shift+Tab 循环（cancel↔modal-x）；Esc 关闭后焦点回到触发按钮「完成」 · 焦点锁 + 同步回焦"
+      }
     },
     {
       "id": "ui-20261124-011",
@@ -274,11 +284,16 @@
       "fact": "「未连接保存服务 · 点击这里看诊断」是 span，不可聚焦，文案在 1440 下已被省略号截断。",
       "harm": "提示让用户点，但键盘到不了、Enter 无效，诊断永远打不开。",
       "fix": "改成 button（或 role=button + tabindex + Enter/Space），允许两行显示完整文案。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "inventory.json",
         "shots/desktop-list.png"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "#save-state 改为 button，tabIndex=0，可 focus；title 带完整文案"
+      }
     },
     {
       "id": "ui-20261124-012",
@@ -394,11 +409,16 @@
       "fact": "切主题整页一帧硬切（hardcuts=2），同时 34 条控件颜色过渡 160ms，双时基并存。",
       "harm": "切换的一两帧选中态与背景不同步，那 34 条过渡几乎不可见。",
       "fix": "统一：要么全瞬时，要么表面层也给同样的 160ms。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "motion/theme-toggle.webm",
         "motion/anims.json"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "切主题时 html[data-theme-switching] 置位 260ms 内清除，全局过渡瞬时；无 34 条控件 160ms 残留"
+      }
     },
     {
       "id": "ui-20261124-018",
@@ -434,11 +454,16 @@
       "fact": "规则文案（里程碑→能力闭环→执行记录、自动流转、确认达成）已计算进 #toolbar-hint，但该元素 display:none。",
       "harm": "用户不知道「完成」会不会连带关闭父级、里程碑靠什么收尾，影响点不点。",
       "fix": "让规则在矩阵视图可见（或首屏一次性提示），确认达成旁标出触发条件。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "code-excerpt.md",
         "shots/desktop-list.png"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "页脚规则文案改为「执行记录全闭环自动收口 · 能力闭环/里程碑需人确认 · 全部关闭后点确认达成」 · #toolbar-hint 仍隐藏，避免塞回工具栏"
+      }
     },
     {
       "id": "ui-20261124-020",
@@ -511,11 +536,16 @@
       "fact": "搜索命中琥珀 outline 与锚点品牌 box-shadow 画在同一条卡边，命中卡被点开时两环重叠，锚点环只剩约 1px。",
       "harm": "「搜索 → 打开命中卡」时「匹配」与「当前打开」两个状态叠成一条双色边，锚点读不出来。",
       "fix": "让两个状态用不同几何（如命中环内缩 outline-offset:-2px，或锚点环改 inset shadow），或在 is-active 时暂时撤掉命中环。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "web/index.html:94",
         "web/index.html:1051"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": ".tnode.is-active[data-hit=\"1\"] outline-offset:-3px，命中环与锚点环错开 · 代码级，未做命中态截图"
+      }
     },
     {
       "id": "ui-20261124-023",
@@ -532,11 +562,16 @@
       "fact": "关闭确认弹窗把默认焦点放在「确认关闭」上（openConfirm 末尾 #modal-ok.focus()）：回车打开弹窗后再回车即写回关闭，流程里没有第二道确认，也没有撤销。",
       "harm": "习惯「回车打开、回车确认」的用户会直接误关记录；误关后只能靠折叠 chip 里 44×24 的「重开」恢复。",
       "fix": "默认焦点改为「取消」；或确认按钮延迟聚焦/二次确认。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "state/confirm-modal.png",
         "web/index.html:6827"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "确认弹窗默认焦点 #modal-cancel；实测 active=modal-cancel"
+      }
     },
     {
       "id": "ui-20261124-024",
@@ -553,12 +588,17 @@
       "fact": ".detail-card 固定 width:404px 且无 max-width：320 宽下左缘夹到 12px，卡片右缘 416px 超出视口 96px，右上角关闭 × 与右侧字段不可见；只能靠 Esc 或盲点卡片外空白退出。",
       "harm": "320/等效 400% 下打开详情得到一张右侧被裁、关闭键不可见的残卡，退出方式没有提示。",
       "fix": "窄屏 .detail-card 宽度改 min(404px, calc(100vw - 24px)) 或改底部抽屉，关闭键常驻可见。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "web/index.html:1186",
         "web/index.html:5425-5427",
         "narrow.json"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R8 修复轮",
+        "result": "resolved",
+        "evidence": "320×800 打开详情：cardRight=308 ≤320、宽度 296、关闭按钮 right=290 可见可点"
+      }
     },
     {
       "id": "ui-20261124-025",

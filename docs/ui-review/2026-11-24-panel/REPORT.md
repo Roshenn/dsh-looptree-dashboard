@@ -166,3 +166,26 @@
 | 003 怎么收 | A2B2/A3B1：≤900px 断点重排 | A1B1/A1B2：宽屏密度不能动 | 断点只作用于 ≤900px，1440 布局与密度不变；按 design-change 走三套方案门禁后再落地 |
 
 **下一轮 top 3（更新）**：1) 003 窄屏/200% 断点重排（design-change，先出 3 套方案）；2) 004 命中区外扩 + 023 弹窗默认焦点改「取消」；3) 009 撤销 toast + Ctrl/Cmd+Z（008/007 与它同属“操作连续性”簇，一起排）。
+
+## 11. 修复轮 R8（2026-11-25 凌晨）：可修项批量销账
+
+**范围**：台账里不改变布局骨架的缺陷类条目；每项都按「改前有证据 → 改后实测」验收，`npm run preflight` 全绿。
+
+| 台账 id | 修复 | 验收证据 |
+| --- | --- | --- |
+| 004 小目标 | 可点盒扩到 ≥24×24（负 margin 抵消视觉占位）：标题按钮 18→24、⋯ 22→24、foldchip 22→24、summary 23→24、#next-jump 22→24、pbtn 22→25、#save-state 20→24 | 1440 与 720×450@2x 实测 smallTargets **57→0**；`elementFromPoint` 扩展区命中按钮 |
+| 006 Prompt 失败态 | 错误段加「重试」（清缓存重拉）；说明文案按 cache.error 改指向重试 | 强制 `/prompts` 失败后 #prompt-sec 显示「生成失败：network down 重试」 |
+| 007 首开重排 | `clampDetailCard()` 在异步 Prompt 段回填后、入场 520ms 后再夹紧 | 720 下打开详情 bottom=565 ≤ vh-11 |
+| 009 撤销 | doClose 的 toast 传 action（6s「撤销」→ reopen）；Ctrl/Cmd+Z 绑最近一次关闭 | 实测 toast 出现「撤销」，点击后「已重开…」；Ctrl+Z 同效 |
+| 010 弹窗焦点 | Tab/Shift+Tab 锁定在弹窗内；Esc 关闭后同步回焦触发按钮 | 实测 cancel↔modal-x 循环；Esc 后焦点回到「完成」按钮 |
+| 011 保存态入口 | `#save-state` 从 span 改为 button（tabIndex 0、title 全文） | 键盘可聚焦，title 有完整文案 |
+| 017 主题双时基 | 切主题时 `html[data-theme-switching]` 全局禁过渡，260ms 内清除（rAF + setTimeout 双保险） | 实测属性置位后清除，主题一步切换 |
+| 019 规则可见 | 页脚规则文案补「全闭环自动收口 / 需人确认 / 确认达成」 | 页脚文案即规则，不再依赖隐藏的 #toolbar-hint |
+| 022 双环重叠 | `.is-active[data-hit]` 的命中环 outline-offset:-3px 内缩 | 代码级；未做命中态截图（下一轮补） |
+| 023 破坏性默认焦点 | 确认弹窗默认焦点改「取消」 | 实测 activeElement=modal-cancel |
+| 024 320 详情裁切 | `.detail-card` 宽度 `min(404px, calc(100vw - 24px))` | 320×800：cardRight=308、关闭按钮 right=290 可见 |
+| 008 部分 | render 重建详情后恢复 scrollTop/焦点；720 下实测 scrollTop 120 跨主题 render 保留 | 剩余：筛选/搜索把锚点过滤掉时仍静默关闭 → 保持 open |
+
+**仍未闭环（8 条）**：003（窄屏/200% 断点重排，design-change：需 3 套方案 + 用户选定）、008（筛选隐藏锚点）、012（下一步/服务入口可点）、013（术语）、014（关闭语义）、015（Tab 顺序）、016（reduced-motion 显式分支）、018（KPI 可点 + 时间戳）。
+
+**环境说明**：本机 headless 下整包 `evidence:ui` 连续调用会偶发挂起，本轮验收改用短生命周期 session + 定点 eval；320/720 的确定性测量已拿到（1440 small=0、720@2x small=0、720 overflow=false）。003 的 320 溢出（621）本轮未动。
