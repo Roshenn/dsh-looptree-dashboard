@@ -1321,6 +1321,50 @@
   }
   @media (max-width:1400px){ #data-src{display:none} }
   @media (max-width:1180px){ #save-state{display:none} }
+@media (max-width:900px){
+  /* A · 两行顶栏：信息全保留，工具栏换行 */
+  html[data-narrow="a"] .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 12px}
+  html[data-narrow="a"] .brand p{display:none}
+  html[data-narrow="a"] .grow{display:none}
+  html[data-narrow="a"] .meta-strip{order:3;width:100%;flex-wrap:wrap;gap:10px}
+  html[data-narrow="a"] .toolbar{flex-wrap:wrap;overflow:visible;height:auto}
+  html[data-narrow="a"] .chipbar{flex-wrap:wrap}
+  html[data-narrow="a"] #data-src,html[data-narrow="a"] #save-state{display:none}
+  html[data-narrow="a"] .brand{flex:1 1 140px;min-width:0}
+  html[data-narrow="a"] .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html[data-narrow="a"] .seg{flex:0 0 auto}
+  html[data-narrow="a"] .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
+  /* B · 两行紧凑：只留数字 + 工具栏单行横滚 */
+  html[data-narrow="b"] .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 10px}
+  html[data-narrow="b"] .brand{flex:1 1 120px;min-width:0}
+  html[data-narrow="b"] .brand p{display:none}
+  html[data-narrow="b"] .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html[data-narrow="b"] .seg{flex:0 0 auto}
+  html[data-narrow="b"] .meta-strip{order:3;width:100%;gap:12px;flex-wrap:nowrap}
+  html[data-narrow="b"] .kpi-label{display:none}
+  html[data-narrow="b"] .kpi:first-child{display:none}   /* 时间戳在窄屏让位给数字 */
+  html[data-narrow="b"] #data-src,html[data-narrow="b"] #save-state{display:none}
+  html[data-narrow="b"] .toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+  html[data-narrow="b"] .toolbar .chipbar{flex:0 0 auto}
+  /* C · 窄屏自动切项目聚焦（单项目流），矩阵隐藏 */
+  html[data-narrow="c"] .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 12px}
+  html[data-narrow="c"] .brand p{display:none}
+  html[data-narrow="c"] .meta-strip{order:3;width:100%;gap:10px;flex-wrap:wrap}
+  html[data-narrow="c"] .toolbar{flex-wrap:wrap;overflow:visible;height:auto}
+  html[data-narrow="c"] .matrix{display:none}
+  html[data-narrow="c"] #focus-switch{flex-wrap:wrap}
+  html[data-narrow="c"] .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
+  html[data-narrow="c"] .focus-wrap{padding:8px;min-width:0 !important}
+  html[data-narrow="c"] .focus-lane{overflow:visible}
+  html[data-narrow="c"] .focus-lane .lane{display:block;min-width:0}
+  html[data-narrow="c"] .focus-lane .canvas{height:auto !important;width:100% !important;min-width:0 !important;padding:8px;display:flex;flex-direction:column;gap:8px}
+  html[data-narrow="c"] .focus-lane .canvas .edges{display:none}
+  html[data-narrow="c"] .focus-lane .tnode{position:static !important;width:auto !important;left:auto !important;top:auto !important}
+  html[data-narrow="c"] .brand{flex:1 1 140px;min-width:0}
+  html[data-narrow="c"] .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html[data-narrow="c"] .seg{flex:0 0 auto}
+  html[data-narrow="c"] .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
+}
 </style>
 </head>
 <body>
@@ -1345,11 +1389,11 @@
       <button id="tab-focus" aria-pressed="false">项目聚焦</button>
     </div>
     <div class="meta-strip mono">
-      <span class="kpi"><span class="dot" style="background:var(--tx4)"></span><span>数据 <b id="stamp">–</b></span></span>
-      <span class="kpi"><span class="dot doing"></span><span>执行中 <b id="k-doing">0</b></span></span>
-      <span class="kpi"><span class="dot" style="background:var(--amber)"></span><span>待确认 <b id="k-review">0</b></span></span>
-      <button type="button" class="kpi kpi-btn" id="kpi-blocked" title="只看阻塞项"><span class="dot blocked"></span><span>阻塞 <b id="k-blocked">0</b></span></button>
-      <span class="kpi"><span class="dot done"></span><span>已关闭 <b id="k-done">0</b></span></span>
+      <span class="kpi"><span class="dot" style="background:var(--tx4)"></span><span><span class="kpi-label">数据 </span><b id="stamp">–</b></span></span>
+      <span class="kpi"><span class="dot doing"></span><span><span class="kpi-label">执行中 </span><b id="k-doing">0</b></span></span>
+      <span class="kpi"><span class="dot" style="background:var(--amber)"></span><span><span class="kpi-label">待确认 </span><b id="k-review">0</b></span></span>
+      <button type="button" class="kpi kpi-btn" id="kpi-blocked" title="只看阻塞项"><span class="dot blocked"></span><span><span class="kpi-label">阻塞 </span><b id="k-blocked">0</b></span></button>
+      <span class="kpi"><span class="dot done"></span><span><span class="kpi-label">已关闭 </span><b id="k-done">0</b></span></span>
       <button class="iconbtn" id="btn-theme" aria-label="切换主题">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
         主题
@@ -8467,6 +8511,9 @@ window.addEventListener('scroll', ()=>{ hideCandTip(); }, true);
 
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
+const narrowVariant = String(qs.get('narrow') || '').toLowerCase();
+if (['a', 'b', 'c'].includes(narrowVariant)) document.documentElement.dataset.narrow = narrowVariant;
+if (narrowVariant === 'c' && innerWidth <= 900) state.view = 'focus';
 if (qs.get('theme')) state.theme = qs.get('theme');
 // 被 DSH 主区嵌入时，主题跟随宿主：宿主通过 postMessage 推送；
 // composer 的「闭环」按钮另发 rotation-focus（项目 + 是否定位当前节点）。
