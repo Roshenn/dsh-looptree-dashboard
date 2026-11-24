@@ -250,6 +250,8 @@
   @media (prefers-reduced-motion:reduce){ .tnode[data-idle-pulse="1"]{animation:none} }
   .frozenbad{font-size:var(--fs-11);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);
     border-radius:var(--radius-sm);padding:2px 5px;line-height:1;white-space:nowrap}
+  .tnode-open{display:block;width:100%;text-align:left;padding:0;border:0;background:none;font:inherit;cursor:pointer;border-radius:var(--radius-sm)}
+  .tnode-open:hover{color:var(--brand-2)}
   .tnode-title{font-size:var(--fs-13);line-height:1.42;color:var(--tx1);
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .tnode-meta{margin-top:3px;font-size:var(--fs-11);color:var(--tx4);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -1048,10 +1050,10 @@
   .tnode[data-updated="fail"]{border-color:color-mix(in srgb,var(--red) 55%,var(--b1));box-shadow:none}
   .tnode[data-frozen="1"]{opacity:.55;filter:none}
   .tnode.is-current{box-shadow:0 0 0 1px var(--brand)}
-  .tnode.is-active{border-color:var(--b2);box-shadow:none}
-  .tnode[data-idle="strong"]{border-color:color-mix(in srgb,var(--ready) 40%,var(--b1));box-shadow:none}
-  .tnode[data-idle="modest"]{border-color:color-mix(in srgb,var(--ready) 26%,var(--b1));box-shadow:none}
-  .tnode[data-ask="1"]{box-shadow:none}
+  .tnode.is-active{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 26%,transparent)}
+  .tnode[data-idle="strong"]:not(.is-active){border-color:color-mix(in srgb,var(--ready) 40%,var(--b1));box-shadow:none}
+  .tnode[data-idle="modest"]:not(.is-active){border-color:color-mix(in srgb,var(--ready) 26%,var(--b1));box-shadow:none}
+  .tnode[data-ask="1"]:not(.is-active){box-shadow:none}
   .tnode-top{gap:7px;margin-bottom:5px}
   .kind{font-size:var(--fs-11);letter-spacing:.02em;font-weight:500;opacity:1}
   .nid{font-size:var(--fs-11);font-family:var(--mono);letter-spacing:0;color:var(--tx4)}
@@ -1375,6 +1377,13 @@
         面板通过注册表找到它们，读写都直接落在项目里。</p>
         <button class="tbtn primary-converge" id="empty-add">添加第一个项目</button>
         <div class="hint" style="margin-top:10px">也可以先点工具栏「+ 项目」，或把窗口缩到一半用「载入 JSON」看样例。</div>
+      </div>
+    </div>
+    <div class="empty-wrap" id="no-match" hidden>
+      <div class="empty-card">
+        <div class="empty-k">没有匹配的节点</div>
+        <p id="no-match-text">换个关键词，或清空搜索。</p>
+        <button class="tbtn primary-converge" id="no-match-clear">清空搜索</button>
       </div>
     </div>
     <div class="matrix" id="matrix"></div>
@@ -3170,7 +3179,7 @@ function nodeMarkup(n, p){
       <span class="idle-pill">可开工</span>
       <span class="st">${st.label}</span>
     </div>
-    <div class="tnode-title" title="${n.title}">${n.title}</div>
+    <button class="tnode-title tnode-open" data-open-detail="${n.id}" aria-haspopup="dialog" aria-label="打开详情：${esc(n.title || n.id)}" title="${esc(n.title)}">${n.title}</button>
     ${n.meta ? `<div class="tnode-meta one" title="${esc(n.metaFull || n.meta)}">${esc(n.meta)}</div>` : ''}
     ${chips.length ? `<div class="tnode-chips">${chipHtml}</div>` : ''}
     ${(blockCount(n) && n.kind!=='exec') ? `<div class="tnode-meta"><span class="blk">⚠ ${blockCount(n)} 项阻塞</span></div>` : ''}
@@ -3600,9 +3609,17 @@ function render(){
   focusSwitch();
   const emptyEl = $('#empty'), matrixEl = $('#matrix'), focusEl = $('#focus');
   const isEmpty = PROJECTS.length === 0;
+  const hitTotal = state.q ? visibleProjects().reduce((sum, p) => sum + projectHitCount(p), 0) : 0;
+  const noMatch = !isEmpty && !!state.q && hitTotal === 0;
+  const noMatchEl = $('#no-match');
+  if (noMatchEl) noMatchEl.hidden = !noMatch;
+  if (noMatch) {
+    const t = $('#no-match-text');
+    if (t) t.textContent = `搜索「${state.q}」命中 0 个节点。按 Esc 清空，或换个关键词。`;
+  }
   if (emptyEl) emptyEl.hidden = !isEmpty;
-  if (matrixEl) matrixEl.hidden = isEmpty || state.view !== 'matrix';
-  if (focusEl) focusEl.hidden = isEmpty || state.view !== 'focus';
+  if (matrixEl) matrixEl.hidden = isEmpty || noMatch || state.view !== 'matrix';
+  if (focusEl) focusEl.hidden = isEmpty || noMatch || state.view !== 'focus';
   if (isEmpty) { updateKpis(); paintFooter(); return; }
   if (state.view==='matrix') renderMatrix(); else renderFocus();
   updateKpis();
@@ -5300,6 +5317,9 @@ function detailMarkup(p, n){
 }
 
 let detailNode = null;
+let detailAnchorEl = null;          // 详情锚点：关闭时把焦点还回去
+let detailOpenedByKeyboard = false; // 当前详情是否由键盘打开
+let detailViaKeyboard = false;      // 本次 openDetail 是否来自键盘（一次性）
 function restorePgen(p, n){
   if (!pgenOpen || pgenOpen.nid !== n.id) return;
   const wrap = $('#pgen-wrap');
@@ -5329,6 +5349,11 @@ function restorePgen(p, n){
 function closeDetail(){
   const d = $('#detail');
   if (!d || d.hidden) return;
+  const wasKeyboard = detailOpenedByKeyboard;
+  const anchorEl = detailAnchorEl;
+  const focusInDetail = !!(document.activeElement && d.contains(document.activeElement));
+  detailOpenedByKeyboard = false;
+  detailAnchorEl = null;
   d.dataset.show = 'false';
   pgenOpen = null;
   const c0 = d.querySelector('.detail-card');
@@ -5336,6 +5361,9 @@ function closeDetail(){
   document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
   setTimeout(() => { if (d.dataset.show === 'false') d.hidden = true; }, 150);
   detailNode = null;
+  if (wasKeyboard && focusInDetail && anchorEl && anchorEl.isConnected) {
+    requestAnimationFrame(() => anchorEl.focus({ preventScroll: true }));
+  }
 }
 function openDetail(id, skipEnsure, origin){
   if (!skipEnsure) ensureVisible(id);
@@ -5352,10 +5380,17 @@ function _openDetail(id, origin){
   }) || candidates[0];
   if (!anchor) return;
   const d = $('#detail'), card = d.querySelector('.detail-card');
+  detailAnchorEl = anchor.querySelector('.tnode-open') || anchor;
   card.innerHTML = detailMarkup(p, n);
   ensurePromptList(p, n).catch(() => {});   // Prompt 段异步补数据，拿到后只重绘这一段
   if (n.kind === 'milestone') refreshPoolCount(p, n);   // 候选池只挂在里程碑上
   d.hidden = false;
+  if (detailViaKeyboard) {
+    detailViaKeyboard = false;
+    detailOpenedByKeyboard = true;
+    card.tabIndex = -1;
+    requestAnimationFrame(() => { if (detailNode === id) card.focus({ preventScroll: true }); });
+  }
   document.querySelectorAll('.tnode.is-active').forEach(el => el.classList.remove('is-active'));
   anchor.classList.add('is-active');
   detailNode = id;
@@ -6834,6 +6869,12 @@ document.addEventListener('keydown', (e) => {
   else if (!$('#ask').hidden) hideModal($('#ask'));
   else if (!$('#launch').hidden) closeLaunch();
   else if (!$('#modal').hidden) closeConfirm();
+  else if (!$('#no-match').hidden) {
+    state.q = '';
+    const s = $('#search');
+    if (s) { s.value = ''; s.focus(); }
+    render();
+  }
   else closeDetail();
 });
 
@@ -8242,9 +8283,16 @@ document.addEventListener('click', (e)=>{
     if (p0) openProjectHistory(p0);
     return;
   }
+  const openBtn = e.target.closest('[data-open-detail]');
+  if (openBtn){
+    detailViaKeyboard = e.detail === 0;   // 键盘触发的 click 不带鼠标计数
+    openDetail(openBtn.dataset.openDetail);
+    return;
+  }
   const nodeEl = e.target.closest('.tnode');
   if (nodeEl && !e.target.closest('button')){
     markNodeRead(nodeEl.dataset.nid);   // 已经看到了：角标即已读
+    detailViaKeyboard = false;
     openDetail(nodeEl.dataset.nid, undefined, { x: e.clientX, y: e.clientY });
     return;
   }
@@ -8322,6 +8370,16 @@ if (qs.get('filter')) state.filter = qs.get('filter');
       btn.dataset.bound = '1';
       btn.addEventListener('click', () => $('#add-project').click());
     }
+  }
+  const clearBtn = $('#no-match-clear');
+  if (clearBtn && !clearBtn.dataset.bound) {
+    clearBtn.dataset.bound = '1';
+    clearBtn.addEventListener('click', () => {
+      state.q = '';
+      const s = $('#search');
+      if (s) { s.value = ''; s.focus(); }
+      render();
+    });
   }
   if (!PROJECTS.some(p => p.id === state.focusId)) state.focusId = PROJECTS[0] ? PROJECTS[0].id : '';
   document.documentElement.dataset.theme = state.theme;
