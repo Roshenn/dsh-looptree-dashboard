@@ -175,6 +175,10 @@
   .info-row{display:flex;align-items:baseline;gap:6px;font-size:var(--fs-12);color:var(--tx3);min-width:0}
   .info-row b{margin-left:auto;color:var(--tx1);font-weight:500;font-variant-numeric:tabular-nums;flex:0 0 auto}
   .info-row .d{width:5px;height:5px;border-radius:50%;background:var(--tone);flex:0 0 auto}
+  .kpi-btn{background:none;border:0;font:inherit;color:inherit;cursor:pointer;border-radius:var(--radius-sm);padding:2px 4px;margin:-2px -4px}
+  .kpi-btn:hover{background:var(--hover)}
+  .info-act-row{width:100%;text-align:left;background:none;border:0;padding:2px 4px;margin:0 -4px;border-radius:var(--radius-sm);cursor:pointer}
+  .info-act-row:hover{background:var(--hover)}
   .ibar{height:4px;border-radius:var(--radius-sm);background:var(--b2);overflow:hidden;display:flex}
   .ibar i{display:block;height:100%;background:var(--green)}
   .ibar i.b{background:var(--red)}
@@ -907,7 +911,13 @@
   .askrow .q{grid-column:1/-1;font-size:var(--fs-11);color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .asktray-more{font-size:var(--fs-11);color:var(--tx4);text-align:center}
 
-  @media (prefers-reduced-motion:reduce){ *{transition-duration:1ms !important;animation-duration:1ms !important} }
+  @media (prefers-reduced-motion:reduce){
+    /* 显式降级：颜色/透明度保留 80ms 反馈；位移与装饰动画去掉；就绪态给静态标记 */
+    *{animation-duration:1ms !important;animation-iteration-count:1 !important;scroll-behavior:auto !important}
+    *{transition-duration:80ms !important}
+    .tnode,.modal-card,.detail-card,.addmenu{transform:none !important}
+    .tnode[data-idle-pulse="1"]{animation:none !important;box-shadow:0 0 0 2px color-mix(in srgb,var(--ready) 40%,transparent)}
+  }
   @media (hover:none){ .tnode:hover{transform:none} }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -1338,7 +1348,7 @@
       <span class="kpi"><span class="dot" style="background:var(--tx4)"></span><span>数据 <b id="stamp">–</b></span></span>
       <span class="kpi"><span class="dot doing"></span><span>执行中 <b id="k-doing">0</b></span></span>
       <span class="kpi"><span class="dot" style="background:var(--amber)"></span><span>待确认 <b id="k-review">0</b></span></span>
-      <span class="kpi"><span class="dot blocked"></span><span>阻塞 <b id="k-blocked">0</b></span></span>
+      <button type="button" class="kpi kpi-btn" id="kpi-blocked" title="只看阻塞项"><span class="dot blocked"></span><span>阻塞 <b id="k-blocked">0</b></span></button>
       <span class="kpi"><span class="dot done"></span><span>已关闭 <b id="k-done">0</b></span></span>
       <button class="iconbtn" id="btn-theme" aria-label="切换主题">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
@@ -1417,7 +1427,7 @@
       <span class="next-arrow" aria-hidden="true">→</span>
     </button>
     <div class="grow"></div>
-    <span>执行记录全闭环自动收口 · 能力闭环 / 里程碑需人确认 · 全部关闭后点「确认达成」</span>
+    <span>执行记录全闭环自动关闭 · 能力闭环 / 里程碑需人确认 · 全部关闭后点「确认达成」</span>
   </footer>
 </div>
 <div class="detail" id="detail" hidden>
@@ -1551,9 +1561,9 @@
 <script>
 /* ─────────── 常量 ─────────── */
 const STAGES = [
-  { key:'milestone', label:'里程碑',         en:'MILESTONE', color:'var(--brand)' },
-  { key:'capability',   label:'能力闭环',         en:'Capability', color:'var(--blue-300)' },
-  { key:'exec',      label:'执行验证反馈记录', en:'Records',   color:'var(--green)' },
+  { key:'milestone', label:'里程碑',         en:'MILESTONE', color:'var(--brand)', tip:'一个可验收的阶段目标：能力闭环全部关闭后，点「确认达成」收尾' },
+  { key:'capability',   label:'能力闭环',         en:'Capability', color:'var(--blue-300)', tip:'一条可验证的能力：执行记录全闭环后自动完成，没有记录时手动「完成」' },
+  { key:'exec',      label:'执行验证反馈记录', en:'Records',   color:'var(--green)', tip:'一次可复核的执行：带验证命令与证据，关错了可撤销' },
 ];
 const KIND = { milestone:'里程碑', capability:'能力闭环', exec:'执行' };
 /** module_mode：改造还是新增（与 host / prompt 的 MODULE_MODE_LABEL 同口径） */
@@ -2241,7 +2251,7 @@ function recomputeIdle() {
   }
 }
 
-const RUN_LABEL = { starting:'启动中', running:'运行中', done:'完成', failed:'失败', cancelled:'已取消', stale:'进程已不在' };
+const RUN_LABEL = { starting:'启动中', running:'运行中', done:'已结束', failed:'失败', cancelled:'已取消', stale:'进程已不在' };
 const RUN_TONE = { starting:'var(--brand-2)', running:'var(--brand-2)', done:'var(--green)', failed:'var(--red)', cancelled:'var(--tx3)', stale:'var(--amber)' };
 
 let API_BASE = (() => {
@@ -2969,7 +2979,7 @@ function laneStats(p){
     <div class="info-sec">
       <div class="health" style="--tone:${s0.health.tone}">
         <span class="num">${s0.score}</span>
-        <span class="cap">收敛健康度 · ${s0.health.label}<br>完成 ${execPct}% · 收口 ${s0.capabilitiesClosed}/${s0.capabilities.length} 能力闭环</span>
+        <span class="cap">收敛健康度 · ${s0.health.label}<br>完成 ${execPct}% · 关闭 ${s0.capabilitiesClosed}/${s0.capabilities.length} 能力闭环</span>
       </div>
       <div class="ibar" title="完成度 / 进行中 / 阻塞">
         <i style="width:${execPct}%"></i><i class="w" style="width:${Math.round(st.doing / (s0.execs.length||1) * 100)}%"></i><i class="b" style="width:${Math.round(st.blocked / (s0.execs.length||1) * 100)}%"></i>
@@ -3010,13 +3020,13 @@ function infoMarkup(p){
     ? lessons.slice(-2).reverse().map(l => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--green);margin-top:5px"></span><span style="color:var(--tx2);font-size:var(--fs-12)">${esc(l.text)}</span></div>`).join('')
     : `<div class="info-empty">执行记录完成后自动提炼</div>`;
   const guideHtml = guide.length
-    ? guide.slice(0,2).map(g => `<div class="info-row" style="align-items:flex-start"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:var(--fs-12)">${g.text}</span></div>`).join('')
-    : `<div class="info-empty">无待办 · 能力闭环全部关闭时，点「确认达成」收口</div>`;
+    ? guide.slice(0,2).map(g => `<button type="button" class="info-row info-act-row" data-open-detail="${esc(g.id)}" title="${esc(g.hint)}"><span class="d" style="--tone:var(--brand-2);margin-top:5px"></span><span style="color:var(--tx2);font-size:var(--fs-12)">${esc(g.text)}</span></button>`).join('')
+    : `<div class="info-empty">无待办 · 能力闭环全部关闭时，点「确认达成」关闭</div>`;
   return `<div class="info">
     ${laneStats(p)}
 
     <div class="info-acts">
-      <button class="tbtn" data-act="focus" data-id="${p.id}">聚焦</button>
+      <button class="tbtn" data-act="focus" data-id="${p.id}" title="只看这个项目（切换「项目聚焦」视图）">单看</button>
       <button class="tbtn" data-act="open" data-id="${p.id}">会话 ↗</button>
       <button class="tbtn" data-act="toggle" data-id="${p.id}">${collapsed.has(p.id) ? '展开' : '收起'}</button>
       <button class="tbtn" data-export="${p.id}">导出</button>
@@ -3443,7 +3453,7 @@ function renderMatrix(){
   const m = $('#matrix');
   const active = visibleProjects();   // 已达成的项目留在主泳道，不再自动移走
   m.innerHTML = `<div class="stage-head corner">项目 / 阶段</div>` +
-    STAGES.map((st,i)=>`<div class="stage-head" data-depth="${i}" style="--c:${st.color}">
+    STAGES.map((st,i)=>`<div class="stage-head" data-depth="${i}" style="--c:${st.color}" title="${esc(st.tip || '')}">
       <span class="swatch"></span><span class="label">${st.label}</span><span class="en">${st.en}</span></div>`).join('') +
     `<div class="stage-head" data-depth="info"><span class="swatch" style="--c:var(--tx4)"></span><span class="label">概览</span><span class="en">Info</span></div>` +
     active.map(laneMarkup).join('');
@@ -3478,14 +3488,14 @@ function nextAction(p){
   const out=[];
   walk(p.root, (n)=>{
     if (hasIssues(n) && !n.closed)
-      out.push({ text:`解阻断：${n.title}`, hint:(nodeIssues(n)[0] && nodeIssues(n)[0].text) || '有未处置问题，后续无法采集证据' });
+      out.push({ id: n.id, text:`解阻断：${n.title}`, hint:(nodeIssues(n)[0] && nodeIssues(n)[0].text) || '有未处置问题，后续无法采集证据' });
   });
   // 有「待确认」的节点时，它就是当前最该做的一步
   const review = [];
   walk(p.root, (n)=>{ if (!n.closed && deriveState(n)==='review') review.push(n); });
   if (review.length){
     const r = review[0];
-    out.push({ text:`${closeLabelOf(r)}：${r.title}`, hint:'子项已全部关闭，等你确认后才写 closed_at' });
+    out.push({ id: r.id, text:`${closeLabelOf(r)}：${r.title}`, hint:'子项已全部关闭，等你确认后才写 closed_at' });
   }
   if (!out.length){
     const doing = [], plan = [], todo = [];
@@ -3498,6 +3508,7 @@ function nextAction(p){
     });
     const pick = doing[0] || plan[0] || todo[0];
     if (pick) out.push({
+      id: pick.id,
       text: `继续推进：${pick.title}`,
       hint: doing[0] ? '已有子节点，把剩下的子项逐个关闭（里程碑最后还要手动「确认达成」）' : (plan[0] ? '已规划，给它拆出下一步' : '新建的节点，先补内容或拆子节点'),
     });
@@ -3617,6 +3628,8 @@ function render(){
   $('#matrix').hidden = state.view!=='matrix';
   $('#focus').hidden = state.view!=='focus';
   $('#stamp').textContent = state.stamp || '—';
+  const stampEl = $('#stamp');
+  if (stampEl) stampEl.title = state.stamp ? `数据时间：${state.stamp}` : '宿主未提供同步时间（连接后自动刷新）';
   const src = $('#data-src');
   if (src) src.textContent = USING_REAL ? `数据源：${CARDS.length} 张 rotation/v1 卡` : '数据源：内置 mock';
   $('#toolbar-hint').textContent = state.q
@@ -3646,7 +3659,7 @@ function render(){
   paintAskTray();                  // 项目/节点标题变了，托盘里的行跟着更新
   if (keepDetail && findProjectByNode(keepDetail)){
     const restore = () => {
-      if (!detailNode) return;
+      if (!detailNode) { pendingDetailId = keepDetail; return; }
       const card = document.querySelector('#detail .detail-card');
       if (card && keepDetailScroll) card.scrollTop = keepDetailScroll;
       if (card && keepDetailFocus){
@@ -3658,6 +3671,22 @@ function render(){
     requestAnimationFrame(() => { openDetail(keepDetail); requestAnimationFrame(restore); });
     setTimeout(() => { if (!detailNode) openDetail(keepDetail); restore(); }, 60);
     setTimeout(restore, 260);
+  }
+  // 上一次 render 因筛选丢掉了详情：这次节点重新可见就恢复（用户不用重新点开）
+  if (pendingDetailId){
+    if (!findProjectByNode(pendingDetailId)) pendingDetailId = null;
+    else {
+      const id = pendingDetailId;
+      const tryOpen = () => {
+        if (detailNode){ if (detailNode !== id) pendingDetailId = null; return; }
+        const hit = [...document.querySelectorAll('.tnode')].find(el => el.dataset.nid === id);
+        if (!hit) return;
+        openDetail(id);
+        if (detailNode === id) pendingDetailId = null;
+      };
+      requestAnimationFrame(tryOpen);
+      setTimeout(tryOpen, 80);     // headless/后台 rAF 可能不推进，留定时兜底
+    }
   }
 }
 
@@ -5351,6 +5380,7 @@ function detailMarkup(p, n){
 }
 
 let detailNode = null;
+let pendingDetailId = null;   // 详情因筛选/搜索隐藏而无法重挂时记住它，节点重新可见时恢复
 let detailAnchorEl = null;          // 详情锚点：关闭时把焦点还回去
 let detailOpenedByKeyboard = false; // 当前详情是否由键盘打开
 let detailViaKeyboard = false;      // 本次 openDetail 是否来自键盘（一次性）
@@ -5860,7 +5890,7 @@ async function abandonRecord(p0, n0){
   if (!p0 || !p0.file || !n0) return toast('节点已不在当前卡片里，刷新面板后重试');
   if (!API_BASE) return toast('未连接服务，无法放弃');
   askConfirm('放弃这条记录',
-    `<div class="mnote">放弃会关闭这条记录并写失败原因；能力闭环要收口还得你点「完成」（失败必须人工处理）。</div>
+    `<div class="mnote">放弃会关闭这条记录并写失败原因；能力闭环还要你点「完成」才能关闭（失败必须人工处理）。</div>
      <div class="detail-row"><dt>原因</dt><dd><input class="dfield" id="ab-reason" style="width:100%" placeholder="例如：会话已失效，不打算再跑"></dd></div>`,
     '放弃', async () => {
       const reason = (($('#ab-reason') || {}).value || '').trim();
@@ -7665,7 +7695,9 @@ function toast(msg, tone, action){
 // 切视图就停掉正在跑的动作轮询（不打断会话本身，回来点刷新照样能看到结果）
 $('#tab-matrix').addEventListener('click', ()=>{ stopActionPolls(); state.view='matrix'; render(); });
 $('#tab-focus').addEventListener('click', ()=>{ stopActionPolls(); state.view='focus'; render(); });
-$('#next-jump').addEventListener('click', jumpToNextTarget);   // 页脚「空闲分支 →」：滚到那条分支
+$('#next-jump').addEventListener('click', jumpToNextTarget);
+const kpiBlocked = $('#kpi-blocked');
+if (kpiBlocked) kpiBlocked.addEventListener('click', () => { const chip = document.querySelector('.chip[data-filter="blocked"]'); if (chip) chip.click(); });   // 页脚「空闲分支 →」：滚到那条分支
 const freshJump = $('#fresh-jump');
 if (freshJump) freshJump.addEventListener('click', jumpToNextUpdated);   // 页脚「已更新 N →」：跳到下一个有新内容的节点
 window.addEventListener('pagehide', stopActionPolls);
