@@ -1182,8 +1182,23 @@
   .footer .next .pill{height:22px;border-radius:var(--radius-sm);font-size:var(--fs-11)}
   .footer > span:last-child{display:none}
 
+  /* 可点区域 ≥24×24：只扩盒子 + 负 margin 抵消，视觉占位不变（WCAG 2.5.8） */
+  .tnode-open{min-height:24px;margin:-3px 0;padding:3px 0}
+  .lane-menu{min-width:24px;min-height:24px;margin:-1px}
+  .foldchip{min-height:24px;margin-top:-1px;margin-bottom:-1px}
+  .fbtn{min-height:24px;margin-top:-3px;margin-bottom:-3px}
+  .tbtn{min-height:24px}
+  .pbtn{min-height:25px}
+  #save-state{min-height:24px}
+  details > summary{min-height:24px}
+  #next-jump{min-height:24px;margin-top:-1px;margin-bottom:-1px}
+  /* 命中环（琥珀 outline）与锚点环（品牌 box-shadow）同边时错开，别叠成一条双色边 */
+  .tnode.is-active[data-hit="1"]{outline-offset:-3px}
+  html[data-theme-switching] *,html[data-theme-switching] *::before,html[data-theme-switching] *::after{transition:none !important}
+  .linkbtn{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+
   /* ── detail sheet ── */
-  .detail-card{width:404px;max-height:calc(100vh - 32px);padding:16px 17px 14px;border-radius:var(--radius-lg);
+  .detail-card{width:min(404px, calc(100vw - 24px));max-height:calc(100vh - 32px);padding:16px 17px 14px;border-radius:var(--radius-lg);
     border:1px solid var(--b2);background:var(--l2);box-shadow:var(--shadow-float)}
   .detail-head{gap:8px;margin-bottom:8px}
   .detail-head .kind{font-size:var(--fs-11);letter-spacing:.02em;text-transform:none;font-weight:500}
@@ -1349,7 +1364,7 @@
     <div class="grow"></div>
     <div id="focus-switch" class="chipbar" hidden></div>
     <span class="hint" id="toolbar-hint" hidden></span>
-    <span class="hint" id="save-state"></span>
+    <button type="button" class="hint linkbtn" id="save-state"></button>
     <span class="hint" id="data-src"></span>
     <button class="chip chip-danger" id="last-error" hidden title="最近一次失败；点开看完整原因">⚠ 最近一次失败</button>
     <button class="chip chip-primary" id="add-project">+ 项目</button>
@@ -1402,7 +1417,7 @@
       <span class="next-arrow" aria-hidden="true">→</span>
     </button>
     <div class="grow"></div>
-    <span>父子关系用连线表示 · 关闭自下而上传播 · 全部关闭后里程碑达成</span>
+    <span>执行记录全闭环自动收口 · 能力闭环 / 里程碑需人确认 · 全部关闭后点「确认达成」</span>
   </footer>
 </div>
 <div class="detail" id="detail" hidden>
@@ -3589,6 +3604,9 @@ function focusCurrentLoop(){
 
 function render(){
   const keepDetail = detailNode;   // 重渲染后把详情卡重新挂回原节点（窗口 resize / 切主题都会走这里）
+  const keepDetailScroll = keepDetail ? ((document.querySelector('#detail .detail-card') || {}).scrollTop || 0) : 0;
+  const keepDetailFocus = keepDetail && document.querySelector('#detail') && document.querySelector('#detail').contains(document.activeElement)
+    ? (document.activeElement.id || '') : '';
   closeDetail();
   recomputeIdle();                 // 先算空闲分支，nodeMarkup / laneMarkup 才有 data-idle 可写
   document.documentElement.dataset.theme = state.theme;
@@ -3627,8 +3645,19 @@ function render(){
   paintUpdatedMarkers();           // 会话完成后打的「新」角标，重绘后要贴回去
   paintAskTray();                  // 项目/节点标题变了，托盘里的行跟着更新
   if (keepDetail && findProjectByNode(keepDetail)){
-    requestAnimationFrame(() => openDetail(keepDetail));
-    setTimeout(() => { if (!detailNode) openDetail(keepDetail); }, 60);
+    const restore = () => {
+      if (!detailNode) return;
+      const card = document.querySelector('#detail .detail-card');
+      if (card && keepDetailScroll) card.scrollTop = keepDetailScroll;
+      if (card && keepDetailFocus){
+        const el = card.querySelector('#' + keepDetailFocus.replace(/[^\w-]/g, ''));
+        if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
+      }
+      clampDetailCard();
+    };
+    requestAnimationFrame(() => { openDetail(keepDetail); requestAnimationFrame(restore); });
+    setTimeout(() => { if (!detailNode) openDetail(keepDetail); restore(); }, 60);
+    setTimeout(restore, 260);
   }
 }
 
@@ -3807,6 +3836,8 @@ function findProjectByNode(id){
   return null;
 }
 let pendingClose = null;
+let modalReturnFocus = null;
+let lastCloseUndo = null;   // 最近一次关闭，供 6s 撤销 / Cmd+Z
 function closeNode(id){ openConfirm(id); }
 /** 关闭后让「已闭环 N」chip 闪一下，告诉用户东西去哪了（reduced-motion 下无动画） */
 let foldPulseTimer = null;
@@ -3836,18 +3867,20 @@ function doClose(id){
   }
   // 只补能力闭环（执行记录全闭环自动收口）；里程碑不再级联，由人确认达成
   autoCloseTree(p.root);
+  lastCloseUndo = { id, title: n.title };
+  const undoAction = { label: '撤销', onClick: () => { lastCloseUndo = null; reopenNode(id); } };
   if (n.kind === 'milestone'){
     p.root.convergedAt = now.slice(0, 16).replace('T', ' ');
     pushClosedMilestone(p, n, now);          // 收进项目里程碑历史
-    toast(`「${n.title}」已达成 · 项目留在泳道，可从 ⋯ 查看里程碑历史或开新里程碑`);
+    toast(`「${n.title}」已达成 · 项目留在泳道，可从 ⋯ 查看里程碑历史或开新里程碑`, null, undoAction);
   } else if (n.kind === 'capability'){
     toast(state.hideClosed
       ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
-      : `「${n.title}」已完成 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`);
+      : `「${n.title}」已完成 · 已折叠进里程碑卡片的「已闭环 N」，点它可展开`, null, undoAction);
   } else {
     toast(state.hideClosed
       ? `「${n.title}」已完成 · 已按「隐藏已闭环」收进卡片 chips（关掉开关可重新看到）`
-      : `「${n.title}」已完成 · 已折叠进能力闭环的「已闭环 N」`);
+      : `「${n.title}」已完成 · 已折叠进能力闭环的「已闭环 N」`, null, undoAction);
   }
   render();
   pulseFoldChip(parent && parent.id);
@@ -4702,6 +4735,7 @@ function repaintPromptSection(p, n){
   const next = holder.firstElementChild;
   if (next) old.replaceWith(next);
   restorePgen(p, n);
+  requestAnimationFrame(clampDetailCard);
 }
 
 /** 某条模板的当前文本：手改过就用手改的，否则用 host 合成的 */
@@ -4759,7 +4793,7 @@ function promptSectionMarkup(p, n){
   const cache = promptCache.get(pkeyOf(p.file, n.id));
   const head = `<div class="detail-k">Prompt 模板<span class="psrc">${esc(cache ? (cache.from || '') : '载入中')}</span></div>`;
   if (!cache) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote">载入中…</div></div>`;
-  if (cache.error) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote" style="color:var(--amber)">${esc(cache.error)}</div></div>`;
+  if (cache.error) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote" style="color:var(--amber)">${esc(cache.error)}</div><button class="tbtn" data-prompt-retry="1">重试</button></div>`;
   if (!cache.list.length) return `<div class="detail-sec" id="prompt-sec">${head}<div class="mnote">这个节点没有可用的 prompt 模板</div></div>`;
   const rows = cache.list.map(t => `<div class="prow" data-task="${esc(t.id)}">
       <button class="ptitle" data-preview-prompt="${esc(t.id)}" data-nid="${n.id}" data-proj="${p.id}" title="展开看结构 / 改原文">
@@ -4835,7 +4869,7 @@ function sessionMarkup(p, n, opts){
       ${tail ? `<div class="detail-row"><dt>最后</dt><dd>${esc(tail.brief || tail.type || '—')}</dd></div>` : ''}
       ${(r.error && !compact) ? `<div class="detail-row"><dt>问题</dt><dd style="color:var(--red)">${esc(r.error)}</dd></div>` : ''}
       ${(r.result || (cardSess && cardSess.result)) ? `<div class="detail-row"><dt>输出</dt><dd class="mnote" style="margin:0">模型已返回内容（${(r.result || cardSess.result).length} 字），点卡片下缘「查看会话」到 DSH 看完整过程</dd></div>` : ''}`
-      : `<div class="detail-row"><dt>说明</dt><dd>${sessId ? (planSess ? '计划已用这个会话产出；点「执行计划」会在同一会话里按计划跑' : '这个节点有历史会话记录，点卡片下缘「查看会话」到 DSH 打开') : '还没有跑过会话；在下面每条 prompt 后面点「发起」即可'}</dd></div>`}
+      : `<div class="detail-row"><dt>说明</dt><dd>${sessId ? (planSess ? '计划已用这个会话产出；点「执行计划」会在同一会话里按计划跑' : '这个节点有历史会话记录，点卡片下缘「查看会话」到 DSH 打开') : ((promptCache.get(pkeyOf(p.file, n.id)) || {}).error ? 'Prompt 模板载入失败：点下方「重试」重新生成' : '还没有跑过会话；在下面每条 prompt 后面点「发起」即可')}</dd></div>`}
     <div class="detail-acts" style="margin-top:8px">${btn}
       ${p.file ? `<button class="tbtn" data-sess-list="1">最近会话</button>` : ''}
       ${r && r.result && n.kind === 'exec' && !isRecord(n) ? `<button class="tbtn" data-run-write="1">写进证据</button>` : ''}
@@ -5346,6 +5380,21 @@ function restorePgen(p, n){
   if (editBtn) editBtn.textContent = pgenOpen.editing ? '收起原文' : '编辑原文';
 }
 
+function clampDetailCard(){
+  const d = $('#detail');
+  if (!d || d.hidden) return;
+  const card = d.querySelector('.detail-card');
+  if (!card) return;
+  const r = card.getBoundingClientRect();
+  if (!r.height) return;
+  let top = r.top, left = r.left;
+  if (r.bottom > innerHeight - 12) top = Math.max(12, innerHeight - r.height - 12);
+  if (top < 12) top = 12;
+  if (r.right > innerWidth - 12) left = Math.max(12, innerWidth - r.width - 12);
+  if (left < 12) left = 12;
+  card.style.top = top + 'px';
+  card.style.left = left + 'px';
+}
 function closeDetail(){
   const d = $('#detail');
   if (!d || d.hidden) return;
@@ -5420,6 +5469,7 @@ function _openDetail(id, origin){
     };
     requestAnimationFrame(showIt2);
     setTimeout(showIt2, 260);
+    setTimeout(() => { if (detailNode === id) clampDetailCard(); }, 520);
     return;
   }
   let left = ar.right + 10;
@@ -6823,13 +6873,29 @@ function openConfirm(id){
   $('#modal-body').innerHTML = rows.join('');
   $('#modal-ok').textContent = (isMilestone || isCapability) ? closeLabelOf(n) : '确认关闭';
   const m = $('#modal');
+  if (!modalReturnFocus || m.hidden) modalReturnFocus = document.activeElement;
   showModal(m);
-  $('#modal-ok').focus();
+  $('#modal-cancel').focus();
 }
 function closeConfirm(){
+  const back = modalReturnFocus;
+  modalReturnFocus = null;
   hideModal($('#modal'));
   pendingClose = null;
+  if (back && back.isConnected && typeof back.focus === 'function') back.focus({ preventScroll: true });
 }
+// 弹窗内锁焦点：Tab / Shift+Tab 不逃到背景
+function trapModalTab(e){
+  if (e.key !== 'Tab') return;
+  const m = e.currentTarget;
+  const f = [...m.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && !el.hidden && el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+}
+['#modal', '#ask', '#launch', '#history'].forEach(sel => { const el = $(sel); if (el) el.addEventListener('keydown', trapModalTab); });
 $('#ask-x').addEventListener('click', () => hideModal($('#ask')));
 $('#ask-cancel').addEventListener('click', () => hideModal($('#ask')));
 $('#ask-ok').addEventListener('click', () => { const cb = askCb; hideModal($('#ask')); if (cb) cb(); });
@@ -6861,6 +6927,17 @@ $('#projinfo-x').addEventListener('click', closeProjInfo);
 $('#projinfo-close').addEventListener('click', closeProjInfo);
 $('#projinfo').addEventListener('click', (e) => { if (e.target.id === 'projinfo') closeProjInfo(); });
 document.addEventListener('keydown', (e) => {
+  // Cmd/Ctrl+Z：撤销最近一次关闭（输入框内不抢键）
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z') {
+    const typing = e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]');
+    if (lastCloseUndo && !typing) {
+      e.preventDefault();
+      const id = lastCloseUndo.id;
+      lastCloseUndo = null;
+      reopenNode(id);
+    }
+    return;
+  }
   if (e.key !== 'Escape') return;
   if (!$('#imgview').hidden) { closeImgView(); return; }
   if (!$('#prjmenu').hidden) { closeProjMenu(); return; }
@@ -6882,6 +6959,7 @@ function markSave(msg, kind){
   const el = $('#save-state');
   if (!el) return;
   el.textContent = msg;
+  el.title = String(msg || '');
   el.dataset.state = kind || '';
 }
 /* ─────────── 待处理交互托盘 ───────────
@@ -7591,7 +7669,14 @@ $('#next-jump').addEventListener('click', jumpToNextTarget);   // 页脚「空�
 const freshJump = $('#fresh-jump');
 if (freshJump) freshJump.addEventListener('click', jumpToNextUpdated);   // 页脚「已更新 N →」：跳到下一个有新内容的节点
 window.addEventListener('pagehide', stopActionPolls);
-$('#btn-theme').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; render(); });
+$('#btn-theme').addEventListener('click', ()=>{
+  document.documentElement.dataset.themeSwitching = '1';
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  render();
+  const clearSwitching = () => { delete document.documentElement.dataset.themeSwitching; };
+  requestAnimationFrame(() => requestAnimationFrame(clearSwitching));
+  setTimeout(clearSwitching, 260);   // headless/后台标签页 rAF 可能不推进，留一道定时兜底
+});
 // 失败提示的两条出口：点 toast 收掉；顶栏「最近一次失败」留到你点开为止
 $('#toast').addEventListener('click', ()=>{
   if ($('#toast').dataset.tone !== 'error') return;
@@ -8221,6 +8306,17 @@ document.addEventListener('click', (e)=>{
   }
   const jump = e.target.closest('[data-jump]');
   if (jump){ openDetail(jump.dataset.jump); return; }
+  const retryPrompt = e.target.closest('[data-prompt-retry]');
+  if (retryPrompt && detailNode){
+    const p0 = findProjectByNode(detailNode);
+    const n0 = p0 && findNode(p0.root, detailNode);
+    if (p0 && n0){
+      promptCache.delete(pkeyOf(p0.file, n0.id));
+      repaintPromptSection(p0, n0);
+      ensurePromptList(p0, n0).catch(() => {});
+    }
+    return;
+  }
   const copyBtn = e.target.closest('[data-copy]');
   if (copyBtn){
     const p0 = findProjectByNode(copyBtn.dataset.copy);
