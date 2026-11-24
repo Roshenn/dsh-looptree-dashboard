@@ -316,9 +316,9 @@
         "inventory.json"
       ],
       "recheck": {
-        "round": "2026-11-24 R9 修复轮",
+        "round": "2026-11-24 R10 修复轮",
         "result": "open",
-        "evidence": "概览「下一步」改按钮，点击打开对应节点详情（实测 detailVisible=true，标题为推荐节点）；页脚 #next-jump 已 ≥24；仍开：顶部「拉起全部服务」仍在 ⋯ 菜单里"
+        "evidence": "下一步可点、页脚 ≥24 已修；剩余「服务入口位置」属改进方向设计，parked 等 sign-off"
       }
     },
     {
@@ -335,15 +335,15 @@
       "fact": "能力闭环/收口/在途/收敛健康度/候选池等术语首屏无可见定义；「聚焦」在顶栏与泳道行同名。",
       "harm": "新用户把 30 秒花在猜词上，且不敢点「聚焦」怕切走视图。",
       "fix": "术语换白话动作名（要做的能力 / 已做完 / 现在做）；不删解释文本；「聚焦」改一个名。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "shots/desktop-list.png",
         "inventory.json"
       ],
       "recheck": {
-        "round": "2026-11-24 R9 修复轮",
-        "result": "open",
-        "evidence": "阶段头加 title 定义（里程碑/能力闭环/执行记录）；「聚焦」重名改为「单看」；仍开：定义只在 hover title，首屏无可见图例"
+        "round": "2026-11-24 R10 修复轮",
+        "result": "resolved",
+        "evidence": "工具栏新增可见「术语」按钮，点开 9 行术语说明（里程碑/能力闭环/执行记录/待确认/已闭环/在途/收敛健康度/候选池/收口）；阶段头 title 定义；「聚焦」重名改「单看」"
       }
     },
     {
@@ -366,9 +366,9 @@
         "inventory.json"
       ],
       "recheck": {
-        "round": "2026-11-24 R9 修复轮",
+        "round": "2026-11-24 R10 修复轮",
         "result": "open",
-        "evidence": "RUN_LABEL.done 完成→已结束（状态与动作词分开）；可见「收口」改「关闭」；仍开：琥珀同时用于 review 状态与主操作按钮（配色语言，属设计变更）"
+        "evidence": "状态/动作词已分开（已结束/完成、收口→关闭）；剩余琥珀双用（review 状态 vs 主操作按钮）属配色语言，parked 等 sign-off"
       }
     },
     {
@@ -385,11 +385,16 @@
       "fact": "Tab 顺序按 DOM 树序（执行卡→能力闭环→执行卡→里程碑），与视觉列序相反。",
       "harm": "焦点先跳最右列再回中间，跨卡扫描无法建立预期。",
       "fix": "按视觉列序调整渲染顺序或按列做 roving tabindex。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "snapshot/a11y.json",
         "shots/desktop-list.png"
-      ]
+      ],
+      "recheck": {
+        "round": "2026-11-24 R10 修复轮",
+        "result": "resolved",
+        "evidence": "强制 layoutCanvas 后实测 canvas 内 DOM 顺序按 (x,y)：ck-loop@11,122 → ck-i1@318,16 → ck-i2@318,232 → ck-e1@624,43 → ck-e2@624,259；仅顺序不同才重排，避免 resize 搬动焦点元素"
+      }
     },
     {
       "id": "ui-20261124-016",
