@@ -169,13 +169,13 @@ out.smallTargets = q('a,button,[role="button"],input,select,summary').filter(vis
   const r = el.getBoundingClientRect();
   return r.width < 24 || r.height < 24
     ? { el: el.tagName.toLowerCase(), text: (el.innerText || el.value || '').trim().slice(0, 24),
-        w: Math.round(r.width), h: Math.round(r.height), path: path(el) } : null; }).filter(Boolean).slice(0, 40);
+        w: Math.round(r.width), h: Math.round(r.height), path: path(el) } : null; }).filter(Boolean);
 out.lowContrast = q('body *').filter(el => !el.childElementCount && (el.textContent || '').trim() && vis(el)).map(el => {
   const cs = getComputedStyle(el), size = parseFloat(cs.fontSize), weight = +cs.fontWeight || 400;
   const need = size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
   const r = contrast(cs.color, bgOf(el));
   return (r !== null && r < need) ? { text: el.textContent.trim().slice(0, 24), ratio: r, need, path: path(el) } : null;
-}).filter(Boolean).slice(0, 40);
+}).filter(Boolean);
 out.animations = document.getAnimations().map(a => { const t = (a.effect && a.effect.getComputedTiming) ? a.effect.getComputedTiming() : {};
   return { name: a.animationName || a.transitionProperty || a.constructor.name,
            duration: Math.round(t.duration || 0), easing: t.easing, iterations: t.iterations };
@@ -187,7 +187,7 @@ out.inventory = q('body *').filter(vis).map(el => {
   if (!text && !interactive) return null;
   return { path: path(el), tag: el.tagName.toLowerCase(), text,
            w: Math.round(r.width), h: Math.round(r.height) };
-}).filter(Boolean).slice(0, 260);
+}).filter(Boolean);
 window.__gate = { frames: [] };
 const t0 = performance.now();
 const tick = now => { window.__gate.frames.push(now);
@@ -332,8 +332,9 @@ async function main() {
             animationsAtRest: (m.animations || []).length,
             inventory: (m.inventory || []).length
           },
-          lowContrast: (m.lowContrast || []).slice(0, 10),
-          smallTargets: (m.smallTargets || []).slice(0, 20)
+          lowContrast: m.lowContrast || [],
+          smallTargets: m.smallTargets || [],
+          smallTargetTotal: (m.smallTargets || []).length
         }
         await writeFile(join(bundle, 'metrics-summary.json'), JSON.stringify(summary, null, 1) + '\n', 'utf8')
       } catch (e) { fail('derive metrics', e.message) }
