@@ -260,6 +260,16 @@ async function main() {
     ab(['network', 'unroute'])
     ab(['open', url])
     ab(['wait', '--load', 'networkidle'], { timeout: 30000 })
+    // 页面没挂上就重载一次（session 复用时偶发空页）
+    const ready = ab(['eval', '--stdin'], {
+      input: 'JSON.stringify({ url: location.href, stage: !!document.querySelector("#stage"), cards: document.querySelectorAll(".tnode").length })',
+      timeout: 30000
+    })
+    if (!ready || !/"cards":[1-9]/.test(ready)) {
+      notes.push('首屏未挂载，重载一次：' + String(ready).slice(0, 120))
+      ab(['reload'])
+      ab(['wait', '--load', 'networkidle'], { timeout: 30000 })
+    }
 
     // 1) 三视口
     for (const [w, h, name] of [[1440, 900, 'desktop-list'], [390, 844, 'mobile-list'], [320, 800, 'narrow-list']]) {
@@ -359,6 +369,36 @@ async function main() {
     ab(['set', 'viewport', '1440', '900'])
     ab(['wait', '300'])
 
+    // 6.6) 200% 页面缩放的布局等效（WCAG 1.4.4 / 1.4.10）
+    // 1440×900 窗口放大 200% → 720×450 CSS px；CLI 无法设置 Chrome 的 Page Zoom 值，
+    // 所以用「布局视口 720 + DPR 2」复现缩放的排版后果，并在报告里如实标注为等效证。
+    ab(['set', 'viewport', '720', '450', '2'])
+    ab(['wait', '600'])
+    ab(['screenshot', join(dirs.shots, 'zoom200-list.png')])
+    const zoom200 = ab(['eval', '--stdin'], {
+      input: `(() => {
+const q = s => [...document.querySelectorAll(s)];
+const vis = el => { const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+  return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden'; };
+const off = q('body *').filter(vis).filter(el => { const r = el.getBoundingClientRect();
+  return r.right > innerWidth + 1 || r.left < -1; }).length;
+const small = q('a,button,[role="button"],input,select,summary').filter(vis).filter(el => {
+  const r = el.getBoundingClientRect(); return r.width < 24 || r.height < 24; }).length;
+const overlapText = q('header *').filter(vis).filter(el => el.childElementCount === 0 && (el.textContent || '').trim()).filter(el => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && (r.right > innerWidth + 1 || r.left < -1);
+}).length;
+return JSON.stringify({ innerWidth, innerHeight, dpr: devicePixelRatio,
+  scrollWidth: document.documentElement.scrollWidth,
+  overflow: document.documentElement.scrollWidth > innerWidth + 1,
+  offscreen: off, smallTargets: small, headerTextOffscreen: overlapText });
+})()`,
+      timeout: 30000
+    })
+    if (zoom200) await writeFile(join(bundle, 'zoom200.json'), normalizeEval(zoom200), 'utf8')
+    ab(['set', 'viewport', '1440', '900'])
+    ab(['wait', '300'])
+
     // 7) 动效录制（每段 ≥3.5s，保证 fps=3 能拼 3x3）
     const motion = [
       ['open-detail', [['click', '.tnode'], ['wait', '1200'], ['click', '#detail-x'], ['wait', '1500']]],
@@ -366,12 +406,38 @@ async function main() {
       ['theme-toggle', [['click', '#btn-theme'], ['wait', '1800'], ['click', '#btn-theme'], ['wait', '1800']]]
     ]
     for (const [name, actions] of motion) {
+      // 每段录制前重载一次：前一段的弹窗/焦点残留会让下一段找不到元素（本机实测）
+      ab(['open', url])
+      ab(['wait', '--load', 'networkidle'], { timeout: 30000 })
+      ab(['wait', '300'])
       const started = ab(['record', 'start', join(dirs.motion, name + '.webm')])
       if (started === null) { fail('record ' + name, 'record start 失败'); continue }
       for (const a of actions) ab(a)
       ab(['record', 'stop'])
       await sleep(200)
     }
+
+
+    // 7.5) toast 与关闭确认（全部只读：复制 JSON 只写剪贴板；确认弹窗打开后取消，不写盘）
+    ab(['open', url])
+    ab(['wait', '--load', 'networkidle'], { timeout: 30000 })
+    ab(['set', 'viewport', '1440', '900'])
+    ab(['wait', '300'])
+    ab(['click', '.tnode[data-kind="exec"] .tnode-open'])
+    ab(['wait', '500'])
+    ab(['record', 'start', join(dirs.motion, 'copy-toast.webm')])
+    ab(['click', '[data-copy]'])
+    ab(['wait', '900'])
+    ab(['screenshot', join(dirs.state, 'toast.png')])
+    ab(['wait', '900'])
+    ab(['record', 'stop'])
+    ab(['click', '[data-close]'])
+    ab(['wait', '600'])
+    ab(['screenshot', join(dirs.state, 'confirm-modal.png')])
+    ab(['click', '#modal-cancel'])
+    ab(['wait', '400'])
+    ab(['click', '#detail-x'])
+    ab(['wait', '300'])
 
     // 8) 错误态（最后做：route 会一直生效）
     ab(['network', 'route', '**/api/**', '--abort'])
