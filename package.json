@@ -84,6 +84,7 @@
     "mock:context": "node scripts/context-mock.mjs",
     "mock:focus-current": "node scripts/focus-current-mock.mjs",
     "lint:plugin": "node scripts/lint-plugin.mjs",
+    "evidence:ui": "node scripts/ui-evidence.mjs",
     "preflight": "node scripts/preflight.mjs",
     "verify:package": "node scripts/verify-package.mjs",
     "migrate:capabilities": "node scripts/migrate-capabilities.mjs",
