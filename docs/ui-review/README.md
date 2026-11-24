@@ -49,3 +49,15 @@ docs/ui-review/<YYYY-MM-DD>-panel/
 - 取证 1–2 分钟（一次性）。
 - 六席盲评 5–10 分钟；合成 10 分钟；复检 10 分钟。
 - 单轮 token 以实际记录为准：每席 brief ≤1200 字 + ≤4 张图；超限就裁剪，不加图。
+
+## 6. 320px 真视口与 200% 缩放（R7 起）
+
+```bash
+npm run evidence:ui -- --slug panel      # 已包含这两组
+```
+
+- `shots/narrow-list.png` + `narrow.json`：真 320×800 视口，判 WCAG 1.4.10 reflow。
+- `shots/zoom200-list.png` + `zoom200.json`：**200% 页面缩放的布局等效**——1440×900 窗口放大 200% ⇒ 720×450 CSS px @ DPR2，判 1.4.4。CLI 设置不了 Chrome 的 Page Zoom 值，报告里必须写「等效」，不能声称做了真缩放。
+- 验收别只看 `overflow`：这次 `headerTextOffscreen=0` 但 KPI 已竖排、标题被纵向裁切。补断言：每个 KPI 文本高 ≤20、品牌标题 `top ≥ 0`、`scrollWidth ≤ innerWidth`。
+- 统计字段禁止截断：`smallTargets`/`inventory` 曾按 40/260 截断，把真实 57 个小目标报成 40；现在是全量 + `smallTargetTotal`。
+- 采集失败如实记 `MANIFEST.failures`：本轮 toast 截图未产出、`motion/anims.json` 缺失，因此动效结论一律不作判。
