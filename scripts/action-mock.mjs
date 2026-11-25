@@ -100,6 +100,8 @@ async function runGoalRounds(sessionId) {
 
 const ctx = {
   logger: console,
+  /** 真宿主上由 connection 服务做 Host/Origin 校验 + 浏览器会话；假宿主一律视为已授权 */
+  connection: { requestRejection: () => undefined },
   webServer: { register(options) { routes.push(options); return () => routes.splice(routes.indexOf(options), 1); } },
   effect(fn) { return fn(); },
   /** 真实宿主上 sessionController / agentPresets 都挂在 ctx 上；runner 走 ctx.get 取 preset */

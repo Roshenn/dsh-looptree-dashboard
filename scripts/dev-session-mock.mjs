@@ -20,6 +20,8 @@ const routes = [];
 
 const ctx = {
   logger: console,
+  /** 真宿主上由 connection 服务做 Host/Origin 校验 + 浏览器会话；假宿主一律视为已授权 */
+  connection: { requestRejection: () => undefined },
   webServer: {
     register(options) { routes.push(options); return () => routes.splice(routes.indexOf(options), 1); },
   },

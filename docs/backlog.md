@@ -110,7 +110,7 @@
 | 6 | `web/index.html` 信息列「会话 ↗」与聚焦视图会话行 | 只弹「原型未接宿主」，而可用的 `data-open-session` 就在旁边 | ✅ 接上真实 `/api/sessions` 列表；点一条切回该会话（独立打开时退化为看全文） |
 | 7 | 全局搜索 | 只有 all / blocked / open 三颗预设筛选，节点多了只能翻或靠页脚随机跳 | ✅ 顶栏搜索框（Ctrl/⌘+K 聚焦、Esc 清空）：按标题 / id / 证据 / 指标 / 实现思路 / 阻塞反馈过滤泳道，命中节点描边，提示条给命中数 |
 | 8 | `docs/prompt-audit.md` §5 | 已写出二期方案，标「本阶段不执行」 | ✅ 补 `失败处理` 块并真的写进「生成计划」；三方标签一致性改成**断言**（lib / docs / 面板 `PROMPT_BLOCKS` 直接比对）；退役的 `场景` / `验收` 从允许标签里清掉 |
-| 9 | `lib/index.js` CORS 与鉴权 | `access-control-allow-origin: *`，声明了 `x-rotation-token` 但全仓没读它——本机任意网页能跨源调 `stop-all` / `probe` / `run` | ✅ 写接口要令牌：每进程随机生成、只注入插件托管的面板 HTML；http(s) 跨源写无令牌 → 403。非浏览器客户端与 `dsh-app://` 放行，`ROTATION_TOKEN` 可固定。新增 `npm run mock:auth`（10 项）进 preflight |
+| 9 | `lib/index.js` CORS 与鉴权 | `access-control-allow-origin: *`，声明了 `x-rotation-token` 但全仓没读它——本机任意网页能跨源调 `stop-all` / `probe` / `run` | ✅ 写接口要令牌：每进程随机生成、只注入插件托管的面板 HTML；http(s) 跨源写无令牌 → 403。非浏览器客户端与 `dsh-app://` 放行，`ROTATION_TOKEN` 可固定。**2026-11-25 补第一层**：`/rotation/api/*` 先过宿主 `connection.requestRejection`（Host/Origin + 浏览器会话 cookie），无栅栏 503；令牌成为第一方非浏览器调用者的通行证。拒绝响应不带 CORS 头。新增 `npm run mock:auth` 严格栅栏一组断言（19 项）进 preflight |
 | 10 | `web/index.html` 长按删除 | `[data-del]` 绑 pointerdown 长按 800ms 且 `preventDefault`，无键盘路径、无撤销 | ✅ 补 Enter/Space 与 Delete/Backspace 两条键盘路径 + 删完可撤销；长按只对树节点生效，字段编辑器的 × 不再被一个删不掉的长按抢事件 |
 
 **顺带修掉的 pre-existing 问题**（不在本清单里，但挡着 preflight 绿）：

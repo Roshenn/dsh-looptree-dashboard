@@ -298,14 +298,21 @@ Precedence is node → card → built-in, and the detail card labels the source.
 Nothing leaves the machine except the model calls that DSH already routes.
 
 - The panel is served by DSH's own web server and answers on the loopback interface only.
-- **Writes need a token, reads do not.** A `POST` / `PUT` / `DELETE` coming from a browser with an
-  http(s) origin must carry `x-rotation-token`. The token is generated per process and injected only
-  into the panel HTML that this plugin serves, so the same-origin policy keeps any other local page
-  from reading it — a cross-origin page can no longer call `stop-all` (which kills listeners by port),
-  `probe`, or `run`. Non-browser clients (CLI / scripts, no `Origin`) and the `dsh-app://` shell are
-  allowed through — they can spawn shells directly anyway; set `ROTATION_TOKEN` to pin the token for
-  scripts. Reads stay open: **any local page can still read card contents** while DSH is running, so
-  do not bind DSH to a public interface. `npm run mock:auth` is the regression test for this rule.
+- **Every API request passes DSH's own access fence first.** `/rotation/api/*` calls
+  `ctx.connection.requestRejection`, the host's Host/Origin check plus its browser-session cookie:
+  a foreign Host (DNS rebinding) or a foreign Origin (a cross-site page) is refused, and so is any
+  caller without the running app's browser session. A host that offers no `connection` service gets
+  `503` rather than an open API. Refusals carry no CORS headers, so a hostile page cannot even read
+  why it was refused. `lib/index.js` keeps the `connection` service in its `inject` list for exactly
+  this reason.
+- **Writes also need a token.** A `POST` / `PUT` / `DELETE` coming from a browser with an http(s)
+  origin must carry `x-rotation-token`. The token is generated per process and injected only into the
+  panel HTML that this plugin serves, so the same-origin policy keeps any other local page from
+  reading it — a cross-origin page can no longer call `stop-all` (which kills listeners by port),
+  `probe`, or `run`. The token is also the escape hatch past the fence for first-party callers that
+  can hold no browser cookie: non-browser clients (CLI / scripts, no `Origin`) and the `dsh-app://`
+  shell present it instead; set `ROTATION_TOKEN` to pin it for scripts. `npm run mock:auth` is the
+  regression test for both layers, including a strict-fence run.
 - **Start service executes a shell command taken from the card file.** Treat a `rotation.json` you did
   not write as executable code: the panel always shows platform, command and `cwd` before spawning,
   and the process runs in its own group so it can be stopped.

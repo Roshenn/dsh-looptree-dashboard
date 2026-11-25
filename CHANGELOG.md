@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 未发布 — `/rotation/api/*` 过 DSH 自己的访问闸门：跨源页面读不到、也调不动
+
+- **触发**（2026-11-25，fksylsy 在 awesome-dsh-plugin 收录 PR 上的评审意见，同一条也适用于本插件）：
+  插件的 HTTP 路由没有走 DSH 的访问校验（`ctx.connection.requestRejection`），
+  浏览器里任何一个开着的网页都能调它们。原来的口径是「读接口不设防、写接口要令牌」，
+  而 `access-control-allow-origin: *` 让**读**变成真正可被跨源页面拿走的数据（项目路径、卡片正文、服务配置）。
+- **口径**（本轮拍板）：两层，先栅栏后令牌。
+  - 第一层：`/rotation/api/*` 先过宿主 `connection.requestRejection`——Host 校验挡 DNS rebinding，
+    Origin 校验挡跨源页面，浏览器会话 cookie 挡「本机随便一个页面」。没有 `connection` 服务就 503，
+    不裸奔。拒绝响应**不带 CORS 头**，跨源页面连原因都读不到。
+  - 第二层：原有写令牌不动（http(s) 跨源写必须带 `x-rotation-token`），
+    同时升级为「过栅栏的通行证」——CLI 与 `dsh-app://` 外壳拿不到 http 的 cookie，
+    但它们能拿到注入的令牌，所以仍走这条路，行为不变。
+  - 静态资源与面板 HTML 不设栅栏：它们不含数据，令牌靠同源策略保护（跨源读不到 body）。
+- **落点**：`lib/index.js`（`inject` 加 `connection`；新增 `tokenMatches` / `readConnection` /
+  `gateApiAccess` / `sendJsonBare`，闸门挂在 `rotationHandler` 的 api 分支上，CORS 预检仍先答）、
+  `scripts/dev-host.mjs`（假宿主的 `connection` 替身，`MOCK_FENCE=strict` 复现真实三条语义）、
+  `scripts/auth-mock.mjs`（新增严格栅栏一组断言）、`scripts/check-install.mjs`（带 `ROTATION_TOKEN`）、
+  8 个 mock 与 `verify-package.mjs` 的假 ctx 补 `connection` 替身、`README.md`、`docs/backlog.md` 五-9。
+- **边界**：只拦 `/rotation/api/*`；`/rotation/app/*` 与 `${base}/` 跳转保持公开（UI 与静态资源）。
+  预检 `OPTIONS` 仍直接回 204——预检请求带不了自定义头，拦它等于把 `dsh-app://` 外壳的跨源写一起关掉。
+- **验证**：`npm run mock:auth` 19 项全过（含 401 无会话 / 403 篡改 Origin / 403 跨站标记 /
+  令牌放行 / cookie 放行 / 预检 204）；`npm run preflight` 全绿。
+
 ## 未发布 — 闭环卡片支持图片：能力闭环挂参考图、执行记录挂证据图
 
 - **需求**（2026-11-15，用户）：闭环卡片里没法加图片，但开发闭环经常要贴产品截图、UI 修复前后对照；

@@ -55,6 +55,9 @@ check('host 声明 inject', Array.isArray(host.inject) && host.inject.includes('
 const routes = [];
 const ctx = {
   logger: { info: () => {}, warn: () => {}, error: () => {} },
+  // 真宿主由 connection 服务做访问校验（Host/Origin + 浏览器会话）；
+  // 这里只验证「装进去的那份代码能挂上路由并对请求作出响应」，所以假宿主放行。
+  connection: { requestRejection: () => undefined },
   webServer: { register(options) { routes.push(options); return () => {}; } },
   effect(fn) { return fn(); },
 };

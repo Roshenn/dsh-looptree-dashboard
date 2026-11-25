@@ -46,6 +46,30 @@ const ctx = {
       };
     },
   } : undefined,
+  /**
+   * 真宿主上由 connection 服务做 Host/Origin 校验 + 浏览器会话；假宿主默认一律放行，
+   * 因为这里的 mock 验的是路由行为，不是鉴权。
+   *
+   * `MOCK_FENCE=strict` 时换成一份按真实语义写的替身（Host 已在假宿主里固定为
+   * 127.0.0.1，所以只复现「Origin 必须同 host」「跨站标记拒绝」「没有会话 cookie
+   * 就是 401」三条），供 auth-mock 验证闸门确实接上了。
+   */
+  connection: {
+    requestRejection(req) {
+      if (process.env.MOCK_FENCE !== 'strict') return undefined;
+      const host = String(req.headers.host || '');
+      const origin = String(req.headers.origin || '');
+      if (origin) {
+        try {
+          if (new URL(origin).host !== host) return 403;
+        } catch {
+          return 403;
+        }
+      }
+      if (String(req.headers['sec-fetch-site'] || '') === 'cross-site') return 403;
+      return req.headers.cookie ? undefined : 401;
+    },
+  },
   webServer: {
     register(options) {
       routes.push(options);
