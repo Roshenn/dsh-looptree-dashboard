@@ -330,7 +330,7 @@
   .tfootline .lead{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
   /* 候选池计数槽位定宽：数字 0→6 变化不改变按钮宽度，节点卡不会因刷新而换行/长高 */
   .cand-n{display:inline-block;min-width:8px;margin-left:3px;text-align:right;font-variant-numeric:tabular-nums}
-  .tbtn.primary{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:color-mix(in srgb,var(--amber) 40%,transparent);color:var(--amber)}
+  .tbtn.primary{background:color-mix(in srgb,var(--brand) 16%,transparent);border-color:color-mix(in srgb,var(--brand) 44%,transparent);color:var(--brand-2)}
   .tbtn.primary-converge{background:color-mix(in srgb,var(--green) 18%,transparent);border-color:color-mix(in srgb,var(--green) 40%,transparent);color:var(--green)}
   .tbtn.ghost{background:transparent;border-style:dashed;color:var(--tx4)}
   .tbtn.ghost:hover{color:var(--tx2)}
@@ -1080,7 +1080,7 @@
   .tbtn{height:24px;padding:0 8px;border-radius:var(--radius-sm);border:1px solid var(--b2);background:transparent;
     color:var(--tx2);font-size:var(--fs-13)}
   .tbtn:hover{background:var(--l4);color:var(--tx1)}
-  .tbtn.primary{background:color-mix(in srgb,var(--amber) 14%,transparent);border-color:color-mix(in srgb,var(--amber) 40%,transparent);color:var(--amber)}
+  .tbtn.primary{background:color-mix(in srgb,var(--brand) 16%,transparent);border-color:color-mix(in srgb,var(--brand) 44%,transparent);color:var(--brand-2)}
   .tbtn.primary-converge{background:color-mix(in srgb,var(--green) 14%,transparent);border-color:color-mix(in srgb,var(--green) 40%,transparent);color:var(--green)}
   .tbtn.ghost{background:transparent;border-style:dashed;color:var(--tx4)}
   .foldchip{height:22px;border-radius:var(--radius-sm);border:1px dashed var(--b2);font-size:var(--fs-11);color:var(--tx4)}
@@ -1322,48 +1322,24 @@
   @media (max-width:1400px){ #data-src{display:none} }
   @media (max-width:1180px){ #save-state{display:none} }
 @media (max-width:900px){
-  /* A · 两行顶栏：信息全保留，工具栏换行 */
-  html[data-narrow="a"] .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 12px}
-  html[data-narrow="a"] .brand p{display:none}
-  html[data-narrow="a"] .grow{display:none}
-  html[data-narrow="a"] .meta-strip{order:3;width:100%;flex-wrap:wrap;gap:10px}
-  html[data-narrow="a"] .toolbar{flex-wrap:wrap;overflow:visible;height:auto}
-  html[data-narrow="a"] .chipbar{flex-wrap:wrap}
-  html[data-narrow="a"] #data-src,html[data-narrow="a"] #save-state{display:none}
-  html[data-narrow="a"] .brand{flex:1 1 140px;min-width:0}
-  html[data-narrow="a"] .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  html[data-narrow="a"] .seg{flex:0 0 auto}
-  html[data-narrow="a"] .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
-  /* B · 两行紧凑：只留数字 + 工具栏单行横滚 */
-  html[data-narrow="b"] .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 10px}
-  html[data-narrow="b"] .brand{flex:1 1 120px;min-width:0}
-  html[data-narrow="b"] .brand p{display:none}
-  html[data-narrow="b"] .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  html[data-narrow="b"] .seg{flex:0 0 auto}
-  html[data-narrow="b"] .meta-strip{order:3;width:100%;gap:12px;flex-wrap:nowrap}
-  html[data-narrow="b"] .kpi-label{display:none}
-  html[data-narrow="b"] .kpi:first-child{display:none}   /* 时间戳在窄屏让位给数字 */
-  html[data-narrow="b"] #data-src,html[data-narrow="b"] #save-state{display:none}
-  html[data-narrow="b"] .toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
-  html[data-narrow="b"] .toolbar .chipbar{flex:0 0 auto}
-  /* C · 窄屏自动切项目聚焦（单项目流），矩阵隐藏 */
-  html[data-narrow="c"] .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 12px}
-  html[data-narrow="c"] .brand p{display:none}
-  html[data-narrow="c"] .meta-strip{order:3;width:100%;gap:10px;flex-wrap:wrap}
-  html[data-narrow="c"] .toolbar{flex-wrap:wrap;overflow:visible;height:auto}
-  html[data-narrow="c"] .matrix{display:none}
-  html[data-narrow="c"] #focus-switch{flex-wrap:wrap}
-  html[data-narrow="c"] .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
-  html[data-narrow="c"] .focus-wrap{padding:8px;min-width:0 !important}
-  html[data-narrow="c"] .focus-lane{overflow:visible}
-  html[data-narrow="c"] .focus-lane .lane{display:block;min-width:0}
-  html[data-narrow="c"] .focus-lane .canvas{height:auto !important;width:100% !important;min-width:0 !important;padding:8px;display:flex;flex-direction:column;gap:8px}
-  html[data-narrow="c"] .focus-lane .canvas .edges{display:none}
-  html[data-narrow="c"] .focus-lane .tnode{position:static !important;width:auto !important;left:auto !important;top:auto !important}
-  html[data-narrow="c"] .brand{flex:1 1 140px;min-width:0}
-  html[data-narrow="c"] .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  html[data-narrow="c"] .seg{flex:0 0 auto}
-  html[data-narrow="c"] .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
+  /* 窄屏（≤900px）sign-off 方案 C：默认项目聚焦视图 + 单列堆叠，矩阵不在窄屏展示 */
+  .seg{display:none}
+  .topbar{height:auto;flex:0 0 auto;flex-wrap:wrap;row-gap:6px;padding:6px 12px}
+  .brand{flex:1 1 140px;min-width:0}
+  .brand p{display:none}
+  .brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta-strip{order:3;width:100%;gap:10px;flex-wrap:wrap}
+  .toolbar{flex-wrap:wrap;overflow:visible;height:auto}
+  .toolbar .chipbar{flex:1 1 100% !important;min-width:0 !important;flex-wrap:wrap !important}
+  #data-src,#save-state{display:none}
+  #focus-switch{flex-wrap:wrap}
+  .matrix{display:none}
+  .focus-wrap{padding:8px;min-width:0 !important}
+  .focus-lane{overflow:visible}
+  .focus-lane .lane{display:block;min-width:0}
+  .focus-lane .canvas{height:auto !important;width:100% !important;min-width:0 !important;padding:8px;display:flex;flex-direction:column;gap:8px}
+  .focus-lane .canvas .edges{display:none}
+  .focus-lane .tnode{position:static !important;width:auto !important;left:auto !important;top:auto !important}
 }
 </style>
 </head>
@@ -3074,6 +3050,7 @@ function infoMarkup(p){
       <button class="tbtn" data-act="focus" data-id="${p.id}" title="只看这个项目（切换「项目聚焦」视图）">单看</button>
       <button class="tbtn" data-act="open" data-id="${p.id}">会话 ↗</button>
       <button class="tbtn" data-act="toggle" data-id="${p.id}">${collapsed.has(p.id) ? '展开' : '收起'}</button>
+      <button class="tbtn" data-svc-jump="${p.id}" title="服务：打开 / 停止 / 复制地址；没配就点 ⋯ →「服务信息收集」">服务</button>
       <button class="tbtn" data-export="${p.id}">导出</button>
     </div>
 
@@ -3670,6 +3647,7 @@ function focusCurrentLoop(){
 }
 
 function render(){
+  if (innerWidth <= 900 && state.view === 'matrix') state.view = 'focus';
   const keepDetail = detailNode;   // 重渲染后把详情卡重新挂回原节点（窗口 resize / 切主题都会走这里）
   const keepDetailScroll = keepDetail ? ((document.querySelector('#detail .detail-card') || {}).scrollTop || 0) : 0;
   const keepDetailFocus = keepDetail && document.querySelector('#detail') && document.querySelector('#detail').contains(document.activeElement)
@@ -8406,6 +8384,20 @@ document.addEventListener('click', (e)=>{
   }
   const jump = e.target.closest('[data-jump]');
   if (jump){ openDetail(jump.dataset.jump); return; }
+  const svcJump = e.target.closest('[data-svc-jump]');
+  if (svcJump){
+    const p0 = PROJECTS.find(x => x.id === svcJump.dataset.svcJump);
+    if (p0){
+      const lane = document.querySelector(`.lane[data-project="${p0.id}"]`) || document;
+      const box = lane.querySelector('.lane-svc') || lane;
+      if (box && box.scrollIntoView) box.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const first = box && box.querySelector('[data-svc-open], .svc-acts .pbtn, .svc-url');
+      const count = (serviceMap.get(p0.file) || []).length;
+      if (first) first.focus({ preventScroll: true });
+      toast(count ? `服务：${count} 条，已定位到服务行` : '这个项目还没配服务：点 ⋯ →「服务信息收集」自动补');
+    }
+    return;
+  }
   const retryPrompt = e.target.closest('[data-prompt-retry]');
   if (retryPrompt && detailNode){
     const p0 = findProjectByNode(detailNode);
@@ -8511,9 +8503,7 @@ window.addEventListener('scroll', ()=>{ hideCandTip(); }, true);
 
 const qs = new URLSearchParams(location.search);
 if (qs.get('view')==='focus') state.view='focus';
-const narrowVariant = String(qs.get('narrow') || '').toLowerCase();
-if (['a', 'b', 'c'].includes(narrowVariant)) document.documentElement.dataset.narrow = narrowVariant;
-if (narrowVariant === 'c' && innerWidth <= 900) state.view = 'focus';
+if (innerWidth <= 900 && !qs.get('view')) state.view = 'focus';   // 窄屏默认项目聚焦（sign-off C）
 if (qs.get('theme')) state.theme = qs.get('theme');
 // 被 DSH 主区嵌入时，主题跟随宿主：宿主通过 postMessage 推送；
 // composer 的「闭环」按钮另发 rotation-focus（项目 + 是否定位当前节点）。

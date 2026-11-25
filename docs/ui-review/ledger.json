@@ -75,15 +75,15 @@
       "fact": "320px 视口 scrollWidth 621（页面级横向溢出 301px，body overflow:hidden 无滚动路径）；顶栏 4 组 KPI 被压成逐字竖列、标题被裁到只剩「碑树」；工具栏 chipbar 601px 不换行，右端「紧凑/隐藏已闭环」「主题/刷新」落在视口外。同根因在 200% 缩放等效（720×450 CSS px @DPR2，模拟 1440 窗口放大 200%）复现：KPI 仍折 2–3 行、标题首行被裁，headerTextOffscreen=0 只说明横向没出界，量不到竖排与纵向裁切。",
       "harm": "低视力用户把字放大到 200% 时顶栏读数先垮；320 窄窗下刷新/主题/紧凑/隐藏已闭环不可达，而「隐藏已闭环」正是 009 恢复路径的前置开关；页脚唯一的下一步建议条也折成 4 行断句。",
       "fix": "≤900px 一档断点同时覆盖 320 与 200%：工具栏 chipbar 允许换行或收进溢出菜单；顶栏改两行/统计收成数字优先的紧凑条；品牌标题单行 ellipsis；补齐验收断言：每项 KPI 文本高 ≤20、h1 top ≥0、documentElement.scrollWidth ≤ innerWidth。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "narrow.json",
         "shots/narrow-list.png"
       ],
       "recheck": {
-        "round": "2026-11-24 R7（320px + 200% 等效）",
-        "result": "open",
-        "evidence": "narrow.json 320/621，zoom200.json 720/450@2x，shots/narrow-list.png、shots/zoom200-list.png；六席中 6 席确认未闭环"
+        "round": "2026-11-25 sign-off 落地",
+        "result": "resolved",
+        "evidence": "sign-off 选 C：≤900px 默认项目聚焦 + 单列堆叠、矩阵隐藏、视图切换隐藏、顶栏换行、chipbar 换行；320 实测 scrollWidth=320（原 621）、720×450@2x 无溢出；final-narrow-c-320.png / final-narrow-c-720.png"
       }
     },
     {
@@ -310,15 +310,15 @@
       "fact": "概览「下一步」是文本不可点；页脚 #next-jump 仅 22px 高；服务入口藏在 ⋯ 菜单。",
       "harm": "新手 30 秒内找不到可点的「现在开始做」，误点文本两次。",
       "fix": "把「下一步」做成动作按钮；页脚建议提为主按钮；泳道服务旁给直接入口。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "shots/desktop-list.png",
         "inventory.json"
       ],
       "recheck": {
-        "round": "2026-11-24 R10 修复轮",
-        "result": "open",
-        "evidence": "下一步可点、页脚 ≥24 已修；剩余「服务入口位置」属改进方向设计，parked 等 sign-off"
+        "round": "2026-11-25 sign-off 落地",
+        "result": "resolved",
+        "evidence": "概览动作行新增「服务」按钮（data-svc-jump，就近定位并聚焦本项目服务行；未配置时 toast 指引 ⋯→服务信息收集）；1440 下 6 个项目均可见，320 点击实测 toast 正常；下一步可点/页脚 ≥24 此前已修"
       }
     },
     {
@@ -360,15 +360,15 @@
       "fact": "「完成/已闭环/关闭/收口」四种写法并存；「完成」既是按钮也是状态；琥珀同时表示状态与动作。",
       "harm": "扫一行时判断不出该点哪个、也判断不出点完是否连带关闭父级。",
       "fix": "状态词统一「已关闭」，按钮统一动词；琥珀只给动作、绿色只给已达成；收口/关闭/已闭环收敛成一个词。",
-      "status": "open",
+      "status": "fixed",
       "evidence": [
         "shots/desktop-list.png",
         "inventory.json"
       ],
       "recheck": {
-        "round": "2026-11-24 R10 修复轮",
-        "result": "open",
-        "evidence": "状态/动作词已分开（已结束/完成、收口→关闭）；剩余琥珀双用（review 状态 vs 主操作按钮）属配色语言，parked 等 sign-off"
+        "round": "2026-11-25 sign-off 落地",
+        "result": "resolved",
+        "evidence": "sign-off：主操作按钮（.tbtn.primary）由琥珀改品牌蓝 #6aa3e8（两处定义同步改），琥珀只保留给待确认/风险状态；320 与 1440 计算色均为 rgb(106,163,232)"
       }
     },
     {
