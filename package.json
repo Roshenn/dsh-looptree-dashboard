@@ -64,6 +64,7 @@
     "migrate:milestone": "node scripts/migrate-milestone.mjs",
     "migrate:supports": "node scripts/migrate-supports.mjs",
     "check": "node scripts/check-install.mjs",
+    "check:chrome": "node scripts/check-window-chrome.mjs",
     "mock:session": "node scripts/dev-session-mock.mjs",
     "mock:action": "node scripts/action-mock.mjs",
     "mock:closure": "node scripts/closure-mock.mjs",

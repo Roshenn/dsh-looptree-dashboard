@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 未发布 — 桌面窗口顶栏让开窗口按钮：红绿灯与宿主控件不再压在品牌上
+
+- **触发**（2026-11-27，用户截图圈出顶栏）：面板顶栏左上角被 macOS 红黄绿按钮压住，标题右侧
+  还叠着两块画在页面之上的灰色小图形（形状是侧栏图标与「+」圆圈）。
+- **定位**：标题左沿量到 `51.5`，正好等于嵌入模式的 `12 + 28 + 11`，而不是独立窗口的
+  `20 + 28 + 11` —— 命中的是「侧栏收起、面板贴着窗口左上角」的主区 iframe，不是独立窗口。
+  标题字形与干净渲染比对 IoU `0.86`、墨量比 `1.10`：**没有双渲染**，那两块灰图是宿主
+  `shell.leading` 座上的「重开侧栏 / 新建会话」控件，画在面板之上。
+- **根因**：面板没实现宿主的窗口 chrome 契约，而且两条放置路径各断一处：
+  - 独立窗口：桌面 preload 用 `markDocumentPlatform()` 把 `process.platform` 写进
+    `<html data-platform>`，面板里这个属性一次都没被读过（`-webkit-app-region` 同样是 0）。
+  - 主区 iframe：窗口 chrome 的带宽挂在**宿主文档** `:root` 的
+    `--dsh-frame-leading-clearance` 上，跨文档不继承，面板永远拿不到，只能沿用 12px 内边距。
+  - 宿主侧事实：macOS hiddenInset 红绿灯占 `x 16..68 / y 18..30`；侧栏收起时 `shell.leading`
+    座挂在框架左上角、覆盖所有主面板。
+- **口径**：只在桌面窗口生效，web 直开保持原样。
+  - 独立窗口：`html[data-platform="darwin"] .topbar` 的 `padding-left` 取
+    `max(var(--dsh-frame-leading-clearance,0px),76px)`（76 = 红绿灯右沿 68 + 8 间隙）；
+    同一条顶栏 `-webkit-app-region:drag`，条内 `button/input/a/select/textarea` 回 `no-drag`；
+    `[data-fullscreen]` 回落到 20px。
+  - 主区 iframe：`adoptHostWindowChrome()` 在**同源**前提下读宿主 `:root` 的
+    `data-platform` 与让位带，并且只在 iframe 贴窗口左上角（`left/top ≤ 2`）时镜像到本文档；
+    读不到（web GUI、跨源、侧栏展开、全屏）就什么都不做。侧栏开合触发 `resize` 重算。
+  - 兜底：插件窗口没挂上 preload 时，`外壳协议 dsh-app: + 非嵌入 + macOS` 才补 `data-platform`。
+- **顺带修掉的两个顶栏缺陷**：
+  - `html[data-embed="1"] .brand-sub{display:none}` 是死选择器（元素是 `id="brand-sub"`），
+    嵌入模式一直没收起版本行、白占约 200px → 改 `#brand-sub`。
+  - 900–1200px 之间没有断点，顶栏文本可折行：935×564 实测副标题折两行把品牌块顶到
+    `60.4px`（条高 56px），h1 顶部 `y=-2.7` 被窗口上沿切掉 → 顶栏关键文本 `white-space:nowrap`
+    + `@media (max-width:1200px){.brand p{display:none}}`。
+- **落点**：`web/index.html`（顶栏 chrome 块、iframe 镜像逻辑、`#brand-sub`、1200px 断点、
+  nowrap 规则）、`scripts/check-window-chrome.mjs`（静态守卫 21 条）、`package.json`
+  （`check:chrome`）、`scripts/preflight.mjs`（接进自检）。
+- **验证**：`npm run check:chrome` 21/21；Playwright 独立窗口 12 条（darwin 下
+  `padding-left=76px`、h1 左沿 115、drag/no-drag、宿主变量 120px 生效、fullscreen 回 20px、
+  935×564 品牌块 28px 且 h1 `top=15.9`、embed 副标题 none）；iframe 路径 6 条（贴角 + 让位带
+  152px → `padding-left=152px`、h1 左沿 191；宿主没发布 / 非 darwin / 面板没贴角三种情况都保持
+  12px）；`npm run preflight` 全绿。
+
 ## 未发布 — `/rotation/api/*` 过 DSH 自己的访问闸门：跨源页面读不到、也调不动
 
 - **触发**（2026-11-25，fksylsy 在 awesome-dsh-plugin 收录 PR 上的评审意见，同一条也适用于本插件）：

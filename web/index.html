@@ -477,7 +477,7 @@
   html[data-embed="1"] .topbar{padding:0 12px;gap:12px}
   html[data-embed="1"] .meta-strip{gap:10px}
   html[data-embed="1"] .toolbar .chip{height:22px;padding:0 7px;font-size:var(--fs-11);flex:0 0 auto}
-  html[data-embed="1"] .brand-sub{display:none}
+  html[data-embed="1"] #brand-sub{display:none}
   /* 嵌入时主区本就窄：这条长说明不参与布局，否则会把工具栏撑成 250px 高（竖排文字） */
   html[data-embed="1"] #toolbar-hint{display:none}
   .detail-row dt{white-space:nowrap}
@@ -932,6 +932,19 @@
   /* ── shell ── */
   body{font:var(--fs-13)/1.55 var(--font);background:var(--base)}
   .topbar{height:56px;flex:0 0 56px;padding:0 20px;gap:20px;border-bottom:1px solid var(--b1);background:var(--base)}
+  /* ── 桌面窗口 chrome：macOS hiddenInset 的红黄绿按钮浮在页面左上角 ──
+     DSH 桌面 preload 给每个窗口写 <html data-platform>（web 直开没有这个属性，
+     所以下面三行只在桌面窗口生效）。按钮占 x 16..68 / y 18..30，内容抵达左上角的
+     面板要自己让开：宿主把让位带宽发布成 --dsh-frame-leading-clearance，取不到时
+     用 76px 兜底（68 + 8 间隙）。同一条顶栏兼作窗口拖拽区，条内控件必须回 no-drag，
+     否则按钮点不动、输入框选不中。 */
+  html[data-platform="darwin"] .topbar{padding-left:max(var(--dsh-frame-leading-clearance,0px),76px);-webkit-app-region:drag}
+  html[data-platform="darwin"] .topbar :is(button,input,a,select,textarea){-webkit-app-region:no-drag}
+  /* 全屏时 macOS 收起红绿灯，让位带跟着撤，否则左上留一条白 */
+  html[data-platform="darwin"][data-fullscreen] .topbar{padding-left:20px}
+  /* 顶栏一行排不下时收缩，不许折行：折行会把固定 56px 的条撑破、h1 被窗口上沿切掉
+     （935×564 实测：副标题折两行 → 品牌块 60.4px > 56px，标题顶部 y=-2.7） */
+  .topbar :is(h1,.brand p,.seg button,.iconbtn,.meta-strip .kpi){white-space:nowrap}
   .brand{gap:11px}
   .mark{width:28px;height:28px;border-radius:var(--radius);background:var(--l2);border:1px solid var(--b1)}
   .mark svg{width:15px;height:15px;stroke:var(--brand-2)}
@@ -1320,6 +1333,9 @@
     html[data-view="focus"] #focus-switch .chip{flex:0 0 auto}
   }
   @media (max-width:1400px){ #data-src{display:none} }
+  /* 900–1200：顶栏先收副标题。这一段原来没有任何断点，副标题在 935px 折成两行、
+     把品牌块顶到 60.4px（条高 56px），h1 被窗口上沿切掉半截 */
+  @media (max-width:1200px){ .brand p{display:none} }
   @media (max-width:1180px){ #save-state{display:none} }
 @media (max-width:900px){
   /* 窄屏（≤900px）sign-off 方案 C：默认项目聚焦视图 + 单列堆叠，矩阵不在窄屏展示 */
@@ -7823,6 +7839,42 @@ $('#svc-stop-all').addEventListener('click', () => stopAllServices());
 let EMBEDDED = false;
 try { EMBEDDED = window.self !== window.top; } catch { EMBEDDED = true; }
 if (EMBEDDED) document.documentElement.dataset.embed = '1';
+
+// ── 桌面窗口 chrome：让开窗口按钮（以及宿主画在左上角的窗口控件）──────────────
+// 宿主有两种把面板放上屏幕的方式，两条路径都要让位：
+//   1) 独立窗口：桌面 preload 在本文档写 <html data-platform>，CSS 规则直接生效；
+//   2) 主区 iframe：侧栏收起时面板贴着窗口左上角，红绿灯与 shell.leading 座上的
+//      「重开侧栏 / 新建会话」两个控件由宿主文档画在面板之上，让位带宽挂在宿主 :root
+//      的 --dsh-frame-leading-clearance 上。同源（宿主代理面板）才读得到；读到就镜像到
+//      本文档，让 CSS 的 max(该变量, 76px) 取到真实值。
+// 读不到（web 直开、跨源页面、侧栏展开）就什么都不做——普通浏览器页面不该凭空让出 76px。
+function adoptHostWindowChrome() {
+  try {
+    if (!EMBEDDED) return;                        // 独立窗口走 preload 标记那条
+    const frame = window.frameElement;
+    if (!frame) return;                           // 跨源时拿不到 frameElement
+    const host = window.parent.document.documentElement;
+    if (host.dataset.platform !== 'darwin') return;
+    const box = frame.getBoundingClientRect();
+    if (box.left > 2 || box.top > 2) return;      // 面板没贴窗口左上角，不需要让位
+    const clearance = getComputedStyle(host).getPropertyValue('--dsh-frame-leading-clearance').trim();
+    if (!clearance) return;                       // 宿主没发布让位带（全屏 / 侧栏展开）
+    document.documentElement.dataset.platform = 'darwin';
+    document.documentElement.style.setProperty('--dsh-frame-leading-clearance', clearance);
+  } catch { /* 跨源或宿主结构变了：跳过，退回默认内边距 */ }
+}
+try { adoptHostWindowChrome(); } catch { /* noop */ }
+// 侧栏收起/展开会改让位带，表现为 iframe 尺寸变化
+try { addEventListener('resize', adoptHostWindowChrome, { passive: true }); } catch { /* noop */ }
+
+// 独立窗口 + preload 没挂上时的兜底：只在外壳协议 + 非嵌入 + macOS 三条同时成立时补标记，
+// 否则 web 直开会被凭空加出 76px 左边距。
+try {
+  if (!EMBEDDED && location.protocol === 'dsh-app:' && !document.documentElement.dataset.platform) {
+    const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+    if (/mac/i.test(plat)) document.documentElement.dataset.platform = 'darwin';
+  }
+} catch { /* noop */ }
 
 // 嵌在主区时留一条回程：composer 的卡片在对话里，上了面板就只剩这条「← 回会话」
 try {

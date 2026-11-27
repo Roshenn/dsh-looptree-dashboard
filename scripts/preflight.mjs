@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 提交前的完整自检（跨平台）：
- * lint → client 契约 → 会话 mock → 动作链路 mock（/plan → /exec → 提炼）→ 候选池 mock
+ * lint → 桌面窗口 chrome 契约 → client 契约 → 会话 mock → 动作链路 mock（/plan → /exec → 提炼）→ 候选池 mock
  * → 面板 stale 会话 / 空闲分支 / 生成按钮 / 候选详情卡 → 样例校验 → 安装文件集
  * 用临时 ROTATION_HOME / MOCK_WS 与随机端口，避免污染真实注册表。
  */
@@ -28,6 +28,8 @@ let ok = true;
 try {
   console.log('── lint:plugin ──');
   await run(npm, ['run', 'lint:plugin']);
+  console.log('── check:chrome ──');
+  await run(npm, ['run', 'check:chrome']);
   console.log('── mock:client ──');
   await run(npm, ['run', 'mock:client']);
   console.log('── mock:session ──');
