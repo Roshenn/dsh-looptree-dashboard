@@ -40,6 +40,10 @@
   - 900–1200px 之间没有断点，顶栏文本可折行：935×564 实测副标题折两行把品牌块顶到
     `60.4px`（条高 56px），h1 顶部 `y=-2.7` 被窗口上沿切掉 → 顶栏关键文本 `white-space:nowrap`
     + `@media (max-width:1200px){.brand p{display:none}}`。
+- **真窗复检**（2026-11-27 09:52，面板窗口重载后由页面探针回传）：
+  `embed=1 proto=dsh-app: anc=dsh-app://app`、`frame=0,0`、`clrFrame=160px`、`clrRoot=-`、
+  `pad=160px`、`iw/ow=2503/2503`——同源路径从 frame 元素上取到了 160px；同时证明变量确实
+  不在 `:root`（第一版读 `:root` 读空，就是当初「刷新了还压着」的原因）。用户确认标题已让开。
 - **落点**：`web/index.html`（顶栏 chrome 块、iframe 镜像逻辑、`#brand-sub`、1200px 断点、
   nowrap 规则）、`scripts/check-window-chrome.mjs`（静态守卫 27 条）、`package.json`
   （`check:chrome`）、`scripts/preflight.mjs`（接进自检）。
