@@ -20,9 +20,19 @@
     `max(var(--dsh-frame-leading-clearance,0px),76px)`（76 = 红绿灯右沿 68 + 8 间隙）；
     同一条顶栏 `-webkit-app-region:drag`，条内 `button/input/a/select/textarea` 回 `no-drag`；
     `[data-fullscreen]` 回落到 20px。
-  - 主区 iframe：`adoptHostWindowChrome()` 在**同源**前提下读宿主 `:root` 的
-    `data-platform` 与让位带，并且只在 iframe 贴窗口左上角（`left/top ≤ 2`）时镜像到本文档；
-    读不到（web GUI、跨源、侧栏展开、全屏）就什么都不做。侧栏开合触发 `resize` 重算。
+  - 主区 iframe：`adoptHostWindowChrome()` 在**同源**前提下读宿主那棵树上的让位带 ——
+    先读 iframe 元素自己的计算值（变量常挂在祖先元素而非 `:root`），再退到 `:root`；
+    只在 iframe 贴窗口左上角（`left/top ≤ 2`）且宿主平台不是 win32 时镜像到本文档。
+    宿主常在首帧之后才发布，按 `0/120/400/1200/3000ms` 重试，并监听 `resize` 与
+    `visibilitychange`；让位带消失（侧栏展开、退出全屏）时撤回。
+  - 同源兜底：桌面窗口里贴角、但宿主这一帧还没发布变量时，同样按 160px 兜底
+    （`web GUI` 没有 `data-platform`，不会命中）。
+  - 跨源兜底：外壳把面板放进另一个 origin 的 iframe 时变量读不到，用宿主 CSS 里的常量
+    `160px`（`[data-platform=darwin] .frame[data-sidebar-collapsed]` 的让位带宽，全屏 84px；
+    `shell.leading` 座两个 28px 控件占 x 88..144），并以「iframe 是否铺满窗口」判断面板是否
+    贴着窗口左上角。web GUI 同源，走不到这条分支。
+  - 踩过的两个坑：首批实现只读 `:root` 且不重试，真窗里不生效（变量其实挂在 frame 元素上、
+    且首帧后才发布）。
   - 兜底：插件窗口没挂上 preload 时，`外壳协议 dsh-app: + 非嵌入 + macOS` 才补 `data-platform`。
 - **顺带修掉的两个顶栏缺陷**：
   - `html[data-embed="1"] .brand-sub{display:none}` 是死选择器（元素是 `id="brand-sub"`），
@@ -31,13 +41,13 @@
     `60.4px`（条高 56px），h1 顶部 `y=-2.7` 被窗口上沿切掉 → 顶栏关键文本 `white-space:nowrap`
     + `@media (max-width:1200px){.brand p{display:none}}`。
 - **落点**：`web/index.html`（顶栏 chrome 块、iframe 镜像逻辑、`#brand-sub`、1200px 断点、
-  nowrap 规则）、`scripts/check-window-chrome.mjs`（静态守卫 21 条）、`package.json`
+  nowrap 规则）、`scripts/check-window-chrome.mjs`（静态守卫 27 条）、`package.json`
   （`check:chrome`）、`scripts/preflight.mjs`（接进自检）。
-- **验证**：`npm run check:chrome` 21/21；Playwright 独立窗口 12 条（darwin 下
+- **验证**：`npm run check:chrome` 27/27；Playwright 独立窗口 12 条（darwin 下
   `padding-left=76px`、h1 左沿 115、drag/no-drag、宿主变量 120px 生效、fullscreen 回 20px、
-  935×564 品牌块 28px 且 h1 `top=15.9`、embed 副标题 none）；iframe 路径 6 条（贴角 + 让位带
-  152px → `padding-left=152px`、h1 左沿 191；宿主没发布 / 非 darwin / 面板没贴角三种情况都保持
-  12px）；`npm run preflight` 全绿。
+  935×564 品牌块 28px 且 h1 `top=15.9`、embed 副标题 none）；iframe 路径 6 条（贴角 + 让位带 152px → `padding-left=152px`、h1 左沿 191；
+  变量挂在祖先元素、500ms 后才发布两种宿主行为也能补上；宿主没发布 / 非 darwin /
+  面板没贴角三种情况都保持 12px）；`npm run preflight` 全绿。
 
 ## 未发布 — `/rotation/api/*` 过 DSH 自己的访问闸门：跨源页面读不到、也调不动
 

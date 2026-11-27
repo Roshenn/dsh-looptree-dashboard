@@ -7844,28 +7844,62 @@ if (EMBEDDED) document.documentElement.dataset.embed = '1';
 // 宿主有两种把面板放上屏幕的方式，两条路径都要让位：
 //   1) 独立窗口：桌面 preload 在本文档写 <html data-platform>，CSS 规则直接生效；
 //   2) 主区 iframe：侧栏收起时面板贴着窗口左上角，红绿灯与 shell.leading 座上的
-//      「重开侧栏 / 新建会话」两个控件由宿主文档画在面板之上，让位带宽挂在宿主 :root
-//      的 --dsh-frame-leading-clearance 上。同源（宿主代理面板）才读得到；读到就镜像到
-//      本文档，让 CSS 的 max(该变量, 76px) 取到真实值。
-// 读不到（web 直开、跨源页面、侧栏展开）就什么都不做——普通浏览器页面不该凭空让出 76px。
+//      「重开侧栏 / 新建会话」两个控件由宿主文档画在面板之上，让位带宽以
+//      --dsh-frame-leading-clearance 发布在宿主那棵树上（挂在 iframe 元素的祖先上，
+//      不一定在 :root），所以先读 iframe 元素自己的计算值，读不到再退到 :root。
+//      同源（宿主代理面板）才读得到；读到就镜像到本文档，让 max(该变量, 76px) 取真实值。
+// 宿主在首帧之后才发布 / 侧栏开合会改它，所以按几个时间点重试 + 监听 resize 与可见性。
+// 读不到（web 直开、跨源页面、侧栏展开）就什么都不做——普通浏览器页面不该凭空让出内边距。
+// 跨源兜底用的常量来自宿主 CSS：`[data-platform=darwin] .frame[data-sidebar-collapsed]`
+// 把 --dsh-frame-leading-clearance 定成 160px（全屏 84px），shell.leading 座上的两个
+// 28px 控件占 x 88..144。跨源读不到全屏状态，按 160 走。
+const SHELL_CLEARANCE_FALLBACK = '160px';
 function adoptHostWindowChrome() {
-  try {
-    if (!EMBEDDED) return;                        // 独立窗口走 preload 标记那条
-    const frame = window.frameElement;
-    if (!frame) return;                           // 跨源时拿不到 frameElement
-    const host = window.parent.document.documentElement;
-    if (host.dataset.platform !== 'darwin') return;
-    const box = frame.getBoundingClientRect();
-    if (box.left > 2 || box.top > 2) return;      // 面板没贴窗口左上角，不需要让位
-    const clearance = getComputedStyle(host).getPropertyValue('--dsh-frame-leading-clearance').trim();
-    if (!clearance) return;                       // 宿主没发布让位带（全屏 / 侧栏展开）
-    document.documentElement.dataset.platform = 'darwin';
-    document.documentElement.style.setProperty('--dsh-frame-leading-clearance', clearance);
-  } catch { /* 跨源或宿主结构变了：跳过，退回默认内边距 */ }
+  if (!EMBEDDED) return;                        // 独立窗口走 preload 标记那条
+  let frame = null;
+  try { frame = window.frameElement; } catch { frame = null; }
+  let clearance = '';
+  let atCorner = false;
+  if (frame) {
+    try {
+      const hostRoot = window.parent.document.documentElement;
+      const hostPlatform = hostRoot.dataset.platform;
+      if (hostPlatform && hostPlatform !== 'darwin') return;
+      const read = (el) => {
+        try { return getComputedStyle(el).getPropertyValue('--dsh-frame-leading-clearance').trim(); }
+        catch { return ''; }
+      };
+      // 宿主把变量挂在 frame 元素上（不是 :root）：先读 iframe 元素自己的计算值
+      clearance = read(frame) || read(hostRoot);
+      const box = frame.getBoundingClientRect();
+      atCorner = box.left <= 2 && box.top <= 2;   // 面板没贴窗口左上角就不用让位
+      // 桌面窗口 + 贴角 + 宿主这次没发布变量（状态切换的中间帧）：按宿主常量兜底。
+      // web GUI 没有 data-platform，走不到这里，普通浏览器不会被加内边距。
+      if (!clearance && atCorner && hostPlatform === 'darwin') clearance = SHELL_CLEARANCE_FALLBACK;
+    } catch { return; }                           // 宿主结构变了：保持默认内边距
+  } else {
+    // 跨源（桌面外壳把面板放进另一个 origin 的 iframe）：宿主变量读不到，退回宿主
+    // 自己 CSS 里的常量；「iframe 铺满窗口」说明侧栏收起、面板正贴着窗口左上角。
+    atCorner = window.outerWidth - window.innerWidth <= 2;
+    if (atCorner) clearance = SHELL_CLEARANCE_FALLBACK;
+  }
+  const root = document.documentElement;
+  if (clearance && atCorner) {
+    root.dataset.platform = 'darwin';
+    root.dataset.chromeAdopted = '1';
+    root.style.setProperty('--dsh-frame-leading-clearance', clearance);
+  } else if (root.dataset.chromeAdopted === '1') {
+    delete root.dataset.platform;
+    delete root.dataset.chromeAdopted;
+    root.style.removeProperty('--dsh-frame-leading-clearance');
+  }
 }
-try { adoptHostWindowChrome(); } catch { /* noop */ }
+for (const ms of [0, 120, 400, 1200, 3000]) {
+  try { setTimeout(adoptHostWindowChrome, ms); } catch { /* noop */ }
+}
 // 侧栏收起/展开会改让位带，表现为 iframe 尺寸变化
 try { addEventListener('resize', adoptHostWindowChrome, { passive: true }); } catch { /* noop */ }
+try { document.addEventListener('visibilitychange', adoptHostWindowChrome); } catch { /* noop */ }
 
 // 独立窗口 + preload 没挂上时的兜底：只在外壳协议 + 非嵌入 + macOS 三条同时成立时补标记，
 // 否则 web 直开会被凭空加出 76px 左边距。

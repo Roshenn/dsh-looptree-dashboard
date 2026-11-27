@@ -75,18 +75,30 @@ check('兜底限定 macOS 且非嵌入窗口',
 
 /* 7. 主区 iframe 那条路（用户 2026-11-27 截图命中的就是这条）：
    侧栏收起时面板贴窗口左上角，红绿灯与 shell.leading 座上的控件由宿主画在面板之上，
-   让位带宽在宿主 :root 上 —— 同源才读得到，必须镜像到本文档，否则 CSS 拿不到值。 */
+   让位带宽以 --dsh-frame-leading-clearance 发布在宿主那棵树上。两处细节踩过坑：
+   变量不一定在 :root（要读 iframe 元素自己的计算值），且宿主常在首帧之后才发布。 */
 check('嵌入主区时镜像宿主窗口 chrome（adoptHostWindowChrome）',
   /function adoptHostWindowChrome\(/.test(html), '缺 iframe 路径的让位逻辑');
-check('镜像只在宿主 darwin 下生效',
-  /host\.dataset\.platform !== 'darwin'/.test(html), '没校验宿主平台');
-check('镜像要求面板贴窗口左上角（不贴就不让位）',
-  /box\.left > 2 \|\| box\.top > 2/.test(html), '没校验 iframe 位置');
-check('镜像把宿主的 --dsh-frame-leading-clearance 写进本文档',
-  /getPropertyValue\('--dsh-frame-leading-clearance'\)/.test(html)
-  && /setProperty\('--dsh-frame-leading-clearance', clearance\)/.test(html), '没回写让位带');
-check('侧栏开合（resize）后重新让位',
+check('先读 iframe 元素上的让位带，再退到宿主 :root',
+  /read\(frame\) \|\| read\(hostRoot\)/.test(html), '没按「iframe 元素 → :root」的顺序读');
+check('宿主平台只认 darwin（win32 的红绿灯在右边）',
+  /hostPlatform && hostPlatform !== 'darwin'/.test(html), '没校验宿主平台');
+check('镜像要求面板贴窗口左上角（贴角才让位）',
+  /box\.left <= 2 && box\.top <= 2/.test(html), '没校验 iframe 位置');
+check('让位带写回本文档变量',
+  /setProperty\('--dsh-frame-leading-clearance', clearance\)/.test(html), '没回写让位带');
+check('首帧后才发布也能补上（多点重试）',
+  /\[0, 120, 400, 1200, 3000\]/.test(html), '缺发布延迟的重试');
+check('侧栏开合（resize）后重算',
   /addEventListener\('resize', adoptHostWindowChrome/.test(html), '缺 resize 重算');
+check('同源但宿主这一帧没发布变量时也兜底（仅 darwin + 贴角）',
+  /if \(!clearance && atCorner && hostPlatform === 'darwin'\) clearance = SHELL_CLEARANCE_FALLBACK/.test(html), '缺同源兜底');
+check('跨源兜底用宿主 CSS 的常量 160px（侧栏收起时的让位带宽）',
+  /SHELL_CLEARANCE_FALLBACK = '160px'/.test(html), '缺跨源兜底常量');
+check('跨源兜底只在面板铺满窗口时生效（侧栏展开不让位）',
+  /window\.outerWidth - window\.innerWidth <= 2/.test(html), '缺跨源贴角判断');
+check('让位带消失时能撤掉（避免侧栏展开后留白）',
+  /chromeAdopted/.test(html) && /removeProperty\('--dsh-frame-leading-clearance'\)/.test(html), '缺撤销逻辑');
 
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} 通过`);
